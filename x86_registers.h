@@ -13,4 +13,8 @@ extern const std::vector<std::tuple<std::string, std::string>> Registers64;
 extern const std::vector<std::tuple<std::string, std::string>> Registers32;
 extern const std::vector<std::tuple<std::string, std::string>> Registers16;
 
+extern const std::vector<std::string> RegisterDisplayOrder64;
+
+extern const std::vector<std::string> RegisterDisplayOrder32;
+
 #endif // X86_REGISTERS_H

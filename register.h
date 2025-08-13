@@ -14,14 +14,16 @@ public:
              std::string description,
              uint64_t value);
 
-    bool update(uint64_t newValue);
-    uint64_t getValue() const;
-    void display() const;
+  bool update(uint64_t newValue);
+  uint64_t getValue() const;
+  uint64_t getPreviousValue() const { return previousValue_; }
+  void display() const;
 
 private:
     std::string name_;
     std::string description_;
     uint64_t value_;
+    uint64_t previousValue_ = 0; 
 };
 
 #endif // REGISTER_H

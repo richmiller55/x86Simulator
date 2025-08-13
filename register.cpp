@@ -12,9 +12,14 @@ Register::Register(std::string shortName,
     value_(value) {}
 
 bool Register::update(uint64_t newValue){
-    value_ = newValue;
-    return true;
+    if (value_ != newValue) {
+        previousValue_ = value_; // Store the current value as previous before updating
+        value_ = newValue;
+        return true; // Value changed
+    }
+    return false;
 }
+
 
 uint64_t Register::getValue() const {
     return value_;

@@ -63,3 +63,21 @@ const std::vector<std::tuple<std::string, std::string>> Registers16 {
   {"es", "Extra Segment Register"},
   {"ip", "Instruction Pointer Register"},
   {"flags", "Flags Register"} };
+
+const std::vector<std::string> RegisterDisplayOrder64 = {
+    "rax", "rbx", "rcx", "rdx",
+    "rsi", "rdi", "rbp", "rsp",
+    "r8", "r9", "r10", "r11",
+    "r12", "r13", "r14", "r15",
+    "rip", // Instruction pointer usually shown last
+    "cs", "ds", "es", "fs", "gs", "ss", // Segment registers
+    "rflags" 
+};
+
+// Define the custom display order for 32-bit registers
+const std::vector<std::string> RegisterDisplayOrder32 = {
+    "eax", "ebx", "ecx", "edx",
+    "esi", "edi", "ebp", "esp",
+    "eip",
+    "eflags"
+};
