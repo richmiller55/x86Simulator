@@ -1,0 +1,3 @@
+  PUSH  RCX
+  POP   RAX
+  RET

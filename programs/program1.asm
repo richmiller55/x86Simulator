@@ -1,0 +1,3 @@
+ MOV  EAX, 10
+  ADD  EBX, EAX
+  JMP  LABEL1
