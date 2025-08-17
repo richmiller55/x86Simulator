@@ -46,6 +46,13 @@ uint64_t Memory::read_text(address_t address) const {
   }
   return main_memory[address];
 }
+void Memory::write_text(address_t address, uint64_t value) {
+  // Enforce the same bounds checking as read_text
+  if (address < text_segment_start || address >= data_segment_start) {
+    throw std::out_of_range("Text segment write out of bounds!");
+  }
+  main_memory[address] = value;
+}
 
 void Memory::write_data(address_t address, uint64_t value) {
   if (address < data_segment_start || address >= bss_segment_start) {

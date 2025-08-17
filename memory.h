@@ -30,6 +30,7 @@ public:
   uint64_t pop();
 
   uint64_t read_text(address_t address) const;
+  void write_text(address_t address, uint64_t value);
 
   void write_data(address_t address, uint64_t value);
   uint64_t read_data(address_t address) const;
