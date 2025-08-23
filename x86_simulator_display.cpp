@@ -1,58 +1,65 @@
 #include "x86_simulator.h"
+#include <ncurses.h>
 
   void X86Simulator::displayRegistersWithDiff() {
     displayRegistersControlled();
   }
       
-  void X86Simulator::displayRegistersControlled() {
-    // Clear screen
-    std::cout << "\033[2J\033[H"; // Clears screen and moves cursor to top-left
+void X86Simulator::displayRegistersControlled() {
+  initscr(); // Initialize the screen
+  cbreak();  // Line buffering disabled, pass keypresses immediately
+  noecho();  // Don't echo input characters
 
-    // Display 32-bit registers
-    int row = 2;
-    int col = 1;
-    std::cout << "\033[" << row++ << ";" << col << "H" << "--- 32-bit Registers ---";
-    for (const std::string& regName : RegisterDisplayOrder32) {
-      if (auto it = regs32_.find(regName); it != regs32_.end()) {
-	const Register& r = it->second;
-	std::cout << "\033[" << row++ << ";" << col << "H"; // Move cursor for this line
+  // Create a window for 32-bit registers
+  WINDOW *win32 = newwin(15, 35, 1, 1); // 15 rows, 35 cols, start at (1,1)
+  // box(win32, 0, 0); // Draw a border around the window
+  mvwprintw(win32, 1, 2, "--- 32-bit Registers ---"); // Print in window
 
-	// Build the string first, then apply color if needed
-	std::stringstream ss;
-	ss << std::left << std::setw(4) << regName << ": 0x" << std::hex << std::setw(8) << std::setfill('0') << r.getValue();
-	std::string formattedString = ss.str();
+  int row = 2;
+  for (const std::string& regName : RegisterDisplayOrder32) {
+    // ... get register value and previous value ...
+    if (auto it = regs32_.find(regName); it != regs32_.end()) {
+      const Register& r = it->second;
 
-	if (r.getValue() != r.getPreviousValue()) {
-	  std::cout << "\033[93m" << formattedString << "\033[0m";
-	} else {
-	  std::cout << formattedString;
-	}
+      std::stringstream ss;
+      ss << std::left << std::setw(4) << regName << ": 0x" <<
+	std::hex << std::setw(8) << std::setfill('0') << r.getValue();
+      std::string formattedString = ss.str();
+
+      if (r.getValue() != r.getPreviousValue()) {
+	wattron(win32, COLOR_PAIR(1)); // Turn on color (e.g., yellow)
+	mvwprintw(win32, row++, 2, "%s", formattedString.c_str());
+	wattroff(win32, COLOR_PAIR(1)); // Turn off color
+      } else {
+	mvwprintw(win32, row++, 2, "%s", formattedString.c_str());
       }
     }
-
-    // Display 64-bit registers
+    wrefresh(win32); // Refresh the window
+  }
+    // Create a window for 64-bit registers
+    WINDOW *win64 = newwin(32, 35, 1, 40); // 32 rows, 35 cols, start at (1,40)
     row = 2;
-    col = 40;
-    std::cout << "\033[" << row++ << ";" << col << "H" << "--- 64-bit Registers ---";
+    // box(win64, 0, 0);
+    mvwprintw(win64, 1, 2, "--- 64-bit Registers ---");
 
     for (const std::string& regName : RegisterDisplayOrder64) {
+ 
       if (auto it = regs64_.find(regName); it != regs64_.end()) {
 	const Register& r = it->second;
-	std::cout << "\033[" << row++ << ";" << col << "H"; // Move cursor for this line
-
 	std::stringstream ss;
-	ss << std::left << std::setw(4) << regName << ": 0x" << std::hex << std::setw(16) << std::setfill('0') << r.getValue();
-	std::string formattedString = ss.str();
+        ss << std::left << std::setw(4) << regName << ": 0x" << std::hex
+	   << std::setw(8) << std::setfill('0') << r.getValue();
+        std::string formattedString = ss.str();
 
-	if (r.getValue() != r.getPreviousValue()) {
-	  std::cout << "\033[93m" << formattedString << "\033[0m";
-	} else {
-	  std::cout << formattedString;
-	}
+        if (r.getValue() != r.getPreviousValue()) {
+	  wattron(win64, COLOR_PAIR(1)); // Turn on color (e.g., yellow)
+	  mvwprintw(win64, row++, 2, "%s", formattedString.c_str());
+	  wattroff(win64, COLOR_PAIR(1)); // Turn off color
+        } else {
+	  mvwprintw(win64, row++, 2, "%s", formattedString.c_str());
+        }
       }
     }
-    std::cout << "\033[25;1H"; // Move cursor to a safe spot
-    std::cout << std::dec; // Reset to decimal for other output
-    std::flush(std::cout); // Ensure output is written immediately
-  }
+      wrefresh(win64);
 
+}

@@ -42,6 +42,20 @@ std::vector<std::string> parseArguments(const std::string& argument_str);
 uint64_t hash_instruction(const std::string& instruction_mnemonic);
 ParsedOperand parse_operand(const std::string& operand_str);
 std::string trim(const std::string& str); // If trim is a standalone helper function
+const uint64_t RFLAGS_CF_BIT = 0;   // Carry Flag
+const uint64_t RFLAGS_PF_BIT = 2;   // Parity Flag
+const uint64_t RFLAGS_AF_BIT = 4;   // Auxiliary Carry Flag
+const uint64_t RFLAGS_ZF_BIT = 6;   // Zero Flag
+const uint64_t RFLAGS_SF_BIT = 7;   // Sign Flag
+const uint64_t RFLAGS_TF_BIT = 8;   // Trap Flag (for single-stepping)
+const uint64_t RFLAGS_IF_BIT = 9;   // Interrupt Enable Flag
+const uint64_t RFLAGS_DF_BIT = 10;  // Direction Flag
+const uint64_t RFLAGS_OF_BIT = 11;  // Overflow Flag
+
+// Reserved bits (always set or unset)
+const uint64_t RFLAGS_ALWAYS_SET_BIT_1 = 1; // Reserved, always set to 1
+const uint64_t RFLAGS_ALWAYS_UNSET_BIT_3 = 3; // Reserved, always unset
+const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
 
 class X86Simulator {
 public:
@@ -56,17 +70,28 @@ public:
   void displayRegistersWithDiff();
   void displayRegistersControlled();
   std::string trim(const std::string& str) ;
+  bool get_CF() const;
+  void set_CF(bool value);
+  bool get_ZF() const;
+  void set_ZF(bool value);
+  bool get_SF() const;
+  void set_SF(bool value);
+
 private:
   RegisterMap regs32_;
   RegisterMap regs64_;
   Memory memory_;
   size_t instructionPointer_ = 0;
   std::vector<std::vector<std::string>> programInstructions_; // Store parsed program
-
+  uint64_t rflags_;
 
   void handleMov(const std::string& dest, const std::string& src);
   void handleAdd(const std::string& dest, const std::string& src);
   void handleJmp(const std::string& targetLabel);
+  void handleJne(const std::string& targetLabel);
+  void handleInc(const std::string& targetLabel);
+  void handleCmp(const std::string& targetLabel);
+
   
 };
 

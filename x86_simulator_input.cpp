@@ -34,6 +34,9 @@ uint64_t hash_instruction(const std::string& instruction_str) {
     if (instruction_str == "OR") return 6;
     if (instruction_str == "XOR") return 7;
     if (instruction_str == "AND") return 8;
+    if (instruction_str == "CMP") return 9;
+    if (instruction_str == "JNE") return 10;
+    if (instruction_str == "INC") return 11;
     // Add more instructions
     return 0; // Unknown instruction
 
@@ -134,18 +137,21 @@ bool X86Simulator::ReadProgram(const std::string& filename) {
         if (line.empty() || line[0] == ';') { // Skip empty lines and comments
             continue;
         }
-
-        std::vector<std::string> parsedLine = parseLine(line); // e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
+        std::vector<std::string> parsedLine = parseLine(line);
+	// e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
 
         if (parsedLine.empty()) {
-            std::cerr << "Warning: Skipping malformed line (no instruction): " << line << std::endl;
+            std::cerr << "Warning: Skipping malformed (no instruction): " <<
+	      line << std::endl;
             continue;
         }
 
         std::string instruction_mnemonic = parsedLine[0];
-        std::string arguments_str = (parsedLine.size() > 1) ? parsedLine[1] : ""; // Get the argument string
+        std::string arguments_str = (parsedLine.size() > 1)
+	  ? parsedLine[1] : ""; // Get the argument string
 
-        std::cout << "  Instruction: " << instruction_mnemonic << ", Arguments: " << arguments_str << std::endl;
+        std::cout << "  Instruction: " << instruction_mnemonic <<
+	  ", Arguments: " << arguments_str << std::endl;
 
         // 1. Encode the instruction ID
         uint64_t instruction_id = hash_instruction(instruction_mnemonic);
@@ -159,10 +165,13 @@ bool X86Simulator::ReadProgram(const std::string& filename) {
 
         // 2. Parse and encode arguments
         if (!arguments_str.empty()) {
-            std::vector<std::string> raw_arguments = parseArguments(arguments_str); // Splits "EAX, 0x10" -> ["EAX", "0x10"]
+            std::vector<std::string> raw_arguments =
+	      parseArguments(arguments_str);
+	    // Splits "EAX, 0x10" -> ["EAX", "0x10"]
 
             for (const std::string& raw_arg : raw_arguments) {
-                ParsedOperand operand = parse_operand(trim(raw_arg)); // Parse each individual argument
+                ParsedOperand operand = parse_operand(trim(raw_arg));
+		// Parse each individual argument
 
                 // Now, encode the parsed operand. This is where the representation in memory matters.
                 // For a simple simulator, you might dedicate multiple words for complex operands,

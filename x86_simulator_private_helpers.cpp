@@ -1,6 +1,5 @@
 #include "x86_simulator.h"
 
-
   // Helper functions for individual instructions
   void X86Simulator::handleMov(const std::string& dest, const std::string& src) {
     uint64_t sourceValue = 0;
@@ -76,6 +75,9 @@
     // Increment instruction pointer
   }
 
+void X86Simulator::handleJne(const std::string& targetLabel) { }
+void X86Simulator::handleInc(const std::string& targetLabel) { }
+void X86Simulator::handleCmp(const std::string& targetLabel) { }
 
   void X86Simulator::handleJmp(const std::string& targetLabel) {
     // This is significantly more complex. You need to:

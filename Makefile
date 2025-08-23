@@ -1,11 +1,12 @@
 CXX = g++
-CXXFLAGS = -g -Wall -std=c++17 -I.  # -I. tells the compiler to look for headers current directory
+CXXFLAGS = -g -Wall -std=c++17 -I. 
 
 SRCS_1 = x86_registers.cpp register.cpp register_map.cpp string_utils.cpp
 SRCS_2 = parser_utils.cpp memory.cpp register_enums.cpp main.cpp
 SRCS_3 = x86_simulator_display.cpp x86_simulator_input.cpp x86_simulator_private_helpers.cpp
-SRCS_4 = x86_simulator_state.cpp x86_simulator_core.cpp
-SRCS = $(SRCS_1) $(SRCS_2) $(SRCS_3) $(SRCS_4) # Corrected line to combine the lists
+SRCS_4 = x86_simulator_state.cpp x86_simulator_core.cpp  -lncursesw
+SRCS_5 = register_rflags.cpp
+SRCS = $(SRCS_1) $(SRCS_2) $(SRCS_3) $(SRCS_4) $(SRCS_5) # Corrected line to combine the lists
 OBJS = $(SRCS:.cpp=.o)
 TARGET = x86simulator
 
