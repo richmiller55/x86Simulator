@@ -41,6 +41,7 @@ bool X86Simulator::executeInstruction(const std::string& instruction,
     std::cerr << "Error: unsupported instruction: " << instruction << std::endl;
     return false;
   }
+  return false;
 }
 
 void X86Simulator::runNextInstruction() {

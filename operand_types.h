@@ -1,7 +1,8 @@
 // In a header file, e.g., OperandTypes.h
 enum class OperandType {
-    IMMEDIATE,
+  IMMEDIATE,
     REGISTER,
     MEMORY,
+    LABEL,
     UNKNOWN_OPERAND_TYPE
-};
+    };

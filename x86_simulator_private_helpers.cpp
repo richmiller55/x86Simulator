@@ -79,28 +79,24 @@ void X86Simulator::handleJne(const std::string& targetLabel) { }
 void X86Simulator::handleInc(const std::string& targetLabel) { }
 void X86Simulator::handleCmp(const std::string& targetLabel) { }
 
-  void X86Simulator::handleJmp(const std::string& targetLabel) {
-    // This is significantly more complex. You need to:
-    // 1. Store labels and their corresponding line numbers during program loading.
-    // 2. Look up the 'targetLabel' in your stored label map.
-    // 3. Set the 'instructionPointer_' to the line number of the target label.
-    std::cerr << "JMP instruction not yet fully implemented for labels." << std::endl;
-    // For now, let's just assume it's an absolute line number for simplicity (not realistic for asm)
-    // try {
-    //     size_t lineNumber = std::stoul(targetLabel);
-    //     if (lineNumber < programInstructions_.size()) {
-    //         instructionPointer_ = lineNumber;
-    //     } else {
-    //         std::cerr << "Error: JMP target out of bounds: " << targetLabel << std::endl;
-    //     }
-    // } catch(...) {
-    //      std::cerr << "Error: JMP target must be a label or address." << std::endl;
-    // }
+void X86Simulator::handleJmp(const std::string& targetLabel) {
+    // Look up the label explicitly using find() to avoid unintended insertion.
+    auto it = symbolTable_.find(targetLabel);
 
-    // No instructionPointer_ increment here, as JMP sets the new IP.
-  }
+    // Check if the label was found.
+    if (it != symbolTable_.end()) {
+        address_t lineNumber = it->second;
+        // Optional: Add a check for a valid address if necessary.
+        // For example, if 0 is an invalid address.
+        if (lineNumber == 0) {
+            std::cerr << "Error: JMP target label '" << targetLabel << "' resolves to an invalid address." << std::endl;
+        } else {
+            instructionPointer_ = lineNumber;
+        }
+    } else {
+        // The label was not found in the symbol table.
+        std::cerr << "Error: JMP target must be a valid label or address. Label '" << targetLabel << "' not found." << std::endl;
+    }
+}
 
-  // You'll need an Instruction Pointer (e.g., store the current instruction line number)
-//  size_t instructionPointer_ = 0;
-//  std::vector<std::vector<std::string>> programInstructions_; // Store parsed program
 

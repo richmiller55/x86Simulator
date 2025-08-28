@@ -70,3 +70,10 @@ std::vector<std::string> parseArguments(const std::string& argString) {
     }
     return args;
 }
+bool parse_label(const std::string& operand_str) {
+  if (operand_str.size() >= 2  && operand_str.back() == ':') {
+    return true;
+  }
+    else return false;
+  }
+
