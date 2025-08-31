@@ -18,7 +18,7 @@ DatabaseManager::~DatabaseManager() {
     }
 }
 
-void DatabaseManager::logEvent(const std::string& event_type, const std::string& payload) {
+void DatabaseManager::logEvent(int session_id, const std::string& event_type, const std::string& payload) {
     try {
         pqxx::work txn(m_conn);
         txn.exec_params("INSERT INTO events (event_type, payload) VALUES ($1, $2)", event_type, payload);
@@ -27,4 +27,39 @@ void DatabaseManager::logEvent(const std::string& event_type, const std::string&
         std::cerr << "SQL error: " << e.what() << std::endl;
         std::cerr << "Query: " << e.query() << std::endl;
     }
+};
+
+void DatabaseManager::log(int session_id,
+			  const std::string& message, 
+			  const std::string& level,
+			  uint64_t instruction_pointer,
+			  const std::string& source_file,
+			  int source_line) {
+        
+        try {
+            pqxx::work w(m_conn);
+            w.exec_params(
+                "INSERT INTO log_entries (session_id, timestamp, instruction_pointer, level, message, source_file, source_line) "
+                "VALUES ($1, NOW(), $2, $3, $4, $5, $6);",
+                session_id, instruction_pointer, level, message, source_file, source_line
+            );
+            w.commit();
+        } catch (const std::exception& e) {
+            std::cerr << "Database logging failed: " << e.what() << std::endl;
+        }
+}
+
+int DatabaseManager::createSession(const std::string& program_name) {
+pqxx::work w(m_conn);
+pqxx::result r = w.exec_params(
+    "INSERT INTO simulation_session (start_time, program_name) "
+    "VALUES (NOW(), $1) "
+    "RETURNING session_id;",
+    program_name
+);
+w.commit();
+
+// Check the result to get the session_id
+ int session_id = r[0][0].as<int>();
+ return session_id;
 }

@@ -63,6 +63,7 @@ public:
     // Constructor, other public methods
     X86Simulator(DatabaseManager& dbManager);
   
+  void init(const std::string& program_name);
   bool executeInstruction(const std::string& instruction, const std::string& args);
   void runNextInstruction();
 
@@ -81,8 +82,15 @@ public:
   void set_ZF(bool value);
   bool get_SF() const;
   void set_SF(bool value);
-
+  int get_session_id() const;
+  void set_session_id(int session_id);
+  uint64_t getRegister(const std::string& register_name);
+  void log(int session_id, const std::string& message, const std::string& level,
+	   uint64_t instruction_pointer, const std::string& source_file,
+	   int source_line);
+  
 private:
+  DatabaseManager& dbManager_;
   RegisterMap regs32_;
   RegisterMap regs64_;
   Memory memory_;
@@ -91,7 +99,8 @@ private:
   std::vector<std::string> programLines_; // raw
   std::map<std::string, address_t> symbolTable_;
   uint64_t rflags_;
-  DatabaseManager& dbManager_;
+
+  int session_id_;
   void handleMov(const std::string& dest, const std::string& src);
   void handleAdd(const std::string& dest, const std::string& src);
   void handleJmp(const std::string& targetLabel);
