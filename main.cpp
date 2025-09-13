@@ -3,7 +3,7 @@
 #include <cstdlib>
 
 int main() {
-  DatabaseManager dbManager("dbname=simulators user=rich password=cljy57zeGJV39M8rxKGE host=steelwork port=5432");
+  DatabaseManager dbManager("dbname=simulators user=rich host=steelwork port=5432");
 
   int session_id = dbManager.createSession("testPrg");
 
