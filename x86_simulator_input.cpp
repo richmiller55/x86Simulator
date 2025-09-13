@@ -1,9 +1,12 @@
 #include "x86_simulator.h"
-
+#include "decoder.h" // For DecodedOperand and helper types if any
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
 #include <algorithm> // For std::remove_if, std::isspace
+
+#include <stdexcept>
+#include <string>
 
 namespace fs = std::filesystem;
 
@@ -21,228 +24,245 @@ std::vector<std::string> readLinesFromFile(const std::string& filePath) {
     }
     file.close();
   } else {
-    std::cerr << "Error: Unable to open file: " << filePath << std::endl;
+    //    log(0, "Unable to open file: ", "ERROR", 0, __FILE__, __LINE__); 
   }
   return lines;
 }
-uint64_t hash_instruction(const std::string& instruction_str) {
-  if (instruction_str == "MOV") return 1;
-  if (instruction_str == "ADD") return 2;
-  if (instruction_str == "JMP") return 3;
-  if (instruction_str == "POP") return 4;
-  if (instruction_str == "PUSH") return 5;
-  if (instruction_str == "OR") return 6;
-  if (instruction_str == "XOR") return 7;
-  if (instruction_str == "AND") return 8;
-  if (instruction_str == "CMP") return 9;
-  if (instruction_str == "JNE") return 10;
-  if (instruction_str == "INC") return 11;
-  // Add more instructions
-  return 0; // Unknown instruction
 
-}
 
-ParsedOperand X86Simulator::parse_operand(const std::string& operand_str) {
-  ParsedOperand result;
-  result.type = OperandType::UNKNOWN_OPERAND_TYPE;
-  result.value = 0;
-  result.reg = RegisterEnum::UNKNOWN_REG;
 
-    if (!operand_str.empty() && operand_str.back() == ':') {
-      std::string label_text = operand_str.substr(0, operand_str.size() - 1);
-      auto it = symbolTable_.find(label_text);
-      if (it != symbolTable_.end()) {
-        // 3. The label was found, so retrieve the address
-	result.value = it->second;   // address_pointer
-	result.type = OperandType::LABEL;
-	return result;
-      }
-      // invalid label blow up
+// Assuming your OperandType enum or similar is defined elsewhere
+// For example:
+// enum class OperandType {
+//     REGISTER, IMMEDIATE, MEMORY, LABEL, UNKNOWN
+// };
 
+DecodedOperand X86Simulator::parse_operand(const std::string& operand_str) {
+    DecodedOperand result;
+    std::string trimmed_str = trim(operand_str);
+
+    // 1. Check for Label
+    if (!trimmed_str.empty() && trimmed_str.back() == ':') {
+        std::string label_text = trimmed_str.substr(0, trimmed_str.size() - 1);
+        auto it = symbolTable_.find(label_text);
+        if (it != symbolTable_.end()) {
+            result.text = label_text;
+            result.value = it->second;
+            result.type = OperandType::LABEL;
+            return result;
+        }
+        // If the label is not in the symbol table, it's an error.
+        throw std::out_of_range("Invalid label reference: " + label_text);
     }
 
-  RegisterEnum found_reg = stringToRegister(operand_str);
-  if (found_reg != RegisterEnum::UNKNOWN_REG) {
-    result.type = OperandType::REGISTER;
-    result.reg = found_reg;
-    return result;
-  }
-
-
-  // 3. Check for Memory Operand (e.g., "[0x100]", "[EAX+4]", "[EBX+ESI*4]")
-  // This is the most complex part and will require more sophisticated parsing.
-  // A simplified approach for common patterns:
-  if (operand_str.size() >= 2 && operand_str.front() == '[' && operand_str.back() == ']') {
-    std::string inner_str = operand_str.substr(1, operand_str.size() - 2);
-
-    // Simple direct address (e.g., "[0x100]")
+    // 2. Check for Register
     try {
-      result.value = std::stoull(inner_str, nullptr, 0);
-      result.type = OperandType::MEMORY;
-      return result;
-    } catch (const std::exception& e) {
-      // Not a direct address, must be a more complex addressing mode
+        // Try getting a 64-bit register
+        register_map_.get64(trimmed_str);
+        result.text = trimmed_str;
+        result.type = OperandType::REGISTER;
+        return result;
+    } catch (const std::out_of_range&) {
+        // Not a 64-bit register, try 32-bit
+        try {
+            register_map_.get32(trimmed_str);
+            result.text = trimmed_str;
+            result.type = OperandType::REGISTER;
+            return result;
+        } catch (const std::out_of_range&) {
+            // Not a register, continue checking other types
+        }
     }
-    // labels:
 
+    // 3. Check for Immediate Value (Hex or Decimal)
+    try {
+        // std::stoull handles decimal, hex (0x), and octal (0)
+        result.value = std::stoull(trimmed_str, nullptr, 0);
+        result.text = trimmed_str;
+        result.type = OperandType::IMMEDIATE;
+        return result;
+    } catch (const std::exception&) {
+        // Not an immediate value, continue checking
+    }
+    
+    // 4. Check for Memory Operand (More complex parsing needed here)
+    if (trimmed_str.size() >= 2 && trimmed_str.front() == '[' && trimmed_str.back() == ']') {
+        // Add your logic for parsing memory operands here.
+        // This is complex and might involve regex or more advanced parsing.
+        // For now, let's treat it as a memory operand and set the text.
+        result.text = trimmed_str;
+        result.type = OperandType::MEMORY;
+        return result;
+    }
 
-  try {
-    result.value = std::stoull(operand_str, nullptr, 0);
-    // Handles decimal, hex (0x prefix), octal (0 prefix)
-    result.type = OperandType::IMMEDIATE;
+    // If none of the above, it's an unrecognized operand
+    std::string output = "Unrecognized operand format: ";
+    output += trimmed_str;
+    log(session_id_, output, "WARNING", 0, __FILE__, __LINE__);
+    result.type = OperandType::UNKNOWN_OPERAND_TYPE;
     return result;
-  } catch (const std::exception& e) {
-    // If it's not a simple integer, it might be a memory address or invalid.
-    // We'll proceed to check for memory addresses.
-  }
-
-    // More complex patterns require more parsing logic
-    // This is where regular expressions or manual string splitting will be essential.
-    // For instance, parsing "EBX+ESI*4+0x10" would involve:
-    // 1. Finding "EBX" -> base register
-    // 2. Finding "ESI" -> index register
-    // 3. Finding "*4" -> scale factor
-    // 4. Finding "0x10" -> displacement
-
-    std::cerr << "Warning: Could not parse complex memory operand: " << operand_str << std::endl;
-    result.type = OperandType::UNKNOWN_OPERAND_TYPE; // Failed to parse
-    return result;
-  }
-
-  // If none of the above, it's an unrecognized operand format
-  std::cerr << "Warning: Unrecognized operand format: " << operand_str << std::endl;
-  return result;
 }
 
 bool X86Simulator::loadProgram(const std::string& filename) {
-    programLines_ = readLinesFromFile(filename);
-    return !programLines_.empty(); // Or a more robust check for successful read.
+  programLines_ = readLinesFromFile(filename);
+  return !programLines_.empty(); // Or a more robust check for successful read.
 }
 
 bool X86Simulator::firstPass() {
-    address_t location_counter = 0;
-    for (const std::string& line_raw : programLines_) {
-        std::string line = trim(line_raw); // Clean up whitespace
+  address_t location_counter = 0;
+  for (const std::string& line_raw : programLines_) {
+    std::string line = trim(line_raw); // Clean up whitespace
 
-        if (line.empty() || line[0] == ';') { // Skip empty lines and comments
-            continue;
-        }
-        std::vector<std::string> parsedLine = parseLine(line);
-	// e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
-
-        if (parsedLine.empty()) {
-            std::cerr << "Warning: Skipping malformed (no instruction): " <<
-	      line << std::endl;
-            continue;
-        }
-
-        std::string instruction_mnemonic = parsedLine[0];
-        std::string arguments_str = (parsedLine.size() > 1) ? parsedLine[1] : ""; // Get the argument string
-
-	if (!instruction_mnemonic.empty() && instruction_mnemonic.back() == ':') {
-	  std::string label_text = instruction_mnemonic.substr(0, instruction_mnemonic.size() - 1);
-	  symbolTable_.emplace( label_text, location_counter++);
-	}
-	else  {
-	  symbolTable_.emplace( instruction_mnemonic, location_counter++);
-	}
+    if (line.empty() || line[0] == ';') { // Skip empty lines and comments
+      continue;
     }
-    return true;
+    std::vector<std::string> parsedLine = parseLine(line);
+    // e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
+
+    if (parsedLine.empty()) {
+      std::string output = "Skipping malformed (no instruction): ";
+      output += line;
+      log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
+      continue;
+    }
+
+    std::string instruction_mnemonic = parsedLine[0];
+    std::string arguments_str = (parsedLine.size() > 1) ? parsedLine[1] : ""; // Get the argument string
+
+    if (!instruction_mnemonic.empty() && instruction_mnemonic.back() == ':') {
+      std::string label_text = instruction_mnemonic.substr(0, instruction_mnemonic.size() - 1);
+      symbolTable_.emplace( label_text, location_counter++);
+    }
+    else  {
+      symbolTable_.emplace( instruction_mnemonic, location_counter++);
+    }
+  }
+  return true;
 }
 
 bool X86Simulator::secondPass() {
 
-    address_t current_text_address = memory_.text_segment_start;
+  address_t current_text_address = memory_.text_segment_start;
 
-    for (const std::string& line_raw : programLines_) {
-        std::string line = trim(line_raw); // Clean up whitespace
+  for (const std::string& line_raw : programLines_) {
+    std::string line = trim(line_raw); // Clean up whitespace
 
-        if (line.empty() || line[0] == ';') { // Skip empty lines and comments
-            continue;
-        }
-        std::vector<std::string> parsedLine = parseLine(line);
-	// e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
+    if (line.empty() || line[0] == ';') { // Skip empty lines and comments
+      continue;
+    }
+    std::vector<std::string> parsedLine = parseLine(line);
+    // e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
 
-        if (parsedLine.empty()) {
-            std::cerr << "Warning: Skipping malformed (no instruction): " <<
-	      line << std::endl;
-            continue;
-        }
-
-        std::string instruction_mnemonic = parsedLine[0];
-        std::string arguments_str = (parsedLine.size() > 1)
-	  ? parsedLine[1] : ""; // Get the argument string
-
-             // 1. Encode the instruction ID
-        uint64_t instruction_id = hash_instruction(instruction_mnemonic);
-        try {
-            memory_.write_text(current_text_address, instruction_id);
-            current_text_address++;
-        } catch (const std::runtime_error& e) {
-            std::cerr << "Memory error encoding instruction ID: " << e.what() << " at address " << current_text_address << std::endl;
-            return false;
-        }
-
-        // 2. Parse and encode arguments
-        if (!arguments_str.empty()) {
-            std::vector<std::string> raw_arguments =
-	      parseArguments(arguments_str);
-	    // Splits "EAX, 0x10" -> ["EAX", "0x10"]
-
-            for (const std::string& raw_arg : raw_arguments) {
-                ParsedOperand operand = parse_operand(trim(raw_arg));
-		// Parse each individual argument
-
-                uint64_t encoded_operand_value = 0; // The value to write to memory
-
-                switch (operand.type) {
-                    case OperandType::IMMEDIATE:
-                        encoded_operand_value = operand.value;
-
-                        break;
-                    case OperandType::REGISTER:
-                        // Store the enum value for the register.
-                        // When executing, the simulator will know to look up this ID in its register file.
-                        encoded_operand_value = static_cast<uint64_t>(operand.reg);
-
-                        break;
-                    case OperandType::MEMORY:
-                        // For a simple memory address, store the address.
-                        // For complex modes (like [EAX+4]), you'd need to encode base, index, scale, displacement.
-                        // For now, let's assume `value` holds a direct address like [0x100] or the base register ID.
-                        encoded_operand_value = operand.value; // Or `static_cast<uint64_t>(operand.reg)` if it was `[EAX]`
-                        break;
-		case OperandType::LABEL:
-
-		  break;
-		  
-                    case OperandType::UNKNOWN_OPERAND_TYPE:
-                    default:
-                        std::cerr << "Error: Unrecognized operand type for: " << raw_arg << std::endl;
-                        return false;
-                }
-
-                // Write the encoded operand value to the text segment
-                try {
-                    memory_.write_text(current_text_address, encoded_operand_value);
-                    current_text_address++;
-                } catch (const std::runtime_error& e) {
-                    std::cerr << "Memory error encoding operand: " << e.what() << " at address " << current_text_address << std::endl;
-                    return false;
-                }
-            }
-        }
+    if (parsedLine.empty()) {
+      std::string output = "Skipping malformed (no instruction): ";
+      output += line;
+      log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
+      continue;
     }
 
-    return true;
+    std::string instruction_mnemonic = parsedLine[0];
+    std::string arguments_str = (parsedLine.size() > 1)
+      ? parsedLine[1] : ""; // Get the argument string
+
+    // 1. Encode the instruction ID
+    Decoder& decoder = Decoder::getInstance();
+    uint64_t instruction_id = decoder.getOpcode(instruction_mnemonic);
+    try {
+      memory_.write_text(current_text_address, instruction_id);
+      current_text_address++;
+    } catch (const std::runtime_error& e) {
+      std::string output = "Memory error encoding instruction ID: ";
+      output += e.what();
+      output += " at address ";
+      std::string result = std::to_string(current_text_address);
+      output += result;
+      log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
+      return false;
+    }
+
+    // 2. Parse and encode arguments
+    if (!arguments_str.empty()) {
+      std::vector<std::string> raw_arguments =
+	parseArguments(arguments_str);
+      // Splits "EAX, 0x10" -> ["EAX", "0x10"]
+
+      for (const std::string& raw_arg : raw_arguments) {
+	DecodedOperand operand = parse_operand(trim(raw_arg));
+	// Parse each individual argument
+
+	uint64_t encoded_operand_value = 0; 
+	// uint64_t type_encoded = static_cast<uint64_t>(operand.type) << 60;
+
+	auto it = symbolTable_.find(operand.text);
+	switch (operand.type) {
+	case OperandType::IMMEDIATE:
+	  encoded_operand_value = operand.value;
+	  break;
+	case OperandType::REGISTER:
+	  encoded_operand_value = operand.value;
+	  // to do see if we need to encode the text to it's value
+	  break;
+	case OperandType::MEMORY:
+	  encoded_operand_value = operand.value;
+	  // Or `static_cast<uint64_t>(operand.reg)` if it was `[EAX]`
+	  break;
+	case OperandType::LABEL:
+	  // Look up the label's address from the symbol table
+
+	  // Assuming `ParsedOperand` stores the label's string
+	  if (it != symbolTable_.end()) {
+	    encoded_operand_value = it->second; // The address
+	  } else {
+	    // This case should not happen if first pass logic is correct,
+	    // but good practice to handle it.
+	    std::string output = "Label not found during second pass: ";
+	    output += operand.text;
+	    log(session_id_, output, "ERROR", 0, __FILE__, __LINE__);
+	    return false;
+	  }
+	  break;
+     
+	case OperandType::UNKNOWN_OPERAND_TYPE:
+	default:
+	  std::string output = "Unrecognized operand type for: ";
+	  std::string result = "";
+	  for (int num : raw_arg) {
+	    result += std::to_string(num);
+	  }
+	  output += result;
+	  log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
+	  return false;
+	}
+
+	// Write the encoded operand value to the text segment
+	try {
+	  memory_.write_text(current_text_address, encoded_operand_value);
+	  current_text_address++;
+	} catch (const std::runtime_error& e) {
+	  std::string output = "Memory error encoding operand: ";
+	  output += e.what();
+	  output += " at address ";
+	  output += current_text_address;
+	  log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
+	  return false;
+	}
+      }
+    }
+  }
+  program_size_in_bytes_ = current_text_address - memory_.text_segment_start;
+  memory_.text_segment_size = program_size_in_bytes_;
+  return true;
 }
 
 // Helper to remove leading/trailing whitespace
 std::string X86Simulator::trim(const std::string& str) {
-    size_t first = str.find_first_not_of(" \t\n\r");
-    if (std::string::npos == first) {
-        return "";
-    }
-    size_t last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, (last - first + 1));
+  size_t first = str.find_first_not_of(" \t\n\r");
+  if (std::string::npos == first) {
+    return "";
+  }
+  size_t last = str.find_last_not_of(" \t\n\r");
+  return str.substr(first, (last - first + 1));
+}
+void X86Simulator::waitForInput() {
+  ui_.waitForInput();
 }

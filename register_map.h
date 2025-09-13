@@ -1,28 +1,29 @@
 #ifndef REGISTER_MAP_H
 #define REGISTER_MAP_H
 
-#include <map>    // For std::map
-#include <string> // For std::string
-#include <vector> // For std::vector
-#include <tuple>  // For std::tuple
-
-#include "register.h" // Include the Register class header
-
-// Forward declaration of the makeMap function
-// This function takes a const reference to a vector of tuples and returns a map.
-std::map<std::string, Register>
-makeMap(const std::vector<std::tuple<std::string, std::string>>& regs);
+#include <map>
+#include <string>
+#include <vector>
+#include <tuple>
+#include <cstdint>
+#include "register_enums.h"
 
 class RegisterMap {
-public:
-    RegisterMap(const std::vector<std::tuple<std::string, std::string>>& regs);
-
-    auto begin()    { return map_.begin(); }
-    auto end()      { return map_.end();   }
-    auto find(const std::string& n) { return map_.find(n); }
-
 private:
-    std::map<std::string, Register> map_;
+  std::map<std::string, Reg64> register_name_map_64_;
+  std::map<std::string, Reg32> register_name_map_32_;
+  std::vector<uint64_t> registers64_;
+  std::vector<uint64_t> registers32_; 
+  std::vector<uint16_t> RegSeg_;
+public:
+  RegisterMap();
+  bool init();
+  uint64_t get64(const std::string& reg_name) const;
+  void set64(const std::string& reg_name, uint64_t value);
+  uint64_t get32(const std::string& reg_name) const;
+  void set32(const std::string& reg_name, uint64_t value);
+  const std::map<std::string, Reg64>& getRegisterNameMap64() const;
+  const  std::map<std::string, Reg32>& getRegisterNameMap32() const;
 };
 
 #endif // REGISTER_MAP_H

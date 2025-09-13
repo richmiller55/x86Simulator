@@ -1,97 +1,112 @@
 #include "x86_simulator.h"
+#include "decoder.h"
 
+bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
+    // Convert instruction mnemonic to normalized format
+    std::string normalized_mnemonic = decoded_instr.mnemonic;
+    std::transform(normalized_mnemonic.begin(), normalized_mnemonic.end(),
+                   normalized_mnemonic.begin(), ::toupper);
+    // Move waitForInput() out of here. It doesn't belong inside the core execution logic.
+    // ui_.waitForInput();
 
-bool X86Simulator::executeInstruction(const std::string& instruction,
-                                      const std::string& args) {
-  // Convert instruction string to a normalized format (e.g., uppercase)
-  std::string normalizedInstr = instruction;
-  std::transform(normalizedInstr.begin(), normalizedInstr.end(),
-                 normalizedInstr.begin(), ::toupper);
-
-  // This is a simplified example. A real simulator might use
-  // more sophisticated decoding or a jump table/map of function pointers.
-
-  if (normalizedInstr == "MOV") {
-    // Parse arguments: "AX, BX" -> dest="AX", src="BX"
-    std::vector<std::string> argParts = parseArguments(args);
-    // A new helper function needed I think we have this
-    if (argParts.size() == 2) {
-      handleMov(argParts[0], argParts[1]);
-      return true;
+    // The logic inside this function looks good.
+    if (normalized_mnemonic == "MOV") {
+        if (decoded_instr.operands.size() == 2) {
+            handleMov(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "ADD") {
+        if (decoded_instr.operands.size() == 2) {
+            handleAdd(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JMP") {
+        if (!decoded_instr.operands.empty()) {
+            handleJmp(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "INC") {
+        if (!decoded_instr.operands.empty()) {
+            handleInc(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "CMP") {
+        if (decoded_instr.operands.size() == 2) {
+            handleCmp(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JNE") {
+        if (!decoded_instr.operands.empty()) {
+            handleJne(decoded_instr);
+            return true;
+        }
+    } else {
+        std::string logmessage = "unsupported instruction: " + decoded_instr.mnemonic;
+        log(session_id_, logmessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return false;
     }
-  } else if (normalizedInstr == "ADD") {
-    std::vector<std::string> argParts = parseArguments(args);
-    if (argParts.size() == 2) {
-      handleAdd(argParts[0], argParts[1]);
-      return true;
-    }
-  } else if (normalizedInstr == "JMP") {
-    handleJmp(args); // JMP usually takes one argument: a label or address
-    return true;
-  } else if (normalizedInstr == "INC") { // <-- Added 'else'
-    handleInc(args);
-    return true;
-  } else if (normalizedInstr == "CMP") { // <-- Added 'else'
-    handleCmp(args);
-    return true;
-  } else if (normalizedInstr == "JNE") { // <-- Added 'else'
-    handleJne(args);
-    return true;
-  } else { // <-- Added 'else' to handle the default case
-    std::cerr << "Error: unsupported instruction: " << instruction << std::endl;
     return false;
-  }
-  return false;
 }
 
-void X86Simulator::runNextInstruction() {
-  if (instructionPointer_ < programInstructions_.size()) {
-    const auto& instrData = programInstructions_[instructionPointer_];
-    if (executeInstruction(instrData[0], instrData[1])) {
-      instructionPointer_++; // Increment IP if instruction executed successfully (unless it was a jump)
-      // Note: JMP would set the IP itself, so careful here to not double-increment
-      // For now, assume a simple sequential flow unless a JMP explicitly changes it
-    } else {
-      // Handle error, maybe halt simulation
-      std::cerr << "Simulation halted due to instruction execution error." << std::endl;
-      instructionPointer_ = programInstructions_.size(); // Stop execution
+void X86Simulator::runSingleInstruction() {
+    address_t instruction_pointer = register_map_.get64("rip");
+
+    // FETCH & DECODE
+    Decoder& decoder = Decoder::getInstance();
+    auto decoded_instr_opt = decoder.decodeInstruction(memory_, instruction_pointer);
+
+    if (!decoded_instr_opt) {
+        log(session_id_, "Decoding failed at RIP: " + std::to_string(instruction_pointer), "ERROR", instruction_pointer, __FILE__, __LINE__);
+        // This is a good place to set a halt flag
+        // isRunning_ = false; 
+        return;
     }
-  } else {
-    std::cout << "End of program reached." << std::endl;
-  }
+
+    DecodedInstruction decoded_instr = *decoded_instr_opt;
+    // Log before execution
+    // log(session_id_, "Executing: " + decoded_instr.mnemonic, "INFO", instruction_pointer, __FILE__, __LINE__);
+
+    // EXECUTE
+    bool success = executeInstruction(decoded_instr);
+
+    if (success) {
+        // ADVANCE THE INSTRUCTION POINTER
+        // Jumps and other control flow instructions will have
+        // already set the new instruction_pointer value within execute()
+        // so we only update for non-jump instructions.
+        if (decoded_instr.mnemonic != "JMP" && decoded_instr.mnemonic != "JNE" /* etc. */) {
+            address_t new_ip = instruction_pointer + decoded_instr.length_in_bytes;
+            register_map_.set64("rip", new_ip);
+        } else {
+            // JMP/JNE already updated rip
+        }
+    } else {
+        log(session_id_, "Execution failed for: " + decoded_instr.mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);
+        // This is a good place to set a halt flag
+        // isRunning_ = false;
+    }
 }
 
 void X86Simulator::runProgram() {
-  // Loop until instructionPointer_ goes out of bounds or a HALT instruction is encountered
-  while (instructionPointer_ < programInstructions_.size()) {
-    runNextInstruction();
-    // Potentially add a delay here for step-by-step viewing
-    // or call your displayRegistersWithDiff()
-    displayRegistersWithDiff(); // Update display after each instruction
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  }
-}
+    bool isRunning = true; // Use a flag for robust loop control
+    
+    while (isRunning) {
+        address_t instruction_pointer = register_map_.get64("rip");
+        
+        // Check for end of program or explicit halt.
+        if (instruction_pointer >= memory_.text_segment_start + memory_.text_segment_size) {
+            isRunning = false; // Program finished
+            log(session_id_, "End of program", "INFO", instruction_pointer, __FILE__, __LINE__);
+        } else {
+            runSingleInstruction();
+        }
 
-// You might want a method to fetch and execute the next instruction in sequence
-//  void runNextInstruction();
+        // Add optional delays, UI updates, or user input handling here.
+        // This is better than placing it inside the core execute function.
 
-
-bool X86Simulator::update(const std::string& name, uint64_t val) {
-  bool updated = false;
-  if (auto it = regs32_.find(name); it != regs32_.end()) {
-    if (it->second.getValue() != val) { // Only update if value changed
-      it->second.update(val);
-      updated = true;
-      // Trigger a display update for this specific register (more advanced)
+        ui_.waitForInput(); // Consider moving this to a specific "step-by-step" mode.
+        
+        // Optional delay for smoother viewing
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
-  }
-  if (auto it = regs64_.find(name); it != regs64_.end()) {
-    if (it->second.getValue() != val) { // Only update if value changed
-      it->second.update(val);
-      updated = true;
-      // Trigger a display update for this specific register (more advanced)
-    }
-  }
-  return updated;
 }
-

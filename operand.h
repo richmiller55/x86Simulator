@@ -5,7 +5,7 @@
 struct ParsedOperand {
     OperandType type;
     uint64_t value; // For immediate values or calculated memory addresses
-    RegisterEnum reg;   // For register operands
+    RegAll reg;   // For register operands
 
 
 

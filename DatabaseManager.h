@@ -8,7 +8,7 @@ private:
 
 public:
     DatabaseManager(const std::string& conn_info);
-    ~DatabaseManager();
+    
 
   void logEvent(int session_id, const std::string& event_type, const std::string& payload);
 

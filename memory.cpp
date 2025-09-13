@@ -17,7 +17,10 @@ Memory::Memory()
   }
 
   next_available_heap_address = heap_segment_start;
-  stack_pointer = total_memory_size;
+  stack_bottom = total_memory_size;
+  stack_pointer = stack_bottom;
+  stack_segment_end = stack_bottom;
+  stack_segment_start = stack_bottom - max_stack_size;
 }
 
 Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
@@ -37,7 +40,10 @@ Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
   }
 
   next_available_heap_address = heap_segment_start;
-  stack_pointer = total_memory_size;
+  stack_bottom = total_memory_size;
+  stack_pointer = stack_bottom;
+  stack_segment_end = stack_bottom;
+  stack_segment_start = stack_bottom - max_stack_size;
 }
 
 uint64_t Memory::read_text(address_t address) const {
@@ -82,23 +88,6 @@ uint64_t Memory::read_bss(address_t address) const {
   return main_memory[address];
 }
 
-void Memory::push(uint64_t value) {
-  if (stack_pointer <= next_available_heap_address) {
-    throw std::runtime_error("Stack overflow (collided with heap)!");
-  }
-  stack_pointer--;
-  main_memory[stack_pointer] = value;
-}
-
-uint64_t Memory::pop() {
-  if (stack_pointer >= total_memory_size) {
-    throw std::runtime_error("Stack underflow!");
-  }
-  uint64_t value = main_memory[stack_pointer];
-  stack_pointer++;
-  return value;
-}
-
 address_t Memory::allocate_heap(size_t size_in_words) {
   if (next_available_heap_address + size_in_words >= stack_pointer) {
     throw std::runtime_error("Heap out of memory (collided with stack)!");
@@ -120,4 +109,18 @@ uint64_t Memory::read_heap(address_t address) const {
     throw std::out_of_range("Heap segment out of bounds!");
   }
   return main_memory[address];
+}
+
+uint64_t Memory::read_stack(address_t address) const {
+  if (address < stack_segment_start || address >= stack_segment_end) {
+    throw std::out_of_range("Stack segment read out of bounds!");
+  }
+  return main_memory[address];
+}
+
+void Memory::write_stack(address_t address, uint64_t value) {
+  if (address < stack_segment_start || address >= stack_segment_end) {
+    throw std::out_of_range("Stack segment write out of bounds!");
+  }
+  main_memory[address] = value;
 }
