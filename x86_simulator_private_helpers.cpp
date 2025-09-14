@@ -59,6 +59,38 @@ void X86Simulator::handleAdd(const DecodedInstruction& decoded_instr) {
     }
 }
 
+void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for SUB", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& src_operand = decoded_instr.operands[1];
+
+    uint64_t destValue = 0;
+    // Get the destination register value using its text representation from register_map_
+    try {
+        destValue = register_map_.get64(dest_operand.text);
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid destination operand in SUB: " + dest_operand.text;
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    // The source value is available directly from the DecodedOperand
+    const uint64_t sourceValue = src_operand.value;
+
+    // Perform subtraction and update destination using register_map_
+    try {
+        register_map_.set64(dest_operand.text, destValue - sourceValue);
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid destination operand in SUB: " + dest_operand.text;
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
 void X86Simulator::handleJmp(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
         log(session_id_, "JMP instruction requires a target.", "ERROR",
@@ -118,9 +150,3 @@ void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& operand2 = decoded_instr.operands[1];
     // ... logic for CMP, using operand1.value and operand2.value ...
 }
-
-
-
-
-
-

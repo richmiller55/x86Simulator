@@ -73,6 +73,7 @@ public:
   bool firstPass();
   bool secondPass();
   void runProgram();
+  void dumpTextSegment(const std::string& filename);
 
   void displayRegistersWithDiff();
   void displayRegistersControlled();
@@ -114,6 +115,7 @@ private:
   void handleJne(const DecodedInstruction& decoded_instr);
   void handleInc(const DecodedInstruction& decoded_instr);
   void handleCmp(const DecodedInstruction& decoded_instr);
+  void handleSub(const DecodedInstruction& decoded_instr);
   
 };
 

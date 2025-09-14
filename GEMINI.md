@@ -55,6 +55,10 @@ make clean
 
 ## Development Conventions
 
-*   **Coding Style:** The code follows a consistent style with the use of header guards, and clear separation of concerns into different classes.
-*   **Database Integration:** The simulator is tightly integrated with a PostgreSQL database. The connection string is hardcoded in `main.cpp` and should be configured properly for the simulator to run.
+*   **Coding Style:** 
+    *   Variable names should use snake_case.
+    *   Member variables will have a trailing underscore (e.g., `decoder_`).
+    *   Filenames will use snake_case.cpp.
+    *   The code follows a consistent style with the use of header guards, and clear separation of concerns into different classes.
+*   **Database Integration:** The simulator is tightly integrated with a PostgreSQL database. The connection string is supplied via the `DB_CONN_STR` environment variable.
 *   **Testing:** There are no explicit tests in the provided file structure.

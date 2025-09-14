@@ -17,7 +17,7 @@ public:
   void drawTextSegment(WINDOW* win, const std::string& title);
 
   void refreshAll();
-  void waitForInput();
+  bool waitForInput();
 private:
   WINDOW *win32;  
   WINDOW *win64;

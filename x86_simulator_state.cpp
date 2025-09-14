@@ -20,6 +20,11 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleAdd(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "SUB") {
+        if (decoded_instr.operands.size() == 2) {
+            handleSub(decoded_instr);
+            return true;
+        }
     } else if (normalized_mnemonic == "JMP") {
         if (!decoded_instr.operands.empty()) {
             handleJmp(decoded_instr);
@@ -104,9 +109,26 @@ void X86Simulator::runProgram() {
         // Add optional delays, UI updates, or user input handling here.
         // This is better than placing it inside the core execute function.
 
-        ui_.waitForInput(); // Consider moving this to a specific "step-by-step" mode.
+        updateDisplay(); // Update the UI with the new state
+        if (!ui_.waitForInput()) { // Wait for user to press a key
+            isRunning = false;
+        }
         
         // Optional delay for smoother viewing
         // std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+}
+
+void X86Simulator::dumpTextSegment(const std::string& filename) {
+    std::ofstream outfile(filename);
+    if (!outfile.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+
+    for (address_t addr = memory_.text_segment_start; addr < memory_.text_segment_start + memory_.text_segment_size; ++addr) {
+        outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << addr << ": "
+                << "0x" << std::hex << std::setw(16) << std::setfill('0') << memory_.read_text(addr) << std::endl;
+    }
+    outfile.close();
 }

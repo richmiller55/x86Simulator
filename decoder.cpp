@@ -2,6 +2,8 @@
 #include <map>
 #include <stdexcept>
 #include <iostream>
+#include <sstream>
+#include <iomanip>
 
 Decoder* Decoder::instance = nullptr;
 
@@ -15,14 +17,14 @@ Decoder::Decoder() {
     return *instance;
   }
 
-  std::string Decoder::getMnemonic(uint64_t opcode) const {
+  std::string Decoder::getMnemonic(uint8_t opcode) const {
     if (auto it = opcode_to_mnemonic.find(opcode); it != opcode_to_mnemonic.end()) {
       return it->second;
     }
     return "UNKNOWN";
   }
 
-  uint64_t Decoder::getOpcode(const std::string& mnemonic) const {
+  uint8_t Decoder::getOpcode(const std::string& mnemonic) const {
     if (auto it = mnemonic_to_opcode.find(mnemonic); it != mnemonic_to_opcode.end()) {
       return it->second;
     }
@@ -30,18 +32,25 @@ Decoder::Decoder() {
   }
 
   std::optional<DecodedInstruction> Decoder::decodeInstruction(const Memory& memory, address_t address) {
+    if (address >= memory.data_segment_start) {
+        return std::nullopt;
+    }
+
     DecodedInstruction decoded_instr;
     decoded_instr.address = address;
 
     // Read the primary opcode byte from memory.
-    uint64_t opcode = memory.read_text(address);
-    address++;
+    uint8_t opcode = memory.read_text(address);
+    address_t current_address = address + 1;
 
     // Simplified logic for prefixes and multi-byte opcodes.
     // Example: Handle a simple two-byte opcode prefix.
     if (opcode == 0x66) {
-      opcode = memory.read_text(address);
-      address++;
+        if (current_address >= memory.data_segment_start) {
+            return std::nullopt; // Incomplete instruction
+        }
+        opcode = memory.read_text(current_address);
+        current_address++;
     }
 
     // Decode the mnemonic.
@@ -53,13 +62,23 @@ Decoder::Decoder() {
     }
 
     // Decode operands based on the opcode.
-    if (opcode == 0xB8) { // MOV EAX, imm32
-      uint64_t imm_value = memory.read_text(address);
-      DecodedOperand operand;
-      operand.text = "0x" + std::to_string(imm_value);
-      operand.value = imm_value;
-      decoded_instr.operands.push_back(operand);
-      decoded_instr.length_in_bytes = 5;
+    if (opcode >= 0xB8 && opcode <= 0xBF) { // MOV r32, imm32
+        if (current_address + 3 >= memory.data_segment_start) { // Need 4 bytes for imm32
+            return std::nullopt; // Incomplete instruction
+        }
+        uint32_t imm_value = 0;
+        imm_value |= (memory.read_text(current_address + 0) & 0xFF) << 0;
+        imm_value |= (memory.read_text(current_address + 1) & 0xFF) << 8;
+        imm_value |= (memory.read_text(current_address + 2) & 0xFF) << 16;
+        imm_value |= (memory.read_text(current_address + 3) & 0xFF) << 24;
+
+        DecodedOperand operand;
+        std::stringstream ss;
+        ss << "0x" << std::hex << imm_value;
+        operand.text = ss.str();
+        operand.value = imm_value;
+        decoded_instr.operands.push_back(operand);
+        decoded_instr.length_in_bytes = 1 + 4; // 1 byte opcode + 4 bytes immediate
     } else {
       // Handle other instructions or assume zero operands for simplicity.
       decoded_instr.length_in_bytes = getInstructionLength(opcode);
@@ -68,7 +87,7 @@ Decoder::Decoder() {
     return decoded_instr;
   }
 
-  std::string Decoder::decodeMnemonic(uint64_t instruction_id) const {
+  std::string Decoder::decodeMnemonic(uint8_t instruction_id) const {
     auto it = opcode_to_mnemonic.find(instruction_id);
     if (it != opcode_to_mnemonic.end()) {
       return it->second;
@@ -84,7 +103,7 @@ Decoder::Decoder() {
     return operand;
   }
 
-  size_t Decoder::getInstructionLength(uint64_t instruction_id) const {
+  size_t Decoder::getInstructionLength(uint8_t instruction_id) const {
     auto it = instruction_lengths.find(instruction_id);
     if (it != instruction_lengths.end()) {
       return it->second;
@@ -92,5 +111,3 @@ Decoder::Decoder() {
     // Return a default length for unknown or complex instructions.
     return 1;
   }
- 
-
