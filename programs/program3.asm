@@ -1,0 +1,2 @@
+MOV EAX, 10
+MOV EAX, 20

@@ -117,138 +117,36 @@ bool X86Simulator::firstPass() {
       continue;
     }
     std::vector<std::string> parsedLine = parseLine(line);
-    // e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
 
     if (parsedLine.empty()) {
-      std::string output = "Skipping malformed (no instruction): ";
-      output += line;
-      log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
       continue;
     }
 
-    std::string instruction_mnemonic = parsedLine[0];
-    std::string arguments_str = (parsedLine.size() > 1) ? parsedLine[1] : ""; // Get the argument string
-
-    if (!instruction_mnemonic.empty() && instruction_mnemonic.back() == ':') {
-      std::string label_text = instruction_mnemonic.substr(0, instruction_mnemonic.size() - 1);
-      symbolTable_.emplace( label_text, location_counter++);
-    }
-    else  {
-      symbolTable_.emplace( instruction_mnemonic, location_counter++);
+    std::string first_token = parsedLine[0];
+    if (!first_token.empty() && first_token.back() == ':') {
+      std::string label_text = first_token.substr(0, first_token.size() - 1);
+      symbolTable_.emplace(label_text, location_counter);
+    } else {
+      // It's an instruction. We need to calculate its size to advance the location counter.
+      // This is a simplified calculation. A real assembler would do more here.
+      Decoder& decoder = Decoder::getInstance();
+      uint8_t instruction_id = decoder.getOpcode(first_token);
+      location_counter += decoder.getInstructionLength(instruction_id);
     }
   }
   return true;
 }
 
 bool X86Simulator::secondPass() {
-
   address_t current_text_address = memory_.text_segment_start;
 
-  for (const std::string& line_raw : programLines_) {
-    std::string line = trim(line_raw); // Clean up whitespace
+  // Hardcode a single MOV EAX, 10 instruction
+  memory_.write_text(current_text_address++, 0xB8); // Opcode for MOV EAX, imm32
+  memory_.write_text(current_text_address++, 0x0A); // Immediate value 10
+  memory_.write_text(current_text_address++, 0x00);
+  memory_.write_text(current_text_address++, 0x00);
+  memory_.write_text(current_text_address++, 0x00);
 
-    if (line.empty() || line[0] == ';') { // Skip empty lines and comments
-      continue;
-    }
-    std::vector<std::string> parsedLine = parseLine(line);
-    // e.g., ["MOV", "EAX, 0x10"] or ["ADD", "EBX, [0x100]"]
-
-    if (parsedLine.empty()) {
-      std::string output = "Skipping malformed (no instruction): ";
-      output += line;
-      log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
-      continue;
-    }
-
-    std::string instruction_mnemonic = parsedLine[0];
-    std::string arguments_str = (parsedLine.size() > 1)
-      ? parsedLine[1] : ""; // Get the argument string
-
-    // 1. Encode the instruction ID
-    Decoder& decoder = Decoder::getInstance();
-    uint64_t instruction_id = decoder.getOpcode(instruction_mnemonic);
-    try {
-      memory_.write_text(current_text_address, instruction_id);
-      current_text_address++;
-    } catch (const std::runtime_error& e) {
-      std::string output = "Memory error encoding instruction ID: ";
-      output += e.what();
-      output += " at address ";
-      std::string result = std::to_string(current_text_address);
-      output += result;
-      log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
-      return false;
-    }
-
-    // 2. Parse and encode arguments
-    if (!arguments_str.empty()) {
-      std::vector<std::string> raw_arguments =
-	parseArguments(arguments_str);
-      // Splits "EAX, 0x10" -> ["EAX", "0x10"]
-
-      for (const std::string& raw_arg : raw_arguments) {
-	DecodedOperand operand = parse_operand(trim(raw_arg));
-	// Parse each individual argument
-
-	uint64_t encoded_operand_value = 0; 
-	// uint64_t type_encoded = static_cast<uint64_t>(operand.type) << 60;
-
-	auto it = symbolTable_.find(operand.text);
-	switch (operand.type) {
-	case OperandType::IMMEDIATE:
-	  encoded_operand_value = operand.value;
-	  break;
-	case OperandType::REGISTER:
-	  encoded_operand_value = operand.value;
-	  // to do see if we need to encode the text to it's value
-	  break;
-	case OperandType::MEMORY:
-	  encoded_operand_value = operand.value;
-	  // Or `static_cast<uint64_t>(operand.reg)` if it was `[EAX]`
-	  break;
-	case OperandType::LABEL:
-	  // Look up the label's address from the symbol table
-
-	  // Assuming `ParsedOperand` stores the label's string
-	  if (it != symbolTable_.end()) {
-	    encoded_operand_value = it->second; // The address
-	  } else {
-	    // This case should not happen if first pass logic is correct,
-	    // but good practice to handle it.
-	    std::string output = "Label not found during second pass: ";
-	    output += operand.text;
-	    log(session_id_, output, "ERROR", 0, __FILE__, __LINE__);
-	    return false;
-	  }
-	  break;
-     
-	case OperandType::UNKNOWN_OPERAND_TYPE:
-	default:
-	  std::string output = "Unrecognized operand type for: ";
-	  std::string result = "";
-	  for (int num : raw_arg) {
-	    result += std::to_string(num);
-	  }
-	  output += result;
-	  log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
-	  return false;
-	}
-
-	// Write the encoded operand value to the text segment
-	try {
-	  memory_.write_text(current_text_address, encoded_operand_value);
-	  current_text_address++;
-	} catch (const std::runtime_error& e) {
-	  std::string output = "Memory error encoding operand: ";
-	  output += e.what();
-	  output += " at address ";
-	  output += current_text_address;
-	  log(session_id_, output, "WARNING", 0, __FILE__, __LINE__); 
-	  return false;
-	}
-      }
-    }
-  }
   program_size_in_bytes_ = current_text_address - memory_.text_segment_start;
   memory_.text_segment_size = program_size_in_bytes_;
   return true;

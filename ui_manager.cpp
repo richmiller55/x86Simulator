@@ -4,11 +4,13 @@
 #include "decoder.h"
 
 UIManager::UIManager(const Memory& memory_instance)
-: memory_(memory_instance),
-  win32(nullptr),
+: win32(nullptr),
   win64(nullptr),
-  win_text_segment(nullptr){
+  win_text_segment(nullptr),
+  memory_(memory_instance) {
     initscr();
+    clear();
+    refresh();
     cbreak();
     noecho();
     if (has_colors()) {
@@ -44,26 +46,26 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
   int row = 2;
   const auto& map64 = regs.getRegisterNameMap64();
   const auto& map32 = regs.getRegisterNameMap32();
-  //  const auto& mapSeg = regs.getSegmentRegisterMap();
+
   for (const std::string& regName : order) {
-    std::string formattedString;   
+    std::stringstream ss;
+    ss << std::left << std::setw(4) << regName << ": 0x" << std::hex << std::setfill('0');
+    
+    bool found = false;
     if (auto it = map64.find(regName); it != map64.end()) {
-      const uint64_t r = it->second;
-      std::stringstream ss;
-      ss << std::left << std::setw(4) << regName << ": 0x" <<
-	std::hex << std::setw(8) << std::setfill('0') << r;
-      formattedString = ss.str();
+      ss << std::setw(16) << it->second;
+      found = true;
     }  else if (auto it = map32.find(regName); it != map32.end()){
-      const uint64_t r = it->second;
-      std::stringstream ss;
-      ss << std::left << std::setw(4) << regName << ": 0x" <<
-	std::hex << std::setw(8) << std::setfill('0') << r;
-      formattedString = ss.str();
+      ss << std::setw(8) << it->second;
+      found = true;
     }
+
+    if (found) {
       wattron(win, COLOR_PAIR(1));
-      mvwprintw(win, row++, 2, "%s", formattedString.c_str());
+      mvwprintw(win, row++, 2, "%s", ss.str().c_str());
       wattroff(win, COLOR_PAIR(1));
     }
+  }
 }
 
 void UIManager::drawRegisters(const RegisterMap& regs) {
@@ -76,14 +78,21 @@ void UIManager::drawTextWindow() {
 }
 
 void UIManager::drawTextSegment(WINDOW* win, const std::string& title) {
-    // ...
-    Decoder& decoder = Decoder::getInstance(); // Or use the dependency-injected instance
-    address_t current_display_address = memory_.text_segment_start;
-    int y_offset = 1;
-    while (current_display_address < memory_.text_segment_size) {
+    werase(win);
+    box(win, 0, 0);
+    mvwprintw(win, 1, 2, "--- %s ---", title.c_str());
+    Decoder& decoder = Decoder::getInstance();
+    int y_offset = 2;
+    const int max_y = getmaxy(win) - 1; // getmaxy returns the number of rows, so the last valid row is max_y - 1
+
+    // Iterate up to the text segment's size.
+    for (size_t i = 0; i < memory_.text_segment_size; /* nothing here, advancement is manual */) {
+        if (y_offset >= max_y) {
+            break;
+        }
+        address_t current_display_address = memory_.text_segment_start + i;
         if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, current_display_address)) {
             DecodedInstruction decoded_instr = *decoded_instr_opt;
-            
             // Display mnemonic
             mvwprintw(win, y_offset, 2, "%s", decoded_instr.mnemonic.c_str());
             
@@ -96,10 +105,15 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title) {
             
             // Crucial change: Advance by the full instruction length
             current_display_address += decoded_instr.length_in_bytes;
+            // ... (rest of the print logic remains the same) ...
+
+            // Advance the index by the instruction length
+            i += decoded_instr.length_in_bytes;
         } else {
-            // Handle error, e.g., print "UNKNOWN" and move one byte
+            // Handle error...
             mvwprintw(win, y_offset, 2, "UNKNOWN");
-            current_display_address++;
+            // Advance by one byte on failure
+            i++;
         }
         y_offset++;
     }
@@ -113,21 +127,24 @@ void UIManager::refreshAll() {
     doupdate();
 }
 
-void UIManager::waitForInput() {
-    // Disable blocking behavior
+bool UIManager::waitForInput() {
+    // Enable blocking behavior to wait for a key press
     nodelay(stdscr, FALSE);
     
     // Display a message in a central location, or in a specific window
-    mvwprintw(stdscr, LINES - 2, 2, "Press any key to continue...");
+    mvwprintw(stdscr, LINES - 2, 2, "Press 'q' to quit, any other key to continue...");
     wrefresh(stdscr);
 
     // Wait for and get a single character
-    getch();
+    int ch = getch();
 
     // Clear the message
-    mvwprintw(stdscr, LINES - 2, 2, "                              "); // Overwrite with spaces
+    wmove(stdscr, LINES - 2, 2);
+    wclrtoeol(stdscr);
     wrefresh(stdscr);
 
     // Re-enable non-blocking if needed for other parts of your program
     // nodelay(stdscr, TRUE);
+
+    return ch != 'q';
 }

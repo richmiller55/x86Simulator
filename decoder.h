@@ -35,37 +35,42 @@ private:
   // Private static instance
   static Decoder* instance;
 
-  const std::map<uint64_t, std::string> opcode_to_mnemonic = {
+  const std::map<uint8_t, std::string> opcode_to_mnemonic = {
     {0x90, "NOP"},
     {0x66, "TWO_BYTE_OPCODE_PREFIX"}, // Example prefix
     {0x5D, "POP"},
     {0x55, "PUSH"},
     {0x01, "ADD"},
+    {0x29, "SUB"},
     {0xEB, "JMP"},
     {0x09, "OR"},
     {0x31, "XOR"},
     {0x21, "AND"},
     {0x39, "CMP"},
     {0x75, "JNE"},
-
+    {0xB8, "MOV"},
+    {0x40, "INC"}
   };
 
-  const std::map<std::string, uint64_t> mnemonic_to_opcode = {
+  const std::map<std::string, uint8_t> mnemonic_to_opcode = {
     {"NOP", 0x90},
     {"TWO_BYTE_OPCODE_PREFIX", 0x66}, 
     {"POP", 0x5d},
     {"PUSH", 0x55},
     {"ADD", 0x01},
+    {"SUB", 0x29},
     {"JMP", 0xEB},
     {"OR", 0x09},
     {"XOR", 0x31},
     {"AND", 0x21},
     {"CMP", 0x39},
     {"JNE", 0x75},
+    {"MOV", 0xB8},
+    {"INC", 0x40},
     // ... more instructions
   };
 
-  const std::map<uint64_t, size_t> instruction_lengths = {
+  const std::map<uint8_t, size_t> instruction_lengths = {
     {0x90, 1}, // NOP
     {0xB8, 5}, // MOV EAX, imm32
     {0x55, 1}, // PUSH EBP
@@ -73,6 +78,9 @@ private:
     
     // ADD (Register-to-Register)
     {0x01, 2}, // ADD r/m32, r32 (e.g., ADD EAX, EBX)
+
+    // SUB (Register-to-Register)
+    {0x29, 2}, // SUB r/m32, r32 (e.g., SUB EAX, EBX)
 
     // JMP (Relative 8-bit offset)
     {0xEB, 2}, // JMP rel8 (1 byte opcode + 1 byte immediate)
@@ -115,12 +123,12 @@ public:
   static Decoder& getInstance();
   // Helper function to decode an encoded operand.
   DecodedOperand decodeOperand(uint64_t encoded_operand) const;
-  std::string getMnemonic(uint64_t opcode) const;
-  std::string decodeMnemonic(uint64_t instruction_id) const;
+  std::string getMnemonic(uint8_t opcode) const;
+  std::string decodeMnemonic(uint8_t instruction_id) const;
   std::optional<DecodedInstruction> decodeInstruction(const Memory& memory, address_t address);
-  uint64_t getOpcode(const std::string& mnemonic) const;
+  uint8_t getOpcode(const std::string& mnemonic) const;
 
-  size_t getInstructionLength(uint64_t instruction_id) const;
+  size_t getInstructionLength(uint8_t instruction_id) const;
 };
 
 #endif // DECODER_H
