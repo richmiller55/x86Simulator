@@ -16,12 +16,13 @@ UIManager::UIManager(const Memory& memory_instance)
     if (has_colors()) {
         start_color();
         init_pair(1, COLOR_YELLOW, COLOR_BLACK);
+        init_pair(2, COLOR_GREEN, COLOR_BLACK); // New color pair for highlighted registers
     }
     // Create and position all windows.
     // The member windows are now created directly here.
-    win32 = newwin(15, 35, 1, 1);
+    win32 = newwin(13, 35, 1, 1);
     win64 = newwin(32, 35, 1, 40);
-    win_text_segment = newwin(25, 35, 16, 1);
+    win_text_segment = newwin(25, 35, 14, 1);
 }
 
 UIManager::~UIManager() {
@@ -52,18 +53,25 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
     ss << std::left << std::setw(4) << regName << ": 0x" << std::hex << std::setfill('0');
     
     bool found = false;
+    uint64_t regValue = 0;
     if (auto it = map64.find(regName); it != map64.end()) {
-      ss << std::setw(16) << it->second;
+      regValue = regs.get64(regName);
+      ss << std::setw(16) << regValue;
       found = true;
     }  else if (auto it = map32.find(regName); it != map32.end()){
-      ss << std::setw(8) << it->second;
+      regValue = regs.get32(regName);
+      ss << std::setw(8) << regValue;
       found = true;
     }
 
     if (found) {
-      wattron(win, COLOR_PAIR(1));
+      if (regName == "rip" || regName == "rsp" || regName == "esp") {
+          wattron(win, COLOR_PAIR(2)); // Use green for rip, rsp, esp
+      } else {
+          wattron(win, COLOR_PAIR(1)); // Use yellow for others
+      }
       mvwprintw(win, row++, 2, "%s", ss.str().c_str());
-      wattroff(win, COLOR_PAIR(1));
+      wattroff(win, A_COLOR); // Turn off any color attribute
     }
   }
 }
