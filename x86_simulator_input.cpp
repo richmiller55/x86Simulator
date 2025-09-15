@@ -4,9 +4,12 @@
 #include <fstream>
 #include <stdexcept>
 #include <algorithm> // For std::remove_if, std::isspace
+#include "CodeGenerator.h"
 
 #include <stdexcept>
 #include <string>
+#include <vector>
+#include <sstream>
 
 namespace fs = std::filesystem;
 
@@ -104,52 +107,104 @@ DecodedOperand X86Simulator::parse_operand(const std::string& operand_str) {
 }
 
 bool X86Simulator::loadProgram(const std::string& filename) {
+  memory_.reset();
   programLines_ = readLinesFromFile(filename);
   return !programLines_.empty(); // Or a more robust check for successful read.
 }
 
+std::vector<std::string> X86Simulator::parseLine(const std::string& line) {
+    std::vector<std::string> tokens;
+    std::stringstream ss(line);
+    std::string token;
+    while (ss >> token) {
+        tokens.push_back(token);
+    }
+    return tokens;
+}
+
 bool X86Simulator::firstPass() {
-  address_t location_counter = 0;
-  for (const std::string& line_raw : programLines_) {
-    std::string line = trim(line_raw); // Clean up whitespace
+    address_t location_counter = 0;
+    for (const std::string& line_raw : programLines_) {
+        std::string line = trim(line_raw);
+        if (line.empty() || line[0] == ';') {
+            continue;
+        }
 
-    if (line.empty() || line[0] == ';') { // Skip empty lines and comments
-      continue;
-    }
-    std::vector<std::string> parsedLine = parseLine(line);
+        std::vector<std::string> tokens = parseLine(line);
+        if (tokens.empty()) {
+            continue;
+        }
 
-    if (parsedLine.empty()) {
-      continue;
-    }
+        std::string& mnemonic = tokens[0];
+        std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(),
+                       [](unsigned char c){ return std::tolower(c); });
+        if (mnemonic.back() == ':') {
+            std::string label = mnemonic.substr(0, mnemonic.size() - 1);
+            symbolTable_[label] = location_counter;
+        } else {
+            if (mnemonic == "mov") {
+                if (tokens.size() < 3) continue;
+                std::string dest = tokens[1];
+                std::transform(dest.begin(), dest.end(), dest.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+                if (dest.back() == ',') dest.pop_back();
+                std::string src = tokens[2];
+                std::transform(src.begin(), src.end(), src.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
 
-    std::string first_token = parsedLine[0];
-    if (!first_token.empty() && first_token.back() == ':') {
-      std::string label_text = first_token.substr(0, first_token.size() - 1);
-      symbolTable_.emplace(label_text, location_counter);
-    } else {
-      // It's an instruction. We need to calculate its size to advance the location counter.
-      // This is a simplified calculation. A real assembler would do more here.
-      Decoder& decoder = Decoder::getInstance();
-      uint8_t instruction_id = decoder.getOpcode(first_token);
-      location_counter += decoder.getInstructionLength(instruction_id);
+                if (dest == "eax" || dest == "ecx") {
+                    try {
+                        std::stoul(src);
+                        location_counter += 5; // Opcode (1) + Immediate (4)
+                    } catch (const std::exception&) {
+                        if (src == "eax" || src == "ebx" || src == "ecx" || src == "edx") {
+                            location_counter += 2; // Opcode (1) + ModR/M (1)
+                        }
+                    }
+                } else if (dest == "ebx" && src == "eax") {
+                    location_counter += 2; // Opcode (1) + ModR/M (1)
+                }
+            } else if (mnemonic == "add") {
+                if (tokens.size() < 3) continue;
+                std::string dest = tokens[1];
+                std::transform(dest.begin(), dest.end(), dest.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+                if (dest.back() == ',') dest.pop_back();
+                std::string src = tokens[2];
+                std::transform(src.begin(), src.end(), src.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+                location_counter += 2; // Opcode (1) + ModR/M (1)
+            } else if (mnemonic == "inc") {
+                if (tokens.size() < 2) continue;
+                std::string dest = tokens[1];
+                std::transform(dest.begin(), dest.end(), dest.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+                location_counter += 2; // Opcode (1) + ModR/M (1)
+            } else if (mnemonic == "cmp") {
+                if (tokens.size() < 3) continue;
+                std::string dest = tokens[1];
+                std::transform(dest.begin(), dest.end(), dest.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+                if (dest.back() == ',') dest.pop_back();
+                std::string src = tokens[2];
+                std::transform(src.begin(), src.end(), src.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+                location_counter += 3; // Opcode (1) + ModR/M (1) + Immediate (1)
+            } else if (mnemonic == "jne") {
+                location_counter += 2; // Opcode (1) + Relative Offset (1)
+            } else if (mnemonic == "jmp") {
+                location_counter += 5; // Opcode (1) + Relative Offset (4)
+            }
+        }
     }
-  }
-  return true;
+    return true;
 }
 
 bool X86Simulator::secondPass() {
-  address_t current_text_address = memory_.text_segment_start;
-
-  // Hardcode a single MOV EAX, 10 instruction
-  memory_.write_text(current_text_address++, 0xB8); // Opcode for MOV EAX, imm32
-  memory_.write_text(current_text_address++, 0x0A); // Immediate value 10
-  memory_.write_text(current_text_address++, 0x00);
-  memory_.write_text(current_text_address++, 0x00);
-  memory_.write_text(current_text_address++, 0x00);
-
-  program_size_in_bytes_ = current_text_address - memory_.text_segment_start;
-  memory_.text_segment_size = program_size_in_bytes_;
-  return true;
+    CodeGenerator code_generator(memory_, symbolTable_);
+    code_generator.generate_code(programLines_);
+    program_size_in_bytes_ = memory_.text_segment_size;
+    return true;
 }
 
 // Helper to remove leading/trailing whitespace
@@ -164,3 +219,4 @@ std::string X86Simulator::trim(const std::string& str) {
 void X86Simulator::waitForInput() {
   ui_.waitForInput();
 }
+

@@ -23,7 +23,8 @@ SRCS = \
 	register_map.cpp \
 	DatabaseManager.cpp \
 	ui_manager.cpp \
-	decoder.cpp
+	decoder.cpp \
+	CodeGenerator.cpp
 
 # Define object files
 OBJS = $(SRCS:.cpp=.o)

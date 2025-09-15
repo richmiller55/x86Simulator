@@ -24,6 +24,9 @@ public:
   uint8_t read_text(address_t address) const;
   void write_text(address_t address, uint8_t value);
 
+  uint32_t read_text_dword(address_t address) const;
+  void write_text_dword(address_t address, uint32_t value);
+
   uint64_t read64(address_t address) const;
   void write64(address_t address, uint64_t value);
 
