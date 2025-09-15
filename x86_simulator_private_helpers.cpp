@@ -126,18 +126,41 @@ void X86Simulator::handleJne(const DecodedInstruction& decoded_instr) {
     }
 
     const DecodedOperand& target_operand = decoded_instr.operands[0];
-    // ... logic for JNE, using target_operand.text ...
+    if (get_ZF() == false) { // If Zero Flag is not set, then jump
+        const std::string& targetLabel = target_operand.text;
+        auto it = symbolTable_.find(targetLabel);
+        if (it != symbolTable_.end()) {
+            address_t targetAddress = it->second;
+            register_map_.set64("rip", targetAddress);
+        } else {
+            std::string logMessage = "JNE target must be a valid label. Label '" + targetLabel + "' not found.";
+            log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        }
+    }
+    // If ZF is set, do nothing and let the instruction pointer advance normally.
 }
 
 void X86Simulator::handleInc(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
         log(session_id_, "INC instruction requires an operand.", "ERROR",
-	    instructionPointer_, __FILE__, __LINE__);
+            instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     const DecodedOperand& operand = decoded_instr.operands[0];
-    // ... logic for INC, using operand.text ...
+    if (operand.type == OperandType::REGISTER) {
+        try {
+            uint64_t value = getRegister(operand.text);
+            value++;
+            register_map_.set64(operand.text, value);
+            // TODO: Update RFLAGS (OF, SF, ZF, AF, PF)
+        } catch (const std::out_of_range& e) {
+            std::string logMessage = "Invalid register in INC: " + operand.text;
+            log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        }
+    } else {
+        log(session_id_, "INC only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
 }
 
 void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
@@ -145,8 +168,23 @@ void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
         log(session_id_, "Invalid number of operands for CMP.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
-
+    
     const DecodedOperand& operand1 = decoded_instr.operands[0];
     const DecodedOperand& operand2 = decoded_instr.operands[1];
-    // ... logic for CMP, using operand1.value and operand2.value ...
+
+    uint64_t val1 = 0;
+    try {
+        val1 = getRegister(operand1.text);
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid destination operand in CMP: " + operand1.text;
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    uint64_t val2 = operand2.value; // Assuming immediate for now
+    uint64_t result = val1 - val2;
+
+    set_ZF(result == 0);
+    set_SF((result & 0x8000000000000000) != 0);
+    // TODO: Set CF and OF correctly for subtraction.
 }
