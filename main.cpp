@@ -15,7 +15,7 @@ int main() {
     X86Simulator sim(dbManager);
 
   sim.set_session_id(session_id);
-  sim.loadProgram("./programs/program3.asm");    
+  sim.loadProgram("./programs/program1.asm");    
   uint64_t instruction_pointer = sim.getRegister("rip");
   sim.log(session_id, "Loaded program", "INFO",
 	  instruction_pointer, "main.cpp", 14); 

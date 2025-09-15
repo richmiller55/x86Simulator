@@ -38,7 +38,6 @@ class DecodedOperand;
 // Forward declarations for helper functions if they are *not* member functions
 
 std::vector<std::string> readLinesFromFile(const std::string& filename);
-std::vector<std::string> parseLine(const std::string& line);
 std::vector<std::string> parseArguments(const std::string& argument_str);
 
 bool parse_label(const std::string& line);
@@ -116,6 +115,7 @@ private:
   void handleInc(const DecodedInstruction& decoded_instr);
   void handleCmp(const DecodedInstruction& decoded_instr);
   void handleSub(const DecodedInstruction& decoded_instr);
+  std::vector<std::string> parseLine(const std::string& line);
   
 };
 

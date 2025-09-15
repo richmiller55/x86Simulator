@@ -43,13 +43,19 @@ private:
     {0x01, "ADD"},
     {0x29, "SUB"},
     {0xEB, "JMP"},
+    {0xE9, "JMP"},
     {0x09, "OR"},
     {0x31, "XOR"},
     {0x21, "AND"},
     {0x39, "CMP"},
+    {0x83, "CMP"},
     {0x75, "JNE"},
     {0xB8, "MOV"},
-    {0x40, "INC"}
+    {0xB9, "MOV"},
+    {0xBB, "MOV"},
+    {0x89, "MOV"},
+    {0x40, "INC"},
+    {0xFF, "INC"}
   };
 
   const std::map<std::string, uint8_t> mnemonic_to_opcode = {
@@ -66,13 +72,16 @@ private:
     {"CMP", 0x39},
     {"JNE", 0x75},
     {"MOV", 0xB8},
-    {"INC", 0x40},
+    {"INC", 0x40}
     // ... more instructions
   };
 
   const std::map<uint8_t, size_t> instruction_lengths = {
     {0x90, 1}, // NOP
     {0xB8, 5}, // MOV EAX, imm32
+    {0xB9, 5}, // MOV ECX, imm32
+    {0xBB, 5}, // MOV EBX, imm32
+    {0x89, 2}, // MOV r/m32, r32
     {0x55, 1}, // PUSH EBP
     {0x5D, 1}, // POP EBP
     
@@ -84,6 +93,7 @@ private:
 
     // JMP (Relative 8-bit offset)
     {0xEB, 2}, // JMP rel8 (1 byte opcode + 1 byte immediate)
+    {0xE9, 5}, // JMP rel32 (1 byte opcode + 4 bytes immediate)
 
     // OR (Register-to-Register)
     {0x09, 2}, // OR r/m32, r32 (e.g., OR EAX, EBX)
@@ -96,6 +106,7 @@ private:
 
     // CMP (Register-to-Register)
     {0x39, 2}, // CMP r/m32, r32 (e.g., CMP EAX, EBX)
+    {0x83, 3}, // CMP r/m32, imm8
 
     // JNE (Relative 8-bit offset)
     {0x75, 2}, // JNE rel8 (1 byte opcode + 1 byte immediate)
@@ -104,7 +115,7 @@ private:
     // Note: In 64-bit mode, 0x4x bytes are REX prefixes.
     // Use the ModR/M version (opcode FF /0) for 32-bit and 64-bit portability.
     {0x40, 1}, // INC EAX (Legacy form, not used in 64-bit mode)
-    // You will need a more complex decoder for ModR/M opcodes like FF /0.
+    {0xFF, 2}, // INC r/m32
     
     // DEC (Register, similar to INC)
     {0x48, 1}, // DEC EAX (Legacy form, not used in 64-bit mode)

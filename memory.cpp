@@ -61,6 +61,20 @@ void Memory::write_text(address_t address, uint8_t value) {
   main_memory[address] = value;
 }
 
+uint32_t Memory::read_text_dword(address_t address) const {
+    uint32_t value = 0;
+    for (int i = 0; i < 4; ++i) {
+        value |= static_cast<uint32_t>(read_text(address + i)) << (i * 8);
+    }
+    return value;
+}
+
+void Memory::write_text_dword(address_t address, uint32_t value) {
+    for (int i = 0; i < 4; ++i) {
+        write_text(address + i, (value >> (i * 8)) & 0xFF);
+    }
+}
+
 uint64_t Memory::read64(address_t address) const {
     uint64_t value = 0;
     for (int i = 0; i < 8; ++i) {
@@ -80,6 +94,10 @@ void Memory::write64(address_t address, uint64_t value) {
 void Memory::reset() {
   main_memory.clear();
   main_memory.resize(total_memory_size);
+
+  for (size_t i = text_segment_start; i < text_segment_start + text_segment_size; ++i) {
+    main_memory[i] = 0;
+  }
 
   for (size_t i = bss_segment_start; i < heap_segment_start; ++i) {
     main_memory[i] = 0;
