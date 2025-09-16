@@ -109,7 +109,7 @@ void X86Simulator::runProgram() {
         // Add optional delays, UI updates, or user input handling here.
         // This is better than placing it inside the core execute function.
 
-        updateDisplay(); // Update the UI with the new state
+        updateDisplay(); // Update the UI with the new state (before waiting for input)
         if (!ui_.waitForInput()) { // Wait for user to press a key
             isRunning = false;
         }
@@ -126,9 +126,39 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
         return;
     }
 
-    for (address_t addr = memory_.text_segment_start; addr < memory_.text_segment_start + memory_.text_segment_size; ++addr) {
-        outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << addr << ": "
-                << "0x" << std::hex << std::setw(16) << std::setfill('0') << memory_.read_text(addr) << std::endl;
+    Decoder& decoder = Decoder::getInstance();
+    address_t current_address = memory_.text_segment_start;
+
+    while (current_address < memory_.text_segment_start + memory_.text_segment_size) {
+        auto decoded_instr_opt = decoder.decodeInstruction(memory_, current_address);
+        if (!decoded_instr_opt) {
+            // If decoding fails, just print the byte and move on
+            outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << current_address << ": "
+                    << std::setw(2) << (int)memory_.read_text(current_address) << "   (decode failed)" << std::endl;
+            current_address++;
+            continue;
+        }
+
+        DecodedInstruction decoded_instr = *decoded_instr_opt;
+
+        // Print Address
+        outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << decoded_instr.address << ": ";
+
+        // Print Raw Bytes
+        std::stringstream bytes_ss;
+        for (size_t i = 0; i < decoded_instr.length_in_bytes; ++i) {
+            bytes_ss << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_text(current_address + i) << " ";
+        }
+        outfile << std::left << std::setw(18) << bytes_ss.str();
+
+        // Print Disassembled Instruction
+        outfile << " " << decoded_instr.mnemonic;
+        for (const auto& op : decoded_instr.operands) {
+            outfile << " " << op.text;
+        }
+        outfile << std::endl;
+
+        current_address += decoded_instr.length_in_bytes;
     }
     outfile.close();
 }

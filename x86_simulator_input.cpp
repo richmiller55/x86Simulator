@@ -179,7 +179,7 @@ bool X86Simulator::firstPass() {
                 std::string dest = tokens[1];
                 std::transform(dest.begin(), dest.end(), dest.begin(),
                                [](unsigned char c){ return std::tolower(c); });
-                location_counter += 2; // Opcode (1) + ModR/M (1)
+                location_counter += 1; // e.g., INC ECX is one byte (0x41)
             } else if (mnemonic == "cmp") {
                 if (tokens.size() < 3) continue;
                 std::string dest = tokens[1];
@@ -219,4 +219,3 @@ std::string X86Simulator::trim(const std::string& str) {
 void X86Simulator::waitForInput() {
   ui_.waitForInput();
 }
-

@@ -53,11 +53,7 @@ void CodeGenerator::process_line(const std::string& line_raw) {
                 memory_.write_text_dword(current_address_, value);
                 current_address_ += 4;
             } catch (const std::exception&) {
-                // Not an immediate value, maybe a register?
-                if (dest == "ebx" && src == "eax") {
-                    memory_.write_text(current_address_++, 0x89);
-                    memory_.write_text(current_address_++, 0xC3);
-                }
+                // Not an immediate, do nothing, will be handled by the next block
             }
         } else if (dest == "ebx" && src == "eax") {
             memory_.write_text(current_address_++, 0x89);

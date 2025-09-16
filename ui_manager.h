@@ -13,8 +13,8 @@ public:
 
   void tearDown();
   void drawRegisters(const RegisterMap& regs64);
-  void drawTextWindow();
-  void drawTextSegment(WINDOW* win, const std::string& title);
+  void drawTextWindow(address_t current_rip);
+  void drawTextSegment(WINDOW* win, const std::string& title, address_t current_rip);
 
   void refreshAll();
   bool waitForInput();

@@ -16,9 +16,9 @@ const char* getRegisterName(uint8_t index) {
 
 // Helper to decode ModR/M byte
 void decodeModRM(uint8_t modrm, DecodedInstruction& instr) {
-    uint8_t mod = (modrm >> 6) & 0x03;
-    uint8_t reg = (modrm >> 3) & 0x07;
-    uint8_t rm = modrm & 0x07;
+    [[maybe_unused]] uint8_t mod = (modrm >> 6) & 0x03;
+    [[maybe_unused]] uint8_t reg = (modrm >> 3) & 0x07;
+    uint8_t rm  = modrm & 0x07;
 
     if (mod == 0b11) { // Register-to-register
         DecodedOperand dest, src;
@@ -109,9 +109,25 @@ std::optional<DecodedInstruction> Decoder::decodeInstruction(const Memory& memor
         decoded_instr.operands.push_back(imm_op);
     } else if (opcode == 0x75) { // JNE rel8
         int8_t offset = memory.read_text(current_address);
+        address_t target_address = address + decoded_instr.length_in_bytes + offset;
+        DecodedOperand op;
+        op.type = OperandType::IMMEDIATE;
+        op.value = target_address;
+        std::stringstream ss;
+        ss << "0x" << std::hex << target_address;
+        op.text = ss.str();
+        decoded_instr.operands.push_back(op);
         // Operand is the target address
     } else if (opcode == 0xE9) { // JMP rel32
         int32_t offset = memory.read_text_dword(current_address);
+        address_t target_address = address + decoded_instr.length_in_bytes + offset;
+        DecodedOperand op;
+        op.type = OperandType::IMMEDIATE;
+        op.value = target_address;
+        std::stringstream ss;
+        ss << "0x" << std::hex << target_address;
+        op.text = ss.str();
+        decoded_instr.operands.push_back(op);
         // Operand is the target address
     }
 

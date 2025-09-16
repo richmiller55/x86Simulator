@@ -1,11 +1,8 @@
-; Test program for SUB instruction
+; A simple program to test basic MOV and JMP.
+; It initializes two registers and then enters an infinite loop.
 
-START:
-    MOV RAX, 10
-    MOV RCX, 3
-    SUB RAX, RCX  ; RAX should be 7
+mov eax, 0xDEADBEEF  ; Load a distinct value into EAX
+mov ebx, eax        ; Copy the value from EAX to EBX
 
-    MOV RBX, 5
-    SUB RBX, 2    ; RBX should be 3
-
-EXIT:
+endless_loop:
+    jmp endless_loop    ; Infinite loop to halt execution

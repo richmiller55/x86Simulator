@@ -81,26 +81,32 @@ void UIManager::drawRegisters(const RegisterMap& regs) {
   drawRegisterWindow(win64, "64-bit Registers", regs, RegisterDisplayOrder64);
 
 }
-void UIManager::drawTextWindow() {
-  drawTextSegment( win_text_segment, "Program" );
+void UIManager::drawTextWindow(address_t current_rip) {
+  drawTextSegment( win_text_segment, "Program", current_rip );
 }
 
-void UIManager::drawTextSegment(WINDOW* win, const std::string& title) {
+void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t current_rip) {
     werase(win);
     box(win, 0, 0);
     mvwprintw(win, 1, 2, "--- %s ---", title.c_str());
     Decoder& decoder = Decoder::getInstance();
     int y_offset = 2;
     const int max_y = getmaxy(win) - 1; // getmaxy returns the number of rows, so the last valid row is max_y - 1
-
+    
+    // Always start decoding from the beginning of the text segment for a stable view.
+    address_t display_address = memory_.text_segment_start;
+    
     // Iterate up to the text segment's size.
-    for (size_t i = 0; i < memory_.text_segment_size; /* nothing here, advancement is manual */) {
+    while (display_address < memory_.text_segment_start + memory_.text_segment_size) {
         if (y_offset >= max_y) {
             break;
         }
-        address_t current_display_address = memory_.text_segment_start + i;
-        if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, current_display_address)) {
+
+        if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, display_address)) {
             DecodedInstruction decoded_instr = *decoded_instr_opt;
+            if (decoded_instr.address == current_rip) {
+                wattron(win, COLOR_PAIR(2)); // Highlight current instruction
+            }
             // Display mnemonic
             mvwprintw(win, y_offset, 2, "%s", decoded_instr.mnemonic.c_str());
             
@@ -111,17 +117,17 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title) {
                 x_offset += operand.text.length() + 1;
             }
             
-            // Crucial change: Advance by the full instruction length
-            current_display_address += decoded_instr.length_in_bytes;
-            // ... (rest of the print logic remains the same) ...
+            if (decoded_instr.address == current_rip) {
+                wattroff(win, COLOR_PAIR(2));
+            }
 
-            // Advance the index by the instruction length
-            i += decoded_instr.length_in_bytes;
+            // Crucial change: Advance by the full instruction length
+            display_address += decoded_instr.length_in_bytes;
         } else {
             // Handle error...
             mvwprintw(win, y_offset, 2, "UNKNOWN");
             // Advance by one byte on failure
-            i++;
+            display_address++;
         }
         y_offset++;
     }
