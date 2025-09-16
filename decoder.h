@@ -115,7 +115,7 @@ private:
     // Note: In 64-bit mode, 0x4x bytes are REX prefixes.
     // Use the ModR/M version (opcode FF /0) for 32-bit and 64-bit portability.
     {0x40, 1}, // INC EAX (Legacy form, not used in 64-bit mode)
-    {0xFF, 2}, // INC r/m32
+    {0xFF, 1}, // INC r/m32 (ModR/M form, e.g., INC ECX is 0x41)
     
     // DEC (Register, similar to INC)
     {0x48, 1}, // DEC EAX (Legacy form, not used in 64-bit mode)

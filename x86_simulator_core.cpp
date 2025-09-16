@@ -30,9 +30,10 @@ void X86Simulator::set_session_id(int session_id) {
 };
 
 void X86Simulator::updateDisplay() {
+  address_t current_rip = register_map_.get64("rip");
   ui_.drawRegisters(register_map_);
-    ui_.drawTextWindow();
-    ui_.refreshAll();
+  ui_.drawTextWindow(current_rip);
+  ui_.refreshAll();
 }
 // X86Simulator.cpp (using the new RegisterMap)
 void X86Simulator::push(uint64_t value) {

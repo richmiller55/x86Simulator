@@ -84,6 +84,8 @@ public:
   void set_ZF(bool value);
   bool get_SF() const;
   void set_SF(bool value);
+  bool get_OF() const;
+  void set_OF(bool value);
   int get_session_id() const;
   void set_session_id(int session_id);
   uint64_t getRegister(const std::string& register_name);
@@ -92,7 +94,7 @@ public:
 	   uint64_t instruction_pointer,
 	   const std::string& source_file,
 	   int source_line);
-  void updateDisplay();
+  void updateDisplay(); // This function now implicitly uses the current RIP
   void waitForInput();
   uint64_t pop();
   void push(uint64_t value); 

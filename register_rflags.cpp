@@ -17,3 +17,8 @@ void X86Simulator::set_SF(bool value) {
   else rflags_ &= ~(1ULL << RFLAGS_SF_BIT);
 }
 
+bool X86Simulator::get_OF() const { return (rflags_ >> RFLAGS_OF_BIT) & 1; }
+void X86Simulator::set_OF(bool value) {
+  if (value) rflags_ |= (1ULL << RFLAGS_OF_BIT);
+  else rflags_ &= ~(1ULL << RFLAGS_OF_BIT);
+}
