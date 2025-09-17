@@ -1,5 +1,6 @@
 // Memory.cpp
 #include "memory.h"
+#include <iostream>
 
 Memory::Memory()
   : text_segment_start(0),
@@ -11,10 +12,10 @@ Memory::Memory()
   text_segment_size = data_segment_start - text_segment_start;
   heap_segment_start = bss_segment_start + 0x100000;
   total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
-  main_memory.resize(total_memory_size);
+  main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size);
 
   for (size_t i = bss_segment_start; i < heap_segment_start; ++i) {
-    main_memory[i] = 0;
+    main_memory->at(i) = 0;
   }
 
   next_available_heap_address = heap_segment_start;
@@ -35,10 +36,10 @@ Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
   heap_segment_start = bss_segment_start + bss_size;
 
   total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
-  main_memory.resize(total_memory_size);
+  main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size);
 
   for (size_t i = bss_segment_start; i < heap_segment_start; ++i) {
-    main_memory[i] = 0;
+    main_memory->at(i) = 0;
   }
 
   next_available_heap_address = heap_segment_start;
@@ -52,13 +53,13 @@ uint8_t Memory::read_text(address_t address) const {
   if (address < text_segment_start || address >= data_segment_start) {
     throw std::out_of_range("Text segment out of bounds!");
   }
-  return main_memory[address];
+  return main_memory->at(address);
 }
 void Memory::write_text(address_t address, uint8_t value) {
   if (address < text_segment_start || address >= data_segment_start) {
     throw std::out_of_range("Text segment write out of bounds!");
   }
-  main_memory[address] = value;
+  main_memory->at(address) = value;
 }
 
 uint32_t Memory::read_text_dword(address_t address) const {
@@ -79,7 +80,7 @@ uint64_t Memory::read64(address_t address) const {
     uint64_t value = 0;
     for (int i = 0; i < 8; ++i) {
         // Assuming little-endian byte order
-        value |= static_cast<uint64_t>(main_memory[address + i]) << (i * 8);
+        value |= static_cast<uint64_t>(main_memory->at(address + i)) << (i * 8);
     }
     return value;
 }
@@ -87,21 +88,17 @@ uint64_t Memory::read64(address_t address) const {
 void Memory::write64(address_t address, uint64_t value) {
     for (int i = 0; i < 8; ++i) {
         // Assuming little-endian byte order
-        main_memory[address + i] = (value >> (i * 8)) & 0xFF;
+        main_memory->at(address + i) = (value >> (i * 8)) & 0xFF;
     }
 }
 
 void Memory::reset() {
-  main_memory.clear();
-  main_memory.resize(total_memory_size);
-
-  for (size_t i = text_segment_start; i < text_segment_start + text_segment_size; ++i) {
-    main_memory[i] = 0;
-  }
-
-  for (size_t i = bss_segment_start; i < heap_segment_start; ++i) {
-    main_memory[i] = 0;
-  }
+  // The assign vector method reallocates the entire memory block and fills it with zeros.
+  // This is a simple and effective way to reset the memory state.
+  main_memory->assign(total_memory_size, 0);
+  
+  // After zeroing all memory, we just need to reset the pointers and sizes.
+  text_segment_size = 0;
   next_available_heap_address = heap_segment_start;
   stack_pointer = stack_bottom;
 }
@@ -118,4 +115,8 @@ void Memory::write_stack(address_t address, uint64_t value) {
     throw std::out_of_range("Stack segment write out of bounds!");
   }
   write64(address, value);
+}
+
+size_t Memory::get_total_memory_size() const {
+    return total_memory_size;
 }

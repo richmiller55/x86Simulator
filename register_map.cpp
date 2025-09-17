@@ -9,7 +9,6 @@ RegisterMap::RegisterMap()
   : register_name_map_64_(),
     register_name_map_32_(),
     registers64_(),
-    registers32_(),
     RegSeg_()
 {
   // The maps are initialized as empty.
@@ -37,7 +36,7 @@ bool RegisterMap::init() {
   // Resize the register vectors based on the enum sizes (if you have them defined)
   // For example: registers64_.resize(NUM_REGISTERS64, 0);
   registers64_.resize(NUM_REG64, 0);
-  registers32_.resize(NUM_REG32, 0);
+  
 
   return true;
 }
@@ -59,14 +58,16 @@ void RegisterMap::set64(const std::string& reg_name, uint64_t value) {
 
 uint64_t RegisterMap::get32(const std::string& reg_name) const {
   if (auto it = register_name_map_32_.find(reg_name); it != register_name_map_32_.end()) {
-    return registers32_[static_cast<size_t>(it->second)];
+    // EAX, EBX, etc. correspond to RAX, RBX in the enum values.
+    return static_cast<uint32_t>(registers64_[static_cast<size_t>(it->second)]);
   }
   throw std::out_of_range("Invalid 32-bit register name: " + reg_name);
 }
 
 void RegisterMap::set32(const std::string& reg_name, uint64_t value) {
   if (auto it = register_name_map_32_.find(reg_name); it != register_name_map_32_.end()) {
-    registers32_[static_cast<size_t>(it->second)] = static_cast<uint32_t>(value);
+    // Writing to a 32-bit register zeros the upper 32 bits of the corresponding 64-bit register.
+    registers64_[static_cast<size_t>(it->second)] = static_cast<uint32_t>(value);
     return;
   }
   throw std::out_of_range("Invalid 32-bit register name: " + reg_name);

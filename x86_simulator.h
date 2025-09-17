@@ -61,7 +61,7 @@ const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
 class X86Simulator {
 public:
     // Constructor, other public methods
-  X86Simulator(DatabaseManager& dbManager);
+  X86Simulator(DatabaseManager& dbManager, int session_id);
   ~X86Simulator();
   
   void init(const std::string& program_name);
@@ -87,7 +87,6 @@ public:
   bool get_OF() const;
   void set_OF(bool value);
   int get_session_id() const;
-  void set_session_id(int session_id);
   uint64_t getRegister(const std::string& register_name);
   void log(int session_id, const std::string& message,
 	   const std::string& level,
@@ -110,12 +109,21 @@ private:
 
   std::vector<std::string> programLines_; // raw
   std::map<std::string, address_t> symbolTable_;
+  std::string entryPointLabel_ = "_start"; // Default entry point
   void handleMov(const DecodedInstruction& decoded_instr);
   void handleAdd(const DecodedInstruction& decoded_instr);
   void handleJmp(const DecodedInstruction& decoded_instr);
   void handleJne(const DecodedInstruction& decoded_instr);
   void handleInc(const DecodedInstruction& decoded_instr);
   void handleCmp(const DecodedInstruction& decoded_instr);
+  void handleInt(const DecodedInstruction& decoded_instr);
+  void handleMul(const DecodedInstruction& decoded_instr);
+  void handleDec(const DecodedInstruction& decoded_instr);
+  void handleDiv(const DecodedInstruction& decoded_instr);
+  void handleAnd(const DecodedInstruction& decoded_instr);
+  void handleOr(const DecodedInstruction& decoded_instr);
+  void handleXor(const DecodedInstruction& decoded_instr);
+  void handleNot(const DecodedInstruction& decoded_instr);
   void handleSub(const DecodedInstruction& decoded_instr);
   std::vector<std::string> parseLine(const std::string& line);
   

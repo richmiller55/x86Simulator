@@ -9,7 +9,7 @@
 class CodeGenerator {
 public:
     CodeGenerator(Memory& memory, const std::map<std::string, address_t>& symbol_table);
-    void generate_code(const std::vector<std::string>& program_lines);
+    size_t generate_code(const std::vector<std::string>& program_lines);
 
 private:
     Memory& memory_;

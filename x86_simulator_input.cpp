@@ -123,6 +123,7 @@ std::vector<std::string> X86Simulator::parseLine(const std::string& line) {
 }
 
 bool X86Simulator::firstPass() {
+    // First pass is now only for building the symbol table.
     address_t location_counter = 0;
     for (const std::string& line_raw : programLines_) {
         std::string line = trim(line_raw);
@@ -141,60 +142,26 @@ bool X86Simulator::firstPass() {
         if (mnemonic.back() == ':') {
             std::string label = mnemonic.substr(0, mnemonic.size() - 1);
             symbolTable_[label] = location_counter;
-        } else {
-            if (mnemonic == "mov") {
-                if (tokens.size() < 3) continue;
-                std::string dest = tokens[1];
-                std::transform(dest.begin(), dest.end(), dest.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-                if (dest.back() == ',') dest.pop_back();
-                std::string src = tokens[2];
-                std::transform(src.begin(), src.end(), src.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-
-                if (dest == "eax" || dest == "ecx") {
-                    try {
-                        std::stoul(src);
-                        location_counter += 5; // Opcode (1) + Immediate (4)
-                    } catch (const std::exception&) {
-                        if (src == "eax" || src == "ebx" || src == "ecx" || src == "edx") {
-                            location_counter += 2; // Opcode (1) + ModR/M (1)
-                        }
-                    }
-                } else if (dest == "ebx" && src == "eax") {
-                    location_counter += 2; // Opcode (1) + ModR/M (1)
-                }
-            } else if (mnemonic == "add") {
-                if (tokens.size() < 3) continue;
-                std::string dest = tokens[1];
-                std::transform(dest.begin(), dest.end(), dest.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-                if (dest.back() == ',') dest.pop_back();
-                std::string src = tokens[2];
-                std::transform(src.begin(), src.end(), src.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-                location_counter += 2; // Opcode (1) + ModR/M (1)
-            } else if (mnemonic == "inc") {
-                if (tokens.size() < 2) continue;
-                std::string dest = tokens[1];
-                std::transform(dest.begin(), dest.end(), dest.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-                location_counter += 1; // e.g., INC ECX is one byte (0x41)
-            } else if (mnemonic == "cmp") {
-                if (tokens.size() < 3) continue;
-                std::string dest = tokens[1];
-                std::transform(dest.begin(), dest.end(), dest.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-                if (dest.back() == ',') dest.pop_back();
-                std::string src = tokens[2];
-                std::transform(src.begin(), src.end(), src.begin(),
-                               [](unsigned char c){ return std::tolower(c); });
-                location_counter += 3; // Opcode (1) + ModR/M (1) + Immediate (1)
-            } else if (mnemonic == "jne") {
-                location_counter += 2; // Opcode (1) + Relative Offset (1)
-            } else if (mnemonic == "jmp") {
-                location_counter += 5; // Opcode (1) + Relative Offset (4)
-            }
+        }
+        // Handle assembler directives
+        else if (mnemonic == "section" || mnemonic == "global") {
+            // These directives do not generate code and do not advance the location counter.
+            // We can just ignore them for the purpose of address calculation.
+            // A more advanced assembler might use 'section' to switch between .text, .data, etc.
+            // and 'global' to adjust symbol visibility, but for now, we can skip.
+            continue;
+        }
+        // The CodeGenerator will determine the actual location counter during the second pass.
+        // To keep the symbol table correct, we must simulate the address calculation here.
+        else {
+            // To get the correct address for labels, we must calculate the size of each instruction.
+            // We use a temporary CodeGenerator for this, as it has the sizing logic.
+            // This is inefficient but ensures correctness by centralizing the logic.
+            Memory temp_mem; // Create a dummy memory object for sizing
+            CodeGenerator temp_gen(temp_mem, symbolTable_);
+            std::vector<std::string> single_line_vec = {line_raw};
+            size_t instruction_size = temp_gen.generate_code(single_line_vec);
+            location_counter += instruction_size;
         }
     }
     return true;
@@ -202,8 +169,19 @@ bool X86Simulator::firstPass() {
 
 bool X86Simulator::secondPass() {
     CodeGenerator code_generator(memory_, symbolTable_);
-    code_generator.generate_code(programLines_);
-    program_size_in_bytes_ = memory_.text_segment_size;
+    // The code generator should return the size of the generated code.
+    program_size_in_bytes_ = code_generator.generate_code(programLines_);
+    memory_.text_segment_size = program_size_in_bytes_;
+
+    // Set the initial instruction pointer (RIP) to the address of the entry point label.
+    auto it = symbolTable_.find(entryPointLabel_);
+    if (it != symbolTable_.end()) {
+        register_map_.set64("rip", it->second);
+    } else {
+        log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
+        // Fallback to the start of the text segment if the label is not found
+        register_map_.set64("rip", memory_.text_segment_start);
+    }
     return true;
 }
 

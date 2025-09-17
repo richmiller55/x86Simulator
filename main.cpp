@@ -12,10 +12,8 @@ int main() {
 
     int session_id = dbManager.createSession("testPrg");
 
-    X86Simulator sim(dbManager);
-
-  sim.set_session_id(session_id);
-  sim.loadProgram("./programs/program1.asm");
+    X86Simulator sim(dbManager, session_id);
+  sim.loadProgram("./programs/testBeta.asm");
   sim.firstPass();
   sim.secondPass(); // This now sets RIP to the start address
   sim.dumpTextSegment("text_segment_dump.txt");

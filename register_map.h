@@ -12,8 +12,7 @@ class RegisterMap {
 private:
   std::map<std::string, Reg64> register_name_map_64_;
   std::map<std::string, Reg32> register_name_map_32_;
-  std::vector<uint64_t> registers64_;
-  std::vector<uint64_t> registers32_; 
+  std::vector<uint64_t> registers64_; 
   std::vector<uint16_t> RegSeg_;
 public:
   RegisterMap();
