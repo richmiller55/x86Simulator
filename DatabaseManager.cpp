@@ -11,6 +11,8 @@ DatabaseManager::DatabaseManager(const std::string& conn_info)
     }
 }
 
+DatabaseManager::~DatabaseManager() = default; // This is now correct because it's declared in the header.
+
 void DatabaseManager::logEvent(int session_id, const std::string& event_type, const std::string& payload) {
     try {
         pqxx::work txn(m_conn);
@@ -66,5 +68,3 @@ int DatabaseManager::createSession(const std::string& program_name) {
   int session_id = r[0][0].as<int>();
   return session_id;
 }
-
-

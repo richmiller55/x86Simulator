@@ -56,11 +56,11 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
     uint64_t regValue = 0;
     if (auto it = map64.find(regName); it != map64.end()) {
       regValue = regs.get64(regName);
-      ss << std::setw(16) << regValue;
+      ss << std::right << std::setw(16) << regValue;
       found = true;
     }  else if (auto it = map32.find(regName); it != map32.end()){
       regValue = regs.get32(regName);
-      ss << std::setw(8) << regValue;
+      ss << std::right << std::setw(8) << regValue;
       found = true;
     }
 
@@ -94,10 +94,10 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t
     const int max_y = getmaxy(win) - 1; // getmaxy returns the number of rows, so the last valid row is max_y - 1
     
     // Always start decoding from the beginning of the text segment for a stable view.
-    address_t display_address = memory_.text_segment_start;
+    address_t display_address = memory_.get_text_segment_start();
     
     // Iterate up to the text segment's size.
-    while (display_address < memory_.text_segment_start + memory_.text_segment_size) {
+    while (display_address < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
         if (y_offset >= max_y) {
             break;
         }

@@ -45,6 +45,46 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleJne(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "INT") {
+        if (!decoded_instr.operands.empty()) {
+            handleInt(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "MUL") {
+        if (!decoded_instr.operands.empty()) {
+            handleMul(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "DEC") {
+        if (!decoded_instr.operands.empty()) {
+            handleDec(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "DIV") {
+        if (!decoded_instr.operands.empty()) {
+            handleDiv(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "AND") {
+        if (decoded_instr.operands.size() == 2) {
+            handleAnd(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "OR") {
+        if (decoded_instr.operands.size() == 2) {
+            handleOr(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "XOR") {
+        if (decoded_instr.operands.size() == 2) {
+            handleXor(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "NOT") {
+        if (decoded_instr.operands.size() == 1) {
+            handleNot(decoded_instr);
+            return true;
+        }
     } else {
         std::string logmessage = "unsupported instruction: " + decoded_instr.mnemonic;
         log(session_id_, logmessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -72,19 +112,17 @@ void X86Simulator::runSingleInstruction() {
     // log(session_id_, "Executing: " + decoded_instr.mnemonic, "INFO", instruction_pointer, __FILE__, __LINE__);
 
     // EXECUTE
+    address_t next_ip = instruction_pointer + decoded_instr.length_in_bytes;
     bool success = executeInstruction(decoded_instr);
 
     if (success) {
-        // ADVANCE THE INSTRUCTION POINTER
-        // Jumps and other control flow instructions will have
-        // already set the new instruction_pointer value within execute()
-        // so we only update for non-jump instructions.
-        if (decoded_instr.mnemonic != "JMP" && decoded_instr.mnemonic != "JNE" /* etc. */) {
-            address_t new_ip = instruction_pointer + decoded_instr.length_in_bytes;
-            register_map_.set64("rip", new_ip);
-        } else {
-            // JMP/JNE already updated rip
+        // If the instruction pointer was not modified by a jump, advance it.
+        // Jumps and conditional jumps will set RIP themselves.
+        // We check if RIP is still pointing to the current instruction.
+        if (register_map_.get64("rip") == instruction_pointer) {
+            register_map_.set64("rip", next_ip);
         }
+        // Otherwise, a jump occurred and RIP is already correct.
     } else {
         log(session_id_, "Execution failed for: " + decoded_instr.mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);
         // This is a good place to set a halt flag
@@ -96,6 +134,13 @@ void X86Simulator::runProgram() {
     bool isRunning = true; // Use a flag for robust loop control
     
     while (isRunning) {
+        updateDisplay(); // Update the UI with the new state (before waiting for input)
+
+        if (!ui_.waitForInput()) { // Wait for user to press a key
+            isRunning = false;
+            continue;
+        }
+
         address_t instruction_pointer = register_map_.get64("rip");
         
         // Check for end of program or explicit halt.
@@ -105,17 +150,6 @@ void X86Simulator::runProgram() {
         } else {
             runSingleInstruction();
         }
-
-        // Add optional delays, UI updates, or user input handling here.
-        // This is better than placing it inside the core execute function.
-
-        updateDisplay(); // Update the UI with the new state (before waiting for input)
-        if (!ui_.waitForInput()) { // Wait for user to press a key
-            isRunning = false;
-        }
-        
-        // Optional delay for smoother viewing
-        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 }
 
@@ -129,7 +163,7 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
     Decoder& decoder = Decoder::getInstance();
     address_t current_address = memory_.text_segment_start;
 
-    while (current_address < memory_.text_segment_start + memory_.text_segment_size) {
+    while (current_address < memory_.data_segment_start && current_address < memory_.text_segment_start + memory_.text_segment_size) {
         auto decoded_instr_opt = decoder.decodeInstruction(memory_, current_address);
         if (!decoded_instr_opt) {
             // If decoding fails, just print the byte and move on

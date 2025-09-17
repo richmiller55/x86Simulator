@@ -54,8 +54,12 @@ private:
     {0xB9, "MOV"},
     {0xBB, "MOV"},
     {0x89, "MOV"},
-    {0x40, "INC"},
+    {0xF7, "GROUP_F7"}, // MUL, NOT, DIV, etc.
+    {0xFF, "GROUP_FF"}, // INC, DEC
+    // The below are for simple cases, but the group is more accurate
+    {0x40, "INC"}, 
     {0xFF, "INC"}
+    ,{0xCD, "INT"}
   };
 
   const std::map<std::string, uint8_t> mnemonic_to_opcode = {
@@ -72,7 +76,8 @@ private:
     {"CMP", 0x39},
     {"JNE", 0x75},
     {"MOV", 0xB8},
-    {"INC", 0x40}
+    {"INC", 0x40},
+    {"INT", 0xCD}
     // ... more instructions
   };
 
@@ -115,10 +120,16 @@ private:
     // Note: In 64-bit mode, 0x4x bytes are REX prefixes.
     // Use the ModR/M version (opcode FF /0) for 32-bit and 64-bit portability.
     {0x40, 1}, // INC EAX (Legacy form, not used in 64-bit mode)
-    {0xFF, 1}, // INC r/m32 (ModR/M form, e.g., INC ECX is 0x41)
+    {0xFF, 2}, // INC r/m32 (ModR/M form, e.g., INC ECX is FF C1)
     
     // DEC (Register, similar to INC)
     {0x48, 1}, // DEC EAX (Legacy form, not used in 64-bit mode)
+
+    // Group F7 instructions (MUL, NOT, DIV) are 2 bytes (Opcode + ModR/M)
+    {0xF7, 2},
+
+    // INT (Software Interrupt)
+    {0xCD, 2} // INT imm8 (e.g., INT 0x80)
   };
 
 

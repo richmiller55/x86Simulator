@@ -3,12 +3,13 @@
 #include "decoder.h"
 
 // Constructor with DatabaseManager injection
-X86Simulator::X86Simulator(DatabaseManager& dbManager)
-    : dbManager_(dbManager), // Initialize the new member
-      memory_(),
+X86Simulator::X86Simulator(DatabaseManager& dbManager, int session_id)
+    : dbManager_(dbManager),
       register_map_(),
+      memory_(),
+      ui_(memory_),
       rflags_(0),
-      ui_(memory_) {
+      session_id_(session_id) {
   rflags_ |= (1ULL << RFLAGS_ALWAYS_SET_BIT_1);
   register_map_.init();
 };
@@ -24,10 +25,6 @@ void X86Simulator::init(const std::string& program_name) {
  int X86Simulator::get_session_id() const {
     return session_id_;
  };
-
-void X86Simulator::set_session_id(int session_id) {
-    session_id_ = session_id;
-};
 
 void X86Simulator::updateDisplay() {
   address_t current_rip = register_map_.get64("rip");
