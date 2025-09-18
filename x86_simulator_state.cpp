@@ -1,5 +1,6 @@
 #include "x86_simulator.h"
 #include "decoder.h"
+#include "ui_manager.h"
 
 bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
     // Convert instruction mnemonic to normalized format
@@ -136,7 +137,7 @@ void X86Simulator::runProgram() {
     while (isRunning) {
         updateDisplay(); // Update the UI with the new state (before waiting for input)
 
-        if (!ui_.waitForInput()) { // Wait for user to press a key
+        if (!ui_->waitForInput()) { // Wait for user to press a key
             isRunning = false;
             continue;
         }

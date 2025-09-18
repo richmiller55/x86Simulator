@@ -1,28 +1,37 @@
+#include "ui_manager.h"
 #include "x86_simulator.h"
 #include <sstream>
 #include <iomanip>
 #include "decoder.h"
+#include "instruction_describer.h" // Will be created later
 
 UIManager::UIManager(const Memory& memory_instance)
-: win32(nullptr),
-  win64(nullptr),
-  win_text_segment(nullptr),
-  memory_(memory_instance) {
+: win32_(nullptr),
+  win64_(nullptr),
+  win_text_segment_(nullptr),
+  win_instruction_description_(nullptr),
+  memory_(memory_instance),
+  text_scroll_offset_(0),
+  decoded_program_(),
+  address_to_index_map_() {
     initscr();
     clear();
     refresh();
     cbreak();
     noecho();
+    keypad(stdscr, TRUE); // Enable keypad for arrow keys
+
     if (has_colors()) {
         start_color();
         init_pair(1, COLOR_YELLOW, COLOR_BLACK);
-        init_pair(2, COLOR_GREEN, COLOR_BLACK); // New color pair for highlighted registers
+        init_pair(2, COLOR_GREEN, COLOR_BLACK);
     }
     // Create and position all windows.
-    // The member windows are now created directly here.
-    win32 = newwin(13, 35, 1, 1);
-    win64 = newwin(32, 35, 1, 40);
-    win_text_segment = newwin(25, 35, 14, 1);
+    win32_ = newwin(13, 35, 1, 1);
+    win64_ = newwin(32, 35, 1, 40);
+    win_text_segment_ = newwin(25, 35, 14, 1);
+    win_instruction_description_ = newwin(12, 70, 33, 40); // Position for the new window
+
 }
 
 UIManager::~UIManager() {
@@ -30,9 +39,10 @@ UIManager::~UIManager() {
 }
 
 void UIManager::tearDown() {
-    delwin(win32);
-    delwin(win64);
-    delwin(win_text_segment);
+    delwin(win32_);
+    delwin(win64_);
+    delwin(win_text_segment_);
+    delwin(win_instruction_description_);
     endwin();
 }
 
@@ -77,88 +87,132 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
 }
 
 void UIManager::drawRegisters(const RegisterMap& regs) {
-  drawRegisterWindow(win32, "32-bit Registers", regs, RegisterDisplayOrder32);
-  drawRegisterWindow(win64, "64-bit Registers", regs, RegisterDisplayOrder64);
+  drawRegisterWindow(win32_, "32-bit Registers", regs, RegisterDisplayOrder32);
+  drawRegisterWindow(win64_, "64-bit Registers", regs, RegisterDisplayOrder64);
 
 }
 void UIManager::drawTextWindow(address_t current_rip) {
-  drawTextSegment( win_text_segment, "Program", current_rip );
+  drawTextSegment(win_text_segment_, "Program", current_rip);
+}
+
+void UIManager::drawInstructionDescription(address_t current_rip, const RegisterMap& regs) {
+    werase(win_instruction_description_);
+    box(win_instruction_description_, 0, 0);
+    mvwprintw(win_instruction_description_, 1, 2, "--- Instruction Details ---");
+
+    auto it = address_to_index_map_.find(current_rip);
+    if (it != address_to_index_map_.end()) {
+        const DecodedInstruction& instr = *decoded_program_[it->second];
+        std::string description = InstructionDescriber::describe(instr, regs);
+
+        // Truncate description to fit in the window to prevent overflow
+        int max_desc_width = getmaxx(win_instruction_description_) - 3;
+        if (max_desc_width < 0) max_desc_width = 0;
+        if (description.length() > static_cast<size_t>(max_desc_width)) {
+            description = description.substr(0, max_desc_width);
+        }
+        mvwaddstr(win_instruction_description_, 2, 2, description.c_str());
+    } else {
+        mvwprintw(win_instruction_description_, 2, 2, "No instruction data for this address.");
+    }
 }
 
 void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t current_rip) {
     werase(win);
     box(win, 0, 0);
     mvwprintw(win, 1, 2, "--- %s ---", title.c_str());
-    Decoder& decoder = Decoder::getInstance();
+
     int y_offset = 2;
-    const int max_y = getmaxy(win) - 1; // getmaxy returns the number of rows, so the last valid row is max_y - 1
-    
-    // Always start decoding from the beginning of the text segment for a stable view.
-    address_t display_address = memory_.get_text_segment_start();
-    
-    // Iterate up to the text segment's size.
-    while (display_address < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
+    const int max_y = getmaxy(win) - 1;
+
+    for (size_t i = text_scroll_offset_; i < decoded_program_.size(); ++i) {
         if (y_offset >= max_y) {
+            mvwprintw(win, max_y, getmaxx(win) - 10, "[More...]");
             break;
         }
 
-        if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, display_address)) {
-            DecodedInstruction decoded_instr = *decoded_instr_opt;
-            if (decoded_instr.address == current_rip) {
-                wattron(win, COLOR_PAIR(2)); // Highlight current instruction
-            }
-            // Display mnemonic
-            mvwprintw(win, y_offset, 2, "%s", decoded_instr.mnemonic.c_str());
-            
-            // Display operands
-            int x_offset = 2 + decoded_instr.mnemonic.length() + 1;
-            for (const auto& operand : decoded_instr.operands) {
-                mvwprintw(win, y_offset, x_offset, "%s", operand.text.c_str());
-                x_offset += operand.text.length() + 1;
-            }
-            
-            if (decoded_instr.address == current_rip) {
-                wattroff(win, COLOR_PAIR(2));
-            }
+        const auto& decoded_instr = *decoded_program_[i];
 
-            // Crucial change: Advance by the full instruction length
-            display_address += decoded_instr.length_in_bytes;
-        } else {
-            // Handle error...
-            mvwprintw(win, y_offset, 2, "UNKNOWN");
-            // Advance by one byte on failure
-            display_address++;
+        if (decoded_instr.address == current_rip) {
+            wattron(win, COLOR_PAIR(2));
         }
+
+        std::string line = decoded_instr.mnemonic;
+        for (const auto& operand : decoded_instr.operands) {
+            line += " " + operand.text;
+        }
+
+        // Truncate line to fit in the window to prevent overflow
+        int max_width = getmaxx(win) - 3; // start at col 2, leave 1 for border
+        if (max_width < 0) max_width = 0;
+        if (line.length() > static_cast<size_t>(max_width)) {
+            line = line.substr(0, max_width);
+        }
+        mvwaddstr(win, y_offset, 2, line.c_str());
+        
+        if (decoded_instr.address == current_rip) {
+            wattroff(win, COLOR_PAIR(2));
+        }
+
         y_offset++;
+    }
+
+    if (text_scroll_offset_ > 0) {
+        mvwprintw(win, 2, getmaxx(win) - 10, "[More...]");
+    }
+}
+
+void UIManager::preDecodeProgram() {
+    Decoder& decoder = Decoder::getInstance();
+    address_t addr = memory_.get_text_segment_start();
+    size_t index = 0;
+    while (addr < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
+        if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, addr)) {
+            decoded_program_.push_back(std::make_unique<DecodedInstruction>(*decoded_instr_opt));
+            address_to_index_map_[addr] = index++;
+            addr += decoded_instr_opt->length_in_bytes;
+        } else {
+            addr++;
+        }
     }
 }
 
 void UIManager::refreshAll() {
-    // Optimize redraws to avoid flicker by using wnoutrefresh and doupdate
-    wnoutrefresh(win32);
-    wnoutrefresh(win64);
-    wnoutrefresh(win_text_segment);
+    wnoutrefresh(win32_);
+    wnoutrefresh(win64_);
+    wnoutrefresh(win_text_segment_);
+    wnoutrefresh(win_instruction_description_);
     doupdate();
 }
 
 bool UIManager::waitForInput() {
-    // Enable blocking behavior to wait for a key press
-    nodelay(stdscr, FALSE);
-    
-    // Display a message in a central location, or in a specific window
-    mvwprintw(stdscr, LINES - 2, 2, "Press 'q' to quit, any other key to continue...");
-    wrefresh(stdscr);
+    while (true) {
+        mvwprintw(stdscr, LINES - 2, 2, "Press 'q' to quit, UP/DOWN to scroll, any other key to step...");
+        
+        int ch = getch();
 
-    // Wait for and get a single character
-    int ch = getch();
+        wmove(stdscr, LINES - 2, 2);
+        wclrtoeol(stdscr);
 
-    // Clear the message
-    wmove(stdscr, LINES - 2, 2);
-    wclrtoeol(stdscr);
-    wrefresh(stdscr);
-
-    // Re-enable non-blocking if needed for other parts of your program
-    // nodelay(stdscr, TRUE);
-
-    return ch != 'q';
+        switch (ch) {
+            case 'q':
+                return false;
+            case KEY_UP:
+                if (text_scroll_offset_ > 0) {
+                    text_scroll_offset_--;
+                }
+                drawTextWindow(0); // Dummy RIP for redraw
+                refreshAll();
+                break; // Continue loop
+            case KEY_DOWN:
+                if (!decoded_program_.empty() && text_scroll_offset_ < decoded_program_.size() - 1) {
+                    text_scroll_offset_++;
+                }
+                drawTextWindow(0); // Dummy RIP for redraw
+                refreshAll();
+                break; // Continue loop
+            default:
+                return true; // Exit loop and continue simulation
+        }
+    }
 }

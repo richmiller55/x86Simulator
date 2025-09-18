@@ -1,4 +1,6 @@
 #include "x86_simulator.h"
+#include "ui_manager.h"
+#include "ui_manager.h"
 #include "decoder.h" // For DecodedOperand and helper types if any
 #include <iostream>
 #include <fstream>
@@ -182,6 +184,7 @@ bool X86Simulator::secondPass() {
         // Fallback to the start of the text segment if the label is not found
         register_map_.set64("rip", memory_.text_segment_start);
     }
+    ui_->preDecodeProgram();
     return true;
 }
 
@@ -195,5 +198,5 @@ std::string X86Simulator::trim(const std::string& str) {
   return str.substr(first, (last - first + 1));
 }
 void X86Simulator::waitForInput() {
-  ui_.waitForInput();
+  ui_->waitForInput();
 }
