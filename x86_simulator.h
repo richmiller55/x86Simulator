@@ -30,7 +30,7 @@
 #include "operand_types.h"
 #include "operand.h"
 #include "DatabaseManager.h"
-#include "ui_manager.h"
+class UIManager;
 
 
 class DecodedInstruction;
@@ -102,7 +102,7 @@ private:
   RegisterMap register_map_;
   Memory memory_;
   address_t instructionPointer_ = 0;
-  UIManager ui_;
+  std::unique_ptr<UIManager> ui_;
   uint64_t rflags_;
   int session_id_;
   address_t program_size_in_bytes_; 

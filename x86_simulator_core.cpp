@@ -7,15 +7,15 @@ X86Simulator::X86Simulator(DatabaseManager& dbManager, int session_id)
     : dbManager_(dbManager),
       register_map_(),
       memory_(),
-      ui_(memory_),
       rflags_(0),
       session_id_(session_id) {
+  ui_ = std::make_unique<UIManager>(memory_);
   rflags_ |= (1ULL << RFLAGS_ALWAYS_SET_BIT_1);
   register_map_.init();
 };
 
 X86Simulator::~X86Simulator() {
-    ui_.tearDown();
+    ui_->tearDown();
 }
 
 void X86Simulator::init(const std::string& program_name) {
@@ -28,9 +28,10 @@ void X86Simulator::init(const std::string& program_name) {
 
 void X86Simulator::updateDisplay() {
   address_t current_rip = register_map_.get64("rip");
-  ui_.drawRegisters(register_map_);
-  ui_.drawTextWindow(current_rip);
-  ui_.refreshAll();
+  ui_->drawRegisters(register_map_);
+  ui_->drawTextWindow(current_rip);
+  ui_->drawInstructionDescription(current_rip, register_map_);
+  ui_->refreshAll();
 }
 // X86Simulator.cpp (using the new RegisterMap)
 void X86Simulator::push(uint64_t value) {
