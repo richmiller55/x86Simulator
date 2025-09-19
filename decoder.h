@@ -5,7 +5,16 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <memory>
 #include "x86_simulator.h" // For address_t
+
+// Represents a VEX prefix, which is used for AVX instructions.
+struct VEX_Prefix {
+    int bytes; // 2 or 3
+    int map_select; // Implied 0F, 0F 38, or 0F 3A
+    int L; // Vector length
+    int vvvv; // Non-destructive source register
+};
 
 // Forward declarations if needed, though included above
 // struct DecodedInstruction;
@@ -33,105 +42,12 @@ private:
   // Helper function to decode the opcode to a mnemonic.
   Decoder();
   // Private static instance
-  static Decoder* instance;
+  static std::unique_ptr<Decoder> instance;
 
-  const std::map<uint8_t, std::string> opcode_to_mnemonic = {
-    {0x90, "NOP"},
-    {0x66, "TWO_BYTE_OPCODE_PREFIX"}, // Example prefix
-    {0x5D, "POP"},
-    {0x55, "PUSH"},
-    {0x01, "ADD"},
-    {0x29, "SUB"},
-    {0xEB, "JMP"},
-    {0xE9, "JMP"},
-    {0x09, "OR"},
-    {0x31, "XOR"},
-    {0x21, "AND"},
-    {0x39, "CMP"},
-    {0x83, "CMP"},
-    {0x75, "JNE"},
-    {0xB8, "MOV"},
-    {0xB9, "MOV"},
-    {0xBB, "MOV"},
-    {0x89, "MOV"},
-    {0xF7, "GROUP_F7"}, // MUL, NOT, DIV, etc.
-    {0xFF, "GROUP_FF"}, // INC, DEC
-    // The below are for simple cases, but the group is more accurate
-    {0x40, "INC"}, 
-    {0xFF, "INC"}
-    ,{0xCD, "INT"}
-  };
-
-  const std::map<std::string, uint8_t> mnemonic_to_opcode = {
-    {"NOP", 0x90},
-    {"TWO_BYTE_OPCODE_PREFIX", 0x66}, 
-    {"POP", 0x5d},
-    {"PUSH", 0x55},
-    {"ADD", 0x01},
-    {"SUB", 0x29},
-    {"JMP", 0xEB},
-    {"OR", 0x09},
-    {"XOR", 0x31},
-    {"AND", 0x21},
-    {"CMP", 0x39},
-    {"JNE", 0x75},
-    {"MOV", 0xB8},
-    {"INC", 0x40},
-    {"INT", 0xCD}
-    // ... more instructions
-  };
-
-  const std::map<uint8_t, size_t> instruction_lengths = {
-    {0x90, 1}, // NOP
-    {0xB8, 5}, // MOV EAX, imm32
-    {0xB9, 5}, // MOV ECX, imm32
-    {0xBB, 5}, // MOV EBX, imm32
-    {0x89, 2}, // MOV r/m32, r32
-    {0x55, 1}, // PUSH EBP
-    {0x5D, 1}, // POP EBP
-    
-    // ADD (Register-to-Register)
-    {0x01, 2}, // ADD r/m32, r32 (e.g., ADD EAX, EBX)
-
-    // SUB (Register-to-Register)
-    {0x29, 2}, // SUB r/m32, r32 (e.g., SUB EAX, EBX)
-
-    // JMP (Relative 8-bit offset)
-    {0xEB, 2}, // JMP rel8 (1 byte opcode + 1 byte immediate)
-    {0xE9, 5}, // JMP rel32 (1 byte opcode + 4 bytes immediate)
-
-    // OR (Register-to-Register)
-    {0x09, 2}, // OR r/m32, r32 (e.g., OR EAX, EBX)
-
-    // XOR (Register-to-Register)
-    {0x31, 2}, // XOR r/m32, r32 (e.g., XOR EAX, EBX)
-
-    // AND (Register-to-Register)
-    {0x21, 2}, // AND r/m32, r32 (e.g., AND EAX, EBX)
-
-    // CMP (Register-to-Register)
-    {0x39, 2}, // CMP r/m32, r32 (e.g., CMP EAX, EBX)
-    {0x83, 3}, // CMP r/m32, imm8
-
-    // JNE (Relative 8-bit offset)
-    {0x75, 2}, // JNE rel8 (1 byte opcode + 1 byte immediate)
-
-    // INC (Register)
-    // Note: In 64-bit mode, 0x4x bytes are REX prefixes.
-    // Use the ModR/M version (opcode FF /0) for 32-bit and 64-bit portability.
-    {0x40, 1}, // INC EAX (Legacy form, not used in 64-bit mode)
-    {0xFF, 2}, // INC r/m32 (ModR/M form, e.g., INC ECX is FF C1)
-    
-    // DEC (Register, similar to INC)
-    {0x48, 1}, // DEC EAX (Legacy form, not used in 64-bit mode)
-
-    // Group F7 instructions (MUL, NOT, DIV) are 2 bytes (Opcode + ModR/M)
-    {0xF7, 2},
-
-    // INT (Software Interrupt)
-    {0xCD, 2} // INT imm8 (e.g., INT 0x80)
-  };
-
+  std::map<uint8_t, std::string> opcode_to_mnemonic;
+  std::map<std::tuple<int, uint8_t>, std::string> vex_opcode_to_mnemonic;
+  std::map<std::string, uint8_t> mnemonic_to_opcode;
+  std::map<uint8_t, size_t> instruction_lengths;
 
 public:
   // Decodes the instruction at the given address in memory.
@@ -140,14 +56,20 @@ public:
   Decoder(Decoder&&) = delete;
   Decoder& operator=(const Decoder&) = delete;
   Decoder& operator=(Decoder&&) = delete;
+  ~Decoder() = default;
 
   // Static method to get the single instance
   static Decoder& getInstance();
+  // Static method to reset the single instance (for testing)
+  static void resetInstance();
+
   // Helper function to decode an encoded operand.
   DecodedOperand decodeOperand(uint64_t encoded_operand) const;
   std::string getMnemonic(uint8_t opcode) const;
-  std::string decodeMnemonic(uint8_t instruction_id) const;
-  std::optional<DecodedInstruction> decodeInstruction(const Memory& memory, address_t address);
+  std::string decodeMnemonic(uint8_t instruction_id) const;  
+  std::unique_ptr<DecodedInstruction> decodeInstruction(const Memory& memory, address_t address);
+  VEX_Prefix decodeVEXPrefix(const Memory& memory, address_t& address);
+  void decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex_prefix, const Memory& memory, address_t opcode_address);
   uint8_t getOpcode(const std::string& mnemonic) const;
 
   size_t getInstructionLength(uint8_t instruction_id) const;

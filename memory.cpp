@@ -50,13 +50,13 @@ Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
 }
 
 uint8_t Memory::read_text(address_t address) const {
-  if (address < text_segment_start || address >= data_segment_start) {
+  if (address < text_segment_start || address >= (text_segment_start + text_segment_size)) {
     throw std::out_of_range("Text segment out of bounds!");
   }
   return main_memory->at(address);
 }
 void Memory::write_text(address_t address, uint8_t value) {
-  if (address < text_segment_start || address >= data_segment_start) {
+  if (address < text_segment_start || address >= (text_segment_start + text_segment_size)) {
     throw std::out_of_range("Text segment write out of bounds!");
   }
   main_memory->at(address) = value;

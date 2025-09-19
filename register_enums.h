@@ -63,8 +63,14 @@ enum Reg32 {
     EFLAGS,
     NUM_REG32
 };
-enum RegSeg {
-    CS, DS, ES, FS, GS, SS
+enum RegSeg { // Added NUM_REG_SEG for sizing
+    CS, DS, ES, FS, GS, SS, NUM_REG_SEG
+};
+
+enum RegYMM {
+    YMM0, YMM1, YMM2, YMM3, YMM4, YMM5, YMM6, YMM7,
+    YMM8, YMM9, YMM10, YMM11, YMM12, YMM13, YMM14, YMM15,
+    NUM_REG_YMM
 };
 
 
@@ -82,6 +88,11 @@ static const std::vector<std::string> RegisterDisplayOrder32 = {
 
 static const std::vector<std::string> RegisterDisplayOrderSeg = {
     "cs", "ds", "es", "fs", "gs", "ss"
+};
+
+static const std::vector<std::string> RegisterDisplayOrderYMM = {
+    "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
+    "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"
 };
 
 // 64-bit General Purpose Registers (GPRs)
