@@ -11,7 +11,7 @@ This project is a command-line x86 simulator written in C++. It is designed to e
 *   **Build System:** Make
 *   **Database:** PostgreSQL (using `libpqxx`)
 *   **UI:** ncurses
-
+*   **test framework** gtest
 **Architecture:**
 
 The simulator is structured around several key classes:
