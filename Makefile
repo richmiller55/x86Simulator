@@ -57,3 +57,17 @@ clean:
 .PHONY: run
 run: $(TARGET)
 	./$(TARGET)
+
+# --- Test Targets ---
+TEST_SRCS = tests/decoder_test.cpp tests/memory_test.cpp tests/instruction_describer_test.cpp tests/operand_parser_test.cpp tests/register_map_test.cpp tests/rflags_test.cpp
+TEST_OBJS = $(TEST_SRCS:.cpp=.o)
+TEST_TARGET = x86_decoder_test
+
+# Add gtest flags
+GTEST_LIBS = -lgtest -lgtest_main -pthread
+
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
+
+$(TEST_TARGET): $(TEST_OBJS) $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(TEST_TARGET) $(filter-out main.o,$(OBJS)) $(TEST_OBJS) $(LDFLAGS) $(LIBS) $(GTEST_LIBS)
