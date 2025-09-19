@@ -9,10 +9,11 @@ RegisterMap::RegisterMap()
   : register_name_map_64_(),
     register_name_map_32_(),
     registers64_(),
+    registers_ymm_(),
     RegSeg_()
 {
-  // The maps are initialized as empty.
-  // The helper functions below should be called in the init() function or from a factory function.
+  // Initialize the object to a valid state upon construction.
+  init();
 }
 
 // Function to initialize the maps
@@ -33,9 +34,19 @@ bool RegisterMap::init() {
   };
   register_name_map_32_ = name_map_32;
 
+  static const std::map<std::string, RegYMM> name_map_ymm = {
+    {"ymm0", YMM0}, {"ymm1", YMM1}, {"ymm2", YMM2}, {"ymm3", YMM3},
+    {"ymm4", YMM4}, {"ymm5", YMM5}, {"ymm6", YMM6}, {"ymm7", YMM7},
+    {"ymm8", YMM8}, {"ymm9", YMM9}, {"ymm10", YMM10}, {"ymm11", YMM11},
+    {"ymm12", YMM12}, {"ymm13", YMM13}, {"ymm14", YMM14}, {"ymm15", YMM15}
+  };
+  register_name_map_ymm_ = name_map_ymm;
+
   // Resize the register vectors based on the enum sizes (if you have them defined)
   // For example: registers64_.resize(NUM_REGISTERS64, 0);
   registers64_.resize(NUM_REG64, 0);
+  registers_ymm_.resize(NUM_REG_YMM, _mm256_setzero_si256());
+  RegSeg_.resize(NUM_REG_SEG, 0);
   
 
   return true;
@@ -79,4 +90,19 @@ const std::map<std::string, Reg64>& RegisterMap::getRegisterNameMap64() const {
 
 const std::map<std::string, Reg32>& RegisterMap::getRegisterNameMap32() const {
   return register_name_map_32_;
+}
+
+__m256i RegisterMap::getYmm(const std::string& reg_name) const {
+  if (auto it = register_name_map_ymm_.find(reg_name); it != register_name_map_ymm_.end()) {
+    return registers_ymm_[static_cast<size_t>(it->second)];
+  }
+  throw std::out_of_range("Invalid YMM register name: " + reg_name);
+}
+
+void RegisterMap::setYmm(const std::string& reg_name, __m256i value) {
+  if (auto it = register_name_map_ymm_.find(reg_name); it != register_name_map_ymm_.end()) {
+    registers_ymm_[static_cast<size_t>(it->second)] = value;
+    return;
+  }
+  throw std::out_of_range("Invalid YMM register name: " + reg_name);
 }

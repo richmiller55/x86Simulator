@@ -108,13 +108,13 @@ void X86Simulator::runSingleInstruction() {
         return;
     }
 
-    DecodedInstruction decoded_instr = *decoded_instr_opt;
+    auto decoded_instr = std::move(decoded_instr_opt);
     // Log before execution
     // log(session_id_, "Executing: " + decoded_instr.mnemonic, "INFO", instruction_pointer, __FILE__, __LINE__);
 
     // EXECUTE
-    address_t next_ip = instruction_pointer + decoded_instr.length_in_bytes;
-    bool success = executeInstruction(decoded_instr);
+    address_t next_ip = instruction_pointer + decoded_instr->length_in_bytes;
+    bool success = executeInstruction(*decoded_instr);
 
     if (success) {
         // If the instruction pointer was not modified by a jump, advance it.
@@ -125,7 +125,7 @@ void X86Simulator::runSingleInstruction() {
         }
         // Otherwise, a jump occurred and RIP is already correct.
     } else {
-        log(session_id_, "Execution failed for: " + decoded_instr.mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);
+        log(session_id_, "Execution failed for: " + decoded_instr->mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);
         // This is a good place to set a halt flag
         // isRunning_ = false;
     }
@@ -174,26 +174,26 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
             continue;
         }
 
-        DecodedInstruction decoded_instr = *decoded_instr_opt;
+        auto decoded_instr = std::move(decoded_instr_opt);
 
         // Print Address
-        outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << decoded_instr.address << ": ";
+        outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << decoded_instr->address << ": ";
 
         // Print Raw Bytes
         std::stringstream bytes_ss;
-        for (size_t i = 0; i < decoded_instr.length_in_bytes; ++i) {
-            bytes_ss << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_text(current_address + i) << " ";
+        for (size_t i = 0; i < decoded_instr->length_in_bytes; ++i) {
+            bytes_ss << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_text(decoded_instr->address + i) << " ";
         }
         outfile << std::left << std::setw(18) << bytes_ss.str();
 
         // Print Disassembled Instruction
-        outfile << " " << decoded_instr.mnemonic;
-        for (const auto& op : decoded_instr.operands) {
+        outfile << " " << decoded_instr->mnemonic;
+        for (const auto& op : decoded_instr->operands) {
             outfile << " " << op.text;
         }
         outfile << std::endl;
 
-        current_address += decoded_instr.length_in_bytes;
+        current_address += decoded_instr->length_in_bytes;
     }
     outfile.close();
 }

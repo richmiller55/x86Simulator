@@ -1,6 +1,6 @@
 # Define compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -g
+CXXFLAGS = -std=c++17 -Wall -g -mavx
 LDFLAGS = 
 
 # Define the target executable name

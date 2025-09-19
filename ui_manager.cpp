@@ -168,7 +168,7 @@ void UIManager::preDecodeProgram() {
     size_t index = 0;
     while (addr < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
         if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, addr)) {
-            decoded_program_.push_back(std::make_unique<DecodedInstruction>(*decoded_instr_opt));
+            decoded_program_.push_back(std::move(decoded_instr_opt));
             address_to_index_map_[addr] = index++;
             addr += decoded_instr_opt->length_in_bytes;
         } else {

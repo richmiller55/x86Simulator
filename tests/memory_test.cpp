@@ -54,12 +54,12 @@ TEST(MemoryTest, ReadWrite64) {
 
 TEST(MemoryTest, OutOfBoundsRead) {
     Memory mem;
-    address_t addr = mem.get_data_segment_start() + 1; // This is out of text segment
+    address_t addr = mem.get_total_memory_size() + 1; // An address guaranteed to be out of bounds
     EXPECT_THROW(mem.read_text(addr), std::out_of_range);
 }
 
 TEST(MemoryTest, OutOfBoundsWrite) {
     Memory mem;
-    address_t addr = mem.get_data_segment_start() + 1; // This is out of text segment
+    address_t addr = mem.get_total_memory_size() + 1; // An address guaranteed to be out of bounds
     EXPECT_THROW(mem.write_text(addr, 0), std::out_of_range);
 }

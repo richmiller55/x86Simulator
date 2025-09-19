@@ -11,11 +11,13 @@ protected:
     }
 
     void TearDown() override {
-        // Clean up any allocated resources
+        // Reset the singleton to ensure no state leaks between test suites.
+        decoder.resetInstance();
     }
 
     Decoder& decoder = Decoder::getInstance();
 };
+
 
 TEST_F(DecoderTest, GetMnemonic) {
     EXPECT_EQ(decoder.getMnemonic(0x90), "NOP");
@@ -50,8 +52,8 @@ TEST_F(DecoderTest, DecodeSimpleInstruction) {
 
     // Test NOP instruction (0x90)
     memory.write_text(start_address, 0x90);
-    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
-    ASSERT_TRUE(decoded_instruction.has_value());
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);    
+    ASSERT_NE(decoded_instruction, nullptr);
     EXPECT_EQ(decoded_instruction->mnemonic, "NOP");
     EXPECT_EQ(decoded_instruction->length_in_bytes, 1);
     EXPECT_EQ(decoded_instruction->address, start_address);
@@ -67,10 +69,31 @@ TEST_F(DecoderTest, DecodeInstructionWithImmediate) {
         memory.write_text(start_address + i, instruction_bytes[i]);
     }
 
-    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
-    ASSERT_TRUE(decoded_instruction.has_value());
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);    
+    ASSERT_NE(decoded_instruction, nullptr);
     EXPECT_EQ(decoded_instruction->mnemonic, "MOV");
     EXPECT_EQ(decoded_instruction->length_in_bytes, 5);
     EXPECT_EQ(decoded_instruction->address, start_address);
     // Optionally, check operands if your decoder supports it
+}
+
+TEST_F(DecoderTest, DecodeVEXInstruction) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x300;
+
+    // VADDPS ymm0, ymm1, ymm2  (c5 f4 58 c2)
+    std::vector<uint8_t> instruction_bytes = {0xc5, 0xf4, 0x58, 0xc2};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);    
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "VADDPS");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 4);
+    EXPECT_EQ(decoded_instruction->address, start_address);
+    ASSERT_EQ(decoded_instruction->operands.size(), 3);
+    EXPECT_EQ(decoded_instruction->operands[0].text, "ymm0");
+    EXPECT_EQ(decoded_instruction->operands[1].text, "ymm1"); // This is the non-destructive source from VEX.vvvv
+    EXPECT_EQ(decoded_instruction->operands[2].text, "ymm2"); // This is from ModRM.rm
 }
