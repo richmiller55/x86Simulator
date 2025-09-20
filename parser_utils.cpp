@@ -1,4 +1,6 @@
 #include "parser_utils.h" // Include your header
+#include "decoder.h" 
+#include "operand_types.h" 
 
 #include <algorithm> // For std::transform
 #include <charconv> // For std::from_chars (C++17+) for robust string-to-number conversion
@@ -34,26 +36,6 @@ std::optional<uint64_t> parseImmediateValue(const std::string& str) {
     }
 }
 
-// Definition of isRegisterName (simplified for demonstration)
-bool isRegisterName(const std::string& operand) {
-    // A simplified check. For a real simulator, you would ideally pass a
-    // reference to your RegisterMap and check against actual known registers.
-    std::string normalizedOperand = operand;
-    std::transform(normalizedOperand.begin(), normalizedOperand.end(), normalizedOperand.begin(), ::tolower);
-
-    // Common prefixes for x86 registers
-    if (normalizedOperand.length() >= 2 &&
-        (normalizedOperand[0] == 'r' || normalizedOperand[0] == 'e' ||
-         normalizedOperand[0] == 'a' || normalizedOperand[0] == 'b' ||
-         normalizedOperand[0] == 'c' || normalizedOperand[0] == 'd' ||
-         normalizedOperand[0] == 's' || normalizedOperand[0] == 'i' ||
-         normalizedOperand[0] == 'p' || normalizedOperand[0] == 'f' ||
-         normalizedOperand[0] == 'g' || normalizedOperand[0] == 'x')) { // Add more if needed
-        return true;
-    }
-    // Very rudimentary check. A lookup in RegisterMap is much better.
-    return false;
-}
 
 // Example helper to parse arguments like "AX, BX" into {"AX", "BX"}
 // You might put this in simulator_utils.h/.cpp
@@ -77,3 +59,54 @@ bool parse_label(const std::string& operand_str) {
     else return false;
   }
 
+DecodedOperand parse_operand(const std::string& operand_str, const RegisterMap& regs, const std::map<std::string, address_t>& symbols) {
+    DecodedOperand result;
+    std::string trimmed_str = operand_str;
+    trim(trimmed_str); // Assumes a global or accessible trim function
+
+    // 1. Check for Label
+    if (!trimmed_str.empty() && trimmed_str.back() == ':') {
+        std::string label_text = trimmed_str.substr(0, trimmed_str.size() - 1);
+        auto it = symbols.find(label_text);
+        if (it != symbols.end()) {
+            result.text = label_text;
+            result.value = it->second;
+            result.type = OperandType::LABEL;
+            return result;
+        }
+        throw std::out_of_range("Invalid label reference: " + label_text);
+    }
+
+    // 2. Check for Register
+    try {
+        regs.get64(trimmed_str);
+        result.text = trimmed_str;
+        result.type = OperandType::REGISTER;
+        return result;
+    } catch (const std::out_of_range&) {
+        try {
+            regs.get32(trimmed_str);
+            result.text = trimmed_str;
+            result.type = OperandType::REGISTER;
+            return result;
+        } catch (const std::out_of_range&) { /* Not a register */ }
+    }
+
+    // 3. Check for Immediate Value
+    try {
+        result.value = std::stoull(trimmed_str, nullptr, 0);
+        result.text = trimmed_str;
+        result.type = OperandType::IMMEDIATE;
+        return result;
+    } catch (const std::exception&) { /* Not an immediate */ }
+    
+    // 4. Check for Memory Operand
+    if (trimmed_str.size() >= 2 && trimmed_str.front() == '[' && trimmed_str.back() == ']') {
+        result.text = trimmed_str;
+        result.type = OperandType::MEMORY;
+        return result;
+    }
+
+    result.type = OperandType::UNKNOWN_OPERAND_TYPE;
+    return result;
+}

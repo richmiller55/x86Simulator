@@ -106,3 +106,7 @@ void RegisterMap::setYmm(const std::string& reg_name, __m256i value) {
   }
   throw std::out_of_range("Invalid YMM register name: " + reg_name);
 }
+
+const std::map<std::string, RegYMM>& RegisterMap::getRegisterNameMapYmm() const {
+    return register_name_map_ymm_;
+}

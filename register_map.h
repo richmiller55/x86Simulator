@@ -28,6 +28,7 @@ public:
   void setYmm(const std::string& reg_name, __m256i value);
   const std::map<std::string, Reg64>& getRegisterNameMap64() const;
   const  std::map<std::string, Reg32>& getRegisterNameMap32() const;
+  const std::map<std::string, RegYMM>& getRegisterNameMapYmm() const;
 };
 
 #endif // REGISTER_MAP_H

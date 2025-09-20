@@ -28,13 +28,12 @@
 #include "register_enums.h"
 #include "register_map.h"
 #include "operand_types.h"
-#include "operand.h"
 #include "DatabaseManager.h"
+#include "decoder.h" // Include for DecodedInstruction and DecodedOperand
+
 class UIManager;
 
 
-class DecodedInstruction;
-class DecodedOperand;
 // Forward declarations for helper functions if they are *not* member functions
 
 std::vector<std::string> readLinesFromFile(const std::string& filename);
@@ -77,7 +76,6 @@ public:
   void displayRegistersWithDiff();
   void displayRegistersControlled();
   std::string trim(const std::string& str) ;
-  DecodedOperand parse_operand(const std::string& operand_str);
   bool get_CF() const;
   void set_CF(bool value);
   bool get_ZF() const;

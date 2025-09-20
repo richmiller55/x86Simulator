@@ -6,7 +6,9 @@
 #include <vector>
 #include <optional>
 #include <memory>
-#include "x86_simulator.h" // For address_t
+#include <map>
+#include "memory.h" // For address_t
+#include "operand_types.h" // For address_t
 
 // Represents a VEX prefix, which is used for AVX instructions.
 struct VEX_Prefix {

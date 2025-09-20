@@ -34,80 +34,6 @@ std::vector<std::string> readLinesFromFile(const std::string& filePath) {
   return lines;
 }
 
-
-
-// Assuming your OperandType enum or similar is defined elsewhere
-// For example:
-// enum class OperandType {
-//     REGISTER, IMMEDIATE, MEMORY, LABEL, UNKNOWN
-// };
-
-DecodedOperand X86Simulator::parse_operand(const std::string& operand_str) {
-    DecodedOperand result;
-    std::string trimmed_str = trim(operand_str);
-
-    // 1. Check for Label
-    if (!trimmed_str.empty() && trimmed_str.back() == ':') {
-        std::string label_text = trimmed_str.substr(0, trimmed_str.size() - 1);
-        auto it = symbolTable_.find(label_text);
-        if (it != symbolTable_.end()) {
-            result.text = label_text;
-            result.value = it->second;
-            result.type = OperandType::LABEL;
-            return result;
-        }
-        // If the label is not in the symbol table, it's an error.
-        throw std::out_of_range("Invalid label reference: " + label_text);
-    }
-
-    // 2. Check for Register
-    try {
-        // Try getting a 64-bit register
-        register_map_.get64(trimmed_str);
-        result.text = trimmed_str;
-        result.type = OperandType::REGISTER;
-        return result;
-    } catch (const std::out_of_range&) {
-        // Not a 64-bit register, try 32-bit
-        try {
-            register_map_.get32(trimmed_str);
-            result.text = trimmed_str;
-            result.type = OperandType::REGISTER;
-            return result;
-        } catch (const std::out_of_range&) {
-            // Not a register, continue checking other types
-        }
-    }
-
-    // 3. Check for Immediate Value (Hex or Decimal)
-    try {
-        // std::stoull handles decimal, hex (0x), and octal (0)
-        result.value = std::stoull(trimmed_str, nullptr, 0);
-        result.text = trimmed_str;
-        result.type = OperandType::IMMEDIATE;
-        return result;
-    } catch (const std::exception&) {
-        // Not an immediate value, continue checking
-    }
-    
-    // 4. Check for Memory Operand (More complex parsing needed here)
-    if (trimmed_str.size() >= 2 && trimmed_str.front() == '[' && trimmed_str.back() == ']') {
-        // Add your logic for parsing memory operands here.
-        // This is complex and might involve regex or more advanced parsing.
-        // For now, let's treat it as a memory operand and set the text.
-        result.text = trimmed_str;
-        result.type = OperandType::MEMORY;
-        return result;
-    }
-
-    // If none of the above, it's an unrecognized operand
-    std::string output = "Unrecognized operand format: ";
-    output += trimmed_str;
-    log(session_id_, output, "WARNING", 0, __FILE__, __LINE__);
-    result.type = OperandType::UNKNOWN_OPERAND_TYPE;
-    return result;
-}
-
 bool X86Simulator::loadProgram(const std::string& filename) {
   memory_.reset();
   programLines_ = readLinesFromFile(filename);
@@ -157,12 +83,12 @@ bool X86Simulator::firstPass() {
         // To keep the symbol table correct, we must simulate the address calculation here.
         else {
             // To get the correct address for labels, we must calculate the size of each instruction.
-            // We use a temporary CodeGenerator for this, as it has the sizing logic.
-            // This is inefficient but ensures correctness by centralizing the logic.
-            Memory temp_mem; // Create a dummy memory object for sizing
-            CodeGenerator temp_gen(temp_mem, symbolTable_);
-            std::vector<std::string> single_line_vec = {line_raw};
-            size_t instruction_size = temp_gen.generate_code(single_line_vec);
+            // We use a CodeGenerator for this, as it has the sizing logic.
+            // With the refactoring, we no longer need a temporary Memory object.
+            CodeGenerator temp_gen(symbolTable_);
+            std::vector<std::string> single_line_vec = { line_raw };
+            std::vector<uint8_t> code = temp_gen.generate_code(single_line_vec);
+            size_t instruction_size = code.size();
             location_counter += instruction_size;
         }
     }
@@ -170,10 +96,16 @@ bool X86Simulator::firstPass() {
 }
 
 bool X86Simulator::secondPass() {
-    CodeGenerator code_generator(memory_, symbolTable_);
-    // The code generator should return the size of the generated code.
-    program_size_in_bytes_ = code_generator.generate_code(programLines_);
-    memory_.text_segment_size = program_size_in_bytes_;
+    CodeGenerator code_generator(symbolTable_);
+    std::vector<uint8_t> machine_code = code_generator.generate_code(programLines_);
+    program_size_in_bytes_ = machine_code.size();
+
+    // Write the generated code to the simulator's memory
+    for (size_t i = 0; i < program_size_in_bytes_; ++i) {
+        memory_.write_text(memory_.get_text_segment_start() + i, machine_code[i]);
+    }
+
+    memory_.set_text_segment_size(program_size_in_bytes_);
 
     // Set the initial instruction pointer (RIP) to the address of the entry point label.
     auto it = symbolTable_.find(entryPointLabel_);
@@ -184,7 +116,9 @@ bool X86Simulator::secondPass() {
         // Fallback to the start of the text segment if the label is not found
         register_map_.set64("rip", memory_.text_segment_start);
     }
-    ui_->preDecodeProgram();
+    auto program_decoder = std::make_unique<ProgramDecoder>(memory_);
+    program_decoder->decode();
+    ui_->setProgramDecoder(std::move(program_decoder));
     return true;
 }
 

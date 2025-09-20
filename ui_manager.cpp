@@ -9,11 +9,10 @@ UIManager::UIManager(const Memory& memory_instance)
 : win32_(nullptr),
   win64_(nullptr),
   win_text_segment_(nullptr),
+  win_ymm_(nullptr),
   win_instruction_description_(nullptr),
   memory_(memory_instance),
-  text_scroll_offset_(0),
-  decoded_program_(),
-  address_to_index_map_() {
+  text_scroll_offset_(0) {
     initscr();
     clear();
     refresh();
@@ -30,6 +29,7 @@ UIManager::UIManager(const Memory& memory_instance)
     win32_ = newwin(13, 35, 1, 1);
     win64_ = newwin(32, 35, 1, 40);
     win_text_segment_ = newwin(25, 35, 14, 1);
+    win_ymm_ = newwin(18, 70, 1, 78); // New window for YMM registers
     win_instruction_description_ = newwin(12, 70, 33, 40); // Position for the new window
 
 }
@@ -38,10 +38,15 @@ UIManager::~UIManager() {
   tearDown();
 }
 
+void UIManager::setProgramDecoder(std::unique_ptr<ProgramDecoder> decoder) {
+    program_decoder_ = std::move(decoder);
+}
+
 void UIManager::tearDown() {
     delwin(win32_);
     delwin(win64_);
     delwin(win_text_segment_);
+    delwin(win_ymm_);
     delwin(win_instruction_description_);
     endwin();
 }
@@ -68,6 +73,12 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
       regValue = regs.get64(regName);
       ss << std::right << std::setw(16) << regValue;
       found = true;
+    } else if (auto it_ymm = regs.getRegisterNameMapYmm().find(regName); it_ymm != regs.getRegisterNameMapYmm().end()) {
+        // Special handling for YMM registers
+        __m256i ymmValue = regs.getYmm(regName);
+        // Just print the first 64 bits for now for simplicity
+        ss << std::right << std::setw(16) << ymmValue[0] << "...";
+      found = true;
     }  else if (auto it = map32.find(regName); it != map32.end()){
       regValue = regs.get32(regName);
       ss << std::right << std::setw(8) << regValue;
@@ -89,7 +100,7 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
 void UIManager::drawRegisters(const RegisterMap& regs) {
   drawRegisterWindow(win32_, "32-bit Registers", regs, RegisterDisplayOrder32);
   drawRegisterWindow(win64_, "64-bit Registers", regs, RegisterDisplayOrder64);
-
+  drawRegisterWindow(win_ymm_, "YMM Registers", regs, RegisterDisplayOrderYMM);
 }
 void UIManager::drawTextWindow(address_t current_rip) {
   drawTextSegment(win_text_segment_, "Program", current_rip);
@@ -100,9 +111,13 @@ void UIManager::drawInstructionDescription(address_t current_rip, const Register
     box(win_instruction_description_, 0, 0);
     mvwprintw(win_instruction_description_, 1, 2, "--- Instruction Details ---");
 
-    auto it = address_to_index_map_.find(current_rip);
-    if (it != address_to_index_map_.end()) {
-        const DecodedInstruction& instr = *decoded_program_[it->second];
+    if (!program_decoder_) return;
+    const auto& address_to_index_map = program_decoder_->getAddressToIndexMap();
+    const auto& decoded_program = program_decoder_->getDecodedProgram();
+
+    auto it = address_to_index_map.find(current_rip);
+    if (it != address_to_index_map.end()) {
+        const DecodedInstruction& instr = *decoded_program[it->second];
         std::string description = InstructionDescriber::describe(instr, regs);
 
         // Truncate description to fit in the window to prevent overflow
@@ -122,16 +137,19 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t
     box(win, 0, 0);
     mvwprintw(win, 1, 2, "--- %s ---", title.c_str());
 
+    if (!program_decoder_) return;
+    const auto& decoded_program = program_decoder_->getDecodedProgram();
+
     int y_offset = 2;
     const int max_y = getmaxy(win) - 1;
 
-    for (size_t i = text_scroll_offset_; i < decoded_program_.size(); ++i) {
+    for (size_t i = text_scroll_offset_; i < decoded_program.size(); ++i) {
         if (y_offset >= max_y) {
             mvwprintw(win, max_y, getmaxx(win) - 10, "[More...]");
             break;
         }
 
-        const auto& decoded_instr = *decoded_program_[i];
+        const auto& decoded_instr = *decoded_program[i];
 
         if (decoded_instr.address == current_rip) {
             wattron(win, COLOR_PAIR(2));
@@ -162,24 +180,10 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t
     }
 }
 
-void UIManager::preDecodeProgram() {
-    Decoder& decoder = Decoder::getInstance();
-    address_t addr = memory_.get_text_segment_start();
-    size_t index = 0;
-    while (addr < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
-        if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, addr)) {
-            decoded_program_.push_back(std::move(decoded_instr_opt));
-            address_to_index_map_[addr] = index++;
-            addr += decoded_instr_opt->length_in_bytes;
-        } else {
-            addr++;
-        }
-    }
-}
-
 void UIManager::refreshAll() {
     wnoutrefresh(win32_);
     wnoutrefresh(win64_);
+    wnoutrefresh(win_ymm_);
     wnoutrefresh(win_text_segment_);
     wnoutrefresh(win_instruction_description_);
     doupdate();
@@ -205,7 +209,7 @@ bool UIManager::waitForInput() {
                 refreshAll();
                 break; // Continue loop
             case KEY_DOWN:
-                if (!decoded_program_.empty() && text_scroll_offset_ < decoded_program_.size() - 1) {
+                if (program_decoder_ && !program_decoder_->getDecodedProgram().empty() && text_scroll_offset_ < program_decoder_->getDecodedProgram().size() - 1) {
                     text_scroll_offset_++;
                 }
                 drawTextWindow(0); // Dummy RIP for redraw
