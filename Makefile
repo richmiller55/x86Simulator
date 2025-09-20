@@ -10,56 +10,9 @@ TARGET = x86simulator
 INCLUDES = -I../libpqxx/include
 
 # Define C++ source files
-SRCS = \
-	main.cpp \
-	string_utils.cpp \
-	parser_utils.cpp \
-	memory.cpp \
-	x86_simulator_input.cpp \
-	x86_simulator_private_helpers.cpp \
-	x86_simulator_state.cpp \
-	x86_simulator_core.cpp \
-	register_rflags.cpp \
-	register_map.cpp \
-	DatabaseManager.cpp \
-	ui_manager.cpp \
-	decoder.cpp \
-	CodeGenerator.cpp \
-	instruction_describer.cpp
+OBJ = main.o string_utils.o parser_utils.o memory.o x86_simulator_input.o x86_simulator_private_helpers.o x86_simulator_state.o x86_simulator_core.o register_rflags.o register_map.o DatabaseManager.o ui_manager.o decoder.o CodeGenerator.o instruction_describer.o program_decoder.o
 
-# Define object files
-OBJS = $(SRCS:.cpp=.o)
-
-# Define libraries to link
-# The order matters for static libraries. libpqxx needs libpq, so it comes first.
-LIBS = -L/var/local -lpqxx -lpq -lncursesw
-
-# --- Build Targets ---
-
-# Default target
-all: $(TARGET)
-
-# Rule to link the executable
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS) $(LIBS)
-
-
-# Rule to compile C++ source files into object files
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
-
-# Target for cleaning up generated files
-.PHONY: clean
-clean:
-	rm -f $(OBJS) $(TARGET)
-
-# Target for running the executable
-.PHONY: run
-run: $(TARGET)
-	./$(TARGET)
-
-# --- Test Targets ---
-TEST_SRCS = tests/decoder_test.cpp tests/memory_test.cpp tests/instruction_describer_test.cpp tests/operand_parser_test.cpp tests/register_map_test.cpp tests/rflags_test.cpp
+TEST_OBJ = tests/test_main.o tests/rflags_test.o tests/memory_test.o tests/register_map_test.o tests/decoder_test.o tests/instruction_describer_test.o tests/operand_parser_test.o program_decoder_test.o
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 

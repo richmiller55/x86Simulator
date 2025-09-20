@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 
 std::unique_ptr<Decoder> Decoder::instance;
 
@@ -150,9 +151,11 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
         VEX_Prefix vex_prefix = decodeVEXPrefix(memory, current_address);
         uint8_t vex_opcode = memory.read_text(current_address);
         if (auto it = vex_opcode_to_mnemonic.find({vex_prefix.map_select, vex_opcode}); it != vex_opcode_to_mnemonic.end()) {
-            decoded_instr->mnemonic = it->second;
+            std::string mnemonic = it->second;
+            std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
+            decoded_instr->mnemonic = mnemonic;
         } else {
-            decoded_instr->mnemonic = "AVX_INSTRUCTION_UNKNOWN";
+            decoded_instr->mnemonic = "avx_instruction_unknown";
         }
         decodeAVXOperands(*decoded_instr, vex_prefix, memory, current_address);
         // The length will be determined by the specific AVX instruction.
@@ -162,7 +165,9 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
     } else {
         // Existing logic for non-AVX instructions
         current_address++;
-        decoded_instr->mnemonic = decodeMnemonic(opcode);
+        std::string mnemonic = decodeMnemonic(opcode);
+        std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
+        decoded_instr->mnemonic = mnemonic;
         if (decoded_instr->mnemonic == "UNKNOWN") {
             return nullptr;
         }
@@ -188,8 +193,8 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             decoded_instr->length_in_bytes = 2;
             uint8_t modrm = memory.read_text(current_address);
             uint8_t reg_field = (modrm >> 3) & 0x07;
-            if (reg_field == 0) decoded_instr->mnemonic = "INC";
-            else if (reg_field == 1) decoded_instr->mnemonic = "DEC";
+            if (reg_field == 0) decoded_instr->mnemonic = "inc";
+            else if (reg_field == 1) decoded_instr->mnemonic = "dec";
             // other group members...
 
             uint8_t rm = modrm & 0x07;
@@ -201,9 +206,9 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             decoded_instr->length_in_bytes = 2;
             uint8_t modrm = memory.read_text(current_address);
             uint8_t reg_field = (modrm >> 3) & 0x07;
-            if (reg_field == 2) decoded_instr->mnemonic = "NOT";
-            else if (reg_field == 4) decoded_instr->mnemonic = "MUL";
-            else if (reg_field == 6) decoded_instr->mnemonic = "DIV";
+            if (reg_field == 2) decoded_instr->mnemonic = "not";
+            else if (reg_field == 4) decoded_instr->mnemonic = "mul";
+            else if (reg_field == 6) decoded_instr->mnemonic = "div";
             // other group members...
 
             uint8_t rm = modrm & 0x07;
@@ -219,9 +224,9 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
 
             // Decode the specific instruction from the /reg field
             if (reg_field == 6) {
-                decoded_instr->mnemonic = "XOR";
+                decoded_instr->mnemonic = "xor";
             } else if (reg_field == 7) {
-                decoded_instr->mnemonic = "CMP";
+                decoded_instr->mnemonic = "cmp";
             }
             // Other instructions in this group (ADD, OR, etc.) can be added here.
 
@@ -309,7 +314,7 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
     uint8_t reg = (modrm >> 3) & 0x07;
     uint8_t rm  = modrm & 0x07;
 
-    if (instr.mnemonic == "VADDPS") {
+    if (instr.mnemonic == "vaddps") {
         DecodedOperand dest, src1, src2;
 
         dest.type = OperandType::YMM_REGISTER;

@@ -1,5 +1,6 @@
 #include "instruction_describer.h"
 #include <sstream>
+#include <algorithm>
 
 std::string InstructionDescriber::describe(const DecodedInstruction& instr, const RegisterMap& regs) {
     std::stringstream ss;

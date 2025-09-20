@@ -54,7 +54,7 @@ TEST_F(DecoderTest, DecodeSimpleInstruction) {
     memory.write_text(start_address, 0x90);
     auto decoded_instruction = decoder.decodeInstruction(memory, start_address);    
     ASSERT_NE(decoded_instruction, nullptr);
-    EXPECT_EQ(decoded_instruction->mnemonic, "NOP");
+    EXPECT_EQ(decoded_instruction->mnemonic, "nop");
     EXPECT_EQ(decoded_instruction->length_in_bytes, 1);
     EXPECT_EQ(decoded_instruction->address, start_address);
 }
@@ -71,7 +71,7 @@ TEST_F(DecoderTest, DecodeInstructionWithImmediate) {
 
     auto decoded_instruction = decoder.decodeInstruction(memory, start_address);    
     ASSERT_NE(decoded_instruction, nullptr);
-    EXPECT_EQ(decoded_instruction->mnemonic, "MOV");
+    EXPECT_EQ(decoded_instruction->mnemonic, "mov");
     EXPECT_EQ(decoded_instruction->length_in_bytes, 5);
     EXPECT_EQ(decoded_instruction->address, start_address);
     // Optionally, check operands if your decoder supports it
@@ -89,7 +89,7 @@ TEST_F(DecoderTest, DecodeVEXInstruction) {
 
     auto decoded_instruction = decoder.decodeInstruction(memory, start_address);    
     ASSERT_NE(decoded_instruction, nullptr);
-    EXPECT_EQ(decoded_instruction->mnemonic, "VADDPS");
+    EXPECT_EQ(decoded_instruction->mnemonic, "vaddps");
     EXPECT_EQ(decoded_instruction->length_in_bytes, 4);
     EXPECT_EQ(decoded_instruction->address, start_address);
     ASSERT_EQ(decoded_instruction->operands.size(), 3);
