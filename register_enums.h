@@ -90,10 +90,7 @@ static const std::vector<std::string> RegisterDisplayOrderSeg = {
     "cs", "ds", "es", "fs", "gs", "ss"
 };
 
-static const std::vector<std::string> RegisterDisplayOrderYMM = {
-    "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
-    "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"
-};
+
 
 // 64-bit General Purpose Registers (GPRs)
 #endif // X86SIMULATOR_REGISTER_ENUMS_H

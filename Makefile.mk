@@ -1,6 +1,6 @@
 # Define compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -g -mavx
+CXXFLAGS = -std=c++17 -Wall -g
 LDFLAGS = 
 
 # Define the target executable name
@@ -26,7 +26,8 @@ SRCS = \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
-	program_decoder.cpp
+	program_decoder.cpp \
+	formatting_utils.cpp
 
 # Define object files
 OBJS = $(SRCS:.cpp=.o)
@@ -46,8 +47,14 @@ $(TARGET): $(OBJS)
 
 
 # Rule to compile C++ source files into object files
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+ui_manager.o: ui_manager.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
+
+register_map.o: register_map.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
+
+formatting_utils.o: formatting_utils.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
 # Target for cleaning up generated files
 .PHONY: clean
@@ -60,7 +67,7 @@ run: $(TARGET)
 	./$(TARGET)
 
 # --- Test Targets ---
-TEST_SRCS = tests/decoder_test.cpp tests/memory_test.cpp tests/instruction_describer_test.cpp tests/operand_parser_test.cpp tests/register_map_test.cpp tests/rflags_test.cpp tests/program_decoder_test.cpp
+TEST_SRCS = tests/decoder_test.cpp tests/memory_test.cpp tests/instruction_describer_test.cpp tests/operand_parser_test.cpp tests/register_map_test.cpp tests/rflags_test.cpp tests/program_decoder_test.cpp tests/formatting_utils_test.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 

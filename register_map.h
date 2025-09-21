@@ -19,7 +19,7 @@ private:
   std::vector<uint16_t> RegSeg_;
 public:
   RegisterMap();
-  bool init();
+  const std::map<std::string, RegYMM>& getRegisterNameMapYmm() const;
   uint64_t get64(const std::string& reg_name) const;
   void set64(const std::string& reg_name, uint64_t value);
   uint64_t get32(const std::string& reg_name) const;
@@ -27,8 +27,7 @@ public:
   __m256i getYmm(const std::string& reg_name) const;
   void setYmm(const std::string& reg_name, __m256i value);
   const std::map<std::string, Reg64>& getRegisterNameMap64() const;
-  const  std::map<std::string, Reg32>& getRegisterNameMap32() const;
-  const std::map<std::string, RegYMM>& getRegisterNameMapYmm() const;
+  const std::map<std::string, Reg32>& getRegisterNameMap32() const;
 };
 
 #endif // REGISTER_MAP_H
