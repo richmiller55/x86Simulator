@@ -11,7 +11,8 @@ X86Simulator::X86Simulator(DatabaseManager& dbManager, int session_id)
       session_id_(session_id) {
   ui_ = std::make_unique<UIManager>(memory_);
   rflags_ |= (1ULL << RFLAGS_ALWAYS_SET_BIT_1);
-  register_map_.init();
+  ui_->setRegisterMap(&register_map_);
+
 };
 
 X86Simulator::~X86Simulator() {
