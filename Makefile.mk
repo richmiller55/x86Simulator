@@ -67,15 +67,21 @@ x86_simulator_private_helpers.o: x86_simulator_private_helpers.cpp
 tests/formatting_utils_test.o: tests/formatting_utils_test.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
+tests/simulator_core_test.o: tests/simulator_core_test.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
+
 # --- Test Targets ---
 TEST_SRCS = \
 	tests/memory_test.cpp \
 	tests/decoder_test.cpp \
 	tests/instruction_describer_test.cpp \
 	tests/operand_parser_test.cpp \
-	tests/register_map_test.cpp tests/rflags_test.cpp \
+	tests/register_map_test.cpp \
+	tests/rflags_test.cpp \
 	tests/program_decoder_test.cpp \
-	tests/formatting_utils_test.cpp
+	tests/formatting_utils_test.cpp \
+	tests/simulator_core_test.cpp \
+	tests/mock_database_manager.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 

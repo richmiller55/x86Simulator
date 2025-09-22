@@ -1,32 +1,28 @@
 #ifndef DATABASE_MANAGER_H
 #define DATABASE_MANAGER_H
 
-// DatabaseManager.h
+#include "i_database_manager.h"
 #include <pqxx/pqxx>
 #include <string>
 
-class DatabaseManager {
+class DatabaseManager : public IDatabaseManager {
 private:
-    pqxx::connection m_conn;
-
-protected:
-    DatabaseManager() = default; // For use by mock objects
+  pqxx::connection m_conn;
 
 public:
-    DatabaseManager(const std::string& conn_info);
-    virtual ~DatabaseManager();
-    
+  DatabaseManager(const std::string &conn_info);
+  ~DatabaseManager() override;
 
-  virtual void logEvent(int session_id, const std::string& event_type, const std::string& payload);
+  void logEvent(int session_id, const std::string &event_type,
+                const std::string &payload) override;
 
-  virtual int createSession(const std::string& programName);
+  int createSession(const std::string &programName) override;
 
-  virtual void saveSnapshot(int session_id, const std::string& snapshotData);
+  void saveSnapshot(int session_id, const std::string &snapshotData) override;
 
-  virtual void log(int session_id, const std::string& message, const std::string& level,
-	   uint64_t instruction_pointer, const std::string& source_file,
-	   int source_line) ;
-
+  void log(int session_id, const std::string &message, const std::string &level,
+           uint64_t instruction_pointer, const std::string &source_file,
+           int source_line) override;
 };
 
 #endif // DATABASE_MANAGER_H

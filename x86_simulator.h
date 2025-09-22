@@ -28,7 +28,7 @@
 #include "register_enums.h"
 #include "register_map.h"
 #include "operand_types.h"
-#include "DatabaseManager.h"
+#include "i_database_manager.h"
 #include "decoder.h" // Include for DecodedInstruction and DecodedOperand
 
 class UIManager;
@@ -60,7 +60,7 @@ const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
 class X86Simulator {
 public:
     // Constructor, other public methods
-  X86Simulator(DatabaseManager& dbManager, int session_id);
+  X86Simulator(IDatabaseManager& dbManager, int session_id);
   ~X86Simulator();
   
   void init(const std::string& program_name);
@@ -97,7 +97,7 @@ public:
   void push(uint64_t value); 
   RegisterMap& getRegisterMapForTesting() { return register_map_; }
 private:
-  DatabaseManager& dbManager_;
+  IDatabaseManager& dbManager_;
   RegisterMap register_map_;
   Memory memory_;
   address_t instructionPointer_ = 0;
@@ -141,4 +141,3 @@ private:
 };
 
 #endif // X86SIMULATOR_H
-

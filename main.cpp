@@ -1,4 +1,6 @@
 #include "x86_simulator.h"
+#include "DatabaseManager.h"
+#include "i_database_manager.h"
 #include <iostream>
 #include <cstdlib>
 

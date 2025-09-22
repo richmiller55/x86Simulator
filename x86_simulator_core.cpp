@@ -1,10 +1,10 @@
 #include "x86_simulator.h"
 #include "ui_manager.h"
 #include "decoder.h"
-#include "tests/mock_database_manager.h" // For IDatabaseManager
+#include "i_database_manager.h"
 
 // Constructor with DatabaseManager injection
-X86Simulator::X86Simulator(DatabaseManager& dbManager, int session_id)
+X86Simulator::X86Simulator(IDatabaseManager& dbManager, int session_id)
     : dbManager_(dbManager),
       register_map_(),
       memory_(),
