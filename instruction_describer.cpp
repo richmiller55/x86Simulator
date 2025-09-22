@@ -36,6 +36,88 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
         if (instr.operands.size() == 1) {
             ss << "Pops a value from the stack into " << instr.operands[0].text << ".";
         }
+    } else if (mnemonic == "vaddps") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Adds packed single-precision floating-point values from " << src2.text << " to " << src1.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vdivps") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Divides packed single-precision floating-point values in " << src1.text << " by values in " << src2.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vmaxps") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Compares packed single-precision floating-point values in " << src1.text << " and " << src2.text << " and stores the maximum values in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vpandn") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Performs a bitwise AND of the inverted " << src1.text << " with " << src2.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vpand") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Performs a bitwise AND of " << src1.text << " and " << src2.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vpmullw") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Multiplies packed 16-bit integers in " << src1.text << " and " << src2.text << ", storing the low 16 bits of the results in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vminps") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Compares packed single-precision floating-point values in " << src1.text << " and " << src2.text << " and stores the minimum values in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vpxor") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Performs a bitwise XOR of " << src1.text << " and " << src2.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vrcpps") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Computes approximate reciprocals of packed single-precision floating-point values in " << src.text << " and stores the results in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vsqrtps") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Computes the square roots of packed single-precision floating-point values in " << src.text << " and stores the results in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vsubps") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Subtracts packed single-precision floating-point values in " << src2.text << " from " << src1.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "vpor") {
+        if (instr.operands.size() == 3) {
+            const auto& dest = instr.operands[0];
+            const auto& src1 = instr.operands[1];
+            const auto& src2 = instr.operands[2];
+            ss << "Performs a bitwise OR of " << src1.text << " and " << src2.text << " and stores the result in " << dest.text << ".";
+        }
     }
     // Default case for other instructions
     else {

@@ -11,15 +11,16 @@ DatabaseManager::DatabaseManager(const std::string& conn_info)
     }
 }
 
-DatabaseManager::~DatabaseManager() = default; // This is now correct because it's declared in the header.
+DatabaseManager::~DatabaseManager() {}
 
 void DatabaseManager::logEvent(int session_id, const std::string& event_type, const std::string& payload) {
     try {
         pqxx::work txn(m_conn);
-	pqxx::params p;
-	p.append(event_type);
-	p.append(payload);
-        txn.exec("INSERT INTO events (event_type, payload) VALUES ($1, $2)",p);
+		pqxx::params p;
+		p.append(session_id);
+		p.append(event_type);
+		p.append(payload);
+        txn.exec("INSERT INTO events (session_id, event_type, payload) VALUES ($1, $2, $3)",p);
         txn.commit();
     } catch (const pqxx::sql_error& e) {
         std::cerr << "SQL error: " << e.what() << std::endl;
@@ -67,4 +68,8 @@ int DatabaseManager::createSession(const std::string& program_name) {
   // Check the result to get the session_id
   int session_id = r[0][0].as<int>();
   return session_id;
+}
+
+void DatabaseManager::saveSnapshot(int session_id, const std::string& snapshotData) {
+    std::cerr << "DatabaseManager::saveSnapshot is not yet implemented." << std::endl;
 }

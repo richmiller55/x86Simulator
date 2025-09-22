@@ -86,6 +86,66 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleNot(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "VADDPS") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVaddps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VDIVPS") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVdivps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VMAXPS") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVmaxps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VPANDN") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVpandn(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VPAND") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVpand(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VPMULLW") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVpmullw(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VMINPS") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVminps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VPXOR") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVpxor(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VRCPPS") {
+        if (decoded_instr.operands.size() == 2) {
+            handleVrcpps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VSQRTPS") {
+        if (decoded_instr.operands.size() == 2) {
+            handleVsqrtps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VSUBPS") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVsubps(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "VPOR") {
+        if (decoded_instr.operands.size() == 3) {
+            handleVpor(decoded_instr);
+            return true;
+        }
     } else {
         std::string logmessage = "unsupported instruction: " + decoded_instr.mnemonic;
         log(session_id_, logmessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
