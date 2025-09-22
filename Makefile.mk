@@ -18,6 +18,7 @@ LIB_SRCS = \
 	x86_simulator_private_helpers.cpp \
 	x86_simulator_state.cpp \
 	x86_simulator_core.cpp \
+	system_bus.cpp \
 	register_rflags.cpp \
 	register_map.cpp \
 	DatabaseManager.cpp \
@@ -81,7 +82,8 @@ TEST_SRCS = \
 	tests/program_decoder_test.cpp \
 	tests/formatting_utils_test.cpp \
 	tests/simulator_core_test.cpp \
-	tests/mock_database_manager.cpp
+	tests/mock_database_manager.cpp \
+	tests/system_bus_test.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 

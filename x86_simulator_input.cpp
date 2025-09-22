@@ -118,7 +118,9 @@ bool X86Simulator::secondPass() {
     }
     auto program_decoder = std::make_unique<ProgramDecoder>(memory_);
     program_decoder->decode();
-    ui_->setProgramDecoder(std::move(program_decoder));
+    if (ui_) {
+        ui_->setProgramDecoder(std::move(program_decoder));
+    }
     return true;
 }
 
@@ -132,5 +134,7 @@ std::string X86Simulator::trim(const std::string& str) {
   return str.substr(first, (last - first + 1));
 }
 void X86Simulator::waitForInput() {
-  ui_->waitForInput();
+  if (ui_) {
+    ui_->waitForInput();
+  }
 }

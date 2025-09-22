@@ -1,0 +1,16 @@
+{
+  "ui_enabled": true,
+  "processes": [
+    {
+      "name": "my_program",
+      "path": "./programs/testBeta.asm"
+    }
+  ],
+  "devices": [
+    {
+      "name": "hdd1",
+      "type": "hard_drive",
+      "port": "0x3F6"
+    }
+  ]
+}

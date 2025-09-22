@@ -1,4 +1,5 @@
 #include "ui_manager.h"
+#include "register_enums.h"
 #include "x86_simulator.h"
 #include <sstream>
 #include <iomanip>
