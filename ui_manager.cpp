@@ -6,6 +6,8 @@
 #include "decoder.h"
 #include "instruction_describer.h" // Will be created later
 
+
+
 UIManager::UIManager(const Memory& memory_instance)
 : win32_(nullptr),
   win64_(nullptr),
@@ -15,34 +17,91 @@ UIManager::UIManager(const Memory& memory_instance)
   win_legend_(nullptr),
   memory_(memory_instance),
   text_scroll_offset_(0),
-  ymm_view_mode_(YmmViewMode::HEX_256), // Initialize to default view
-  display_base_(DisplayBase::HEX),     // Initialize to hex display
-  current_regs_(nullptr),
-  RegisterDisplayOrderYMM_({ // Initialize RegisterDisplayOrderYMM_
-    "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
-    "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"
-  })
+  ymm_scroll_offset_(0),
+  current_view_(UIView::kNormal),
+  show_flags_as_text_(true),
+  ymm_view_mode_(YmmViewMode::HEX_256),
+  display_base_(DisplayBase::HEX),
+  current_regs_(nullptr)
 {
     initscr();
     clear();
     refresh();
     cbreak();
     noecho();
-    keypad(stdscr, TRUE); // Enable keypad for arrow keys
+    keypad(stdscr, TRUE);
 
     if (has_colors()) {
         start_color();
         init_pair(1, COLOR_YELLOW, COLOR_BLACK);
         init_pair(2, COLOR_GREEN, COLOR_BLACK);
     }
-    // Create and position all windows.
-    win32_ = newwin(13, 35, 1, 1);
-    win64_ = newwin(32, 35, 1, 40);
-    win_text_segment_ = newwin(25, 35, 14, 1);
-    win_ymm_ = newwin(19, 80, 33, 40); // New window for YMM registers
-    win_instruction_description_ = newwin(12, 70, 1, 78); // Position for the new window
-    win_legend_ = newwin(4, 70, 14, 78);
 
+    win32_ = newwin(1, 1, 1, 1);
+    win64_ = newwin(1, 1, 1, 1);
+    win_text_segment_ = newwin(1, 1, 1, 1);
+    win_ymm_ = newwin(1, 1, 1, 1);
+    win_instruction_description_ = newwin(1, 1, 1, 1);
+    win_legend_ = newwin(1, 1, 1, 1);
+
+    arrangeWindows();
+}
+
+namespace { // Anonymous namespace for layout constants
+    const WindowLayout kNormalWin32Layout = { .y = 1, .x = 1, .height = 13, .width = 30 };
+    const WindowLayout kNormalWin64Layout = { .y = 1, .x = 32, .height = 22, .width = 30 };
+    const WindowLayout kNormalTextSegmentLayout = { .y = 14, .x = 1, .height = 25, .width = 30 };
+    const WindowLayout kNormalYmmLayout = { .y = 23, .x = 32, .height = 12, .width = 80 };
+    const WindowLayout kNormalInstructionDescLayout = { .y = 1, .x = 63, .height = 12, .width = 50 };
+    const WindowLayout kNormalLegendLayout = { .y = 14, .x = 63, .height = 6, .width = 50 };
+
+    const WindowLayout kExpandedYmmLayout = { .y = 23, .x = 32, .height = 19, .width = 80 };
+} // namespace
+
+std::string UIManager::formatFlags(uint64_t flags_value) {
+    std::stringstream ss;
+    ss << "[ ";
+    ss << ((flags_value >> RFLAGS_OF_BIT) & 1 ? 'O' : '-');
+    ss << ((flags_value >> RFLAGS_DF_BIT) & 1 ? 'D' : '-');
+    ss << ((flags_value >> RFLAGS_IF_BIT) & 1 ? 'I' : '-');
+    ss << ((flags_value >> RFLAGS_TF_BIT) & 1 ? 'T' : '-');
+    ss << ((flags_value >> RFLAGS_SF_BIT) & 1 ? 'S' : '-');
+    ss << ((flags_value >> RFLAGS_ZF_BIT) & 1 ? 'Z' : '-');
+    ss << ((flags_value >> RFLAGS_AF_BIT) & 1 ? 'A' : '-');
+    ss << ((flags_value >> RFLAGS_PF_BIT) & 1 ? 'P' : '-');
+    ss << ((flags_value >> RFLAGS_CF_BIT) & 1 ? 'C' : '-');
+    ss << " ]";
+    return ss.str();
+}
+
+void UIManager::arrangeWindows() {
+    const auto& win32_layout = kNormalWin32Layout;
+    const auto& win64_layout = kNormalWin64Layout;
+    const auto& text_segment_layout = kNormalTextSegmentLayout;
+    const auto& instruction_desc_layout = kNormalInstructionDescLayout;
+    const auto& legend_layout = kNormalLegendLayout;
+    const auto& ymm_layout = (current_view_ == UIView::kNormal) ? kNormalYmmLayout : kExpandedYmmLayout;
+
+    mvwin(win32_, win32_layout.y, win32_layout.x);
+    wresize(win32_, win32_layout.height, win32_layout.width);
+
+    mvwin(win64_, win64_layout.y, win64_layout.x);
+    wresize(win64_, win64_layout.height, win64_layout.width);
+
+    mvwin(win_text_segment_, text_segment_layout.y, text_segment_layout.x);
+    wresize(win_text_segment_, text_segment_layout.height, text_segment_layout.width);
+
+    mvwin(win_ymm_, ymm_layout.y, ymm_layout.x);
+    wresize(win_ymm_, ymm_layout.height, ymm_layout.width);
+
+    mvwin(win_instruction_description_, instruction_desc_layout.y, instruction_desc_layout.x);
+    wresize(win_instruction_description_, instruction_desc_layout.height, instruction_desc_layout.width);
+
+    mvwin(win_legend_, legend_layout.y, legend_layout.x);
+    wresize(win_legend_, legend_layout.height, legend_layout.width);
+
+    clear();
+    refresh();
 }
 
 void UIManager::setRegisterMap(const RegisterMap* regs) {
@@ -69,9 +128,10 @@ void UIManager::tearDown() {
 
 void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
 			  const RegisterMap& regs,
-			  std::vector<std::string> order,
-			  YmmViewMode current_ymm_view_mode, DisplayBase current_display_base) { 		 
-  werase(win); // Clear the window before drawing
+			  const std::vector<std::string>& order,
+			  YmmViewMode current_ymm_view_mode, DisplayBase current_display_base,
+			  size_t scroll_offset, int max_regs) {
+  werase(win);
   box(win, 0, 0);
 
   std::string actual_title = title;
@@ -98,7 +158,9 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
   const auto& map64 = regs.getRegisterNameMap64();
   const auto& map32 = regs.getRegisterNameMap32();
 
-  for (const std::string& regName : order) {
+  size_t end = (max_regs == -1) ? order.size() : std::min(order.size(), scroll_offset + static_cast<size_t>(max_regs));
+  for (size_t i = scroll_offset; i < end; ++i) {
+    const std::string& regName = order[i];
     std::stringstream ss;
     ss << std::left << std::setw(4) << regName << ": ";
     
@@ -106,46 +168,52 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
     uint64_t regValue = 0;
     if (auto it = map64.find(regName); it != map64.end()) {
       regValue = regs.get64(regName);
-      ss << "0x" << std::hex << std::setfill('0') << std::right << std::setw(16) << regValue;
+      if (regName == "rflags" && show_flags_as_text_) {
+          ss << formatFlags(regValue);
+      } else {
+          ss << "0x" << std::hex << std::setfill('0') << std::right << std::setw(16) << regValue;
+      }
       found = true;
     } else if (auto it_ymm = regs.getRegisterNameMapYmm().find(regName); it_ymm != regs.getRegisterNameMapYmm().end()) {
-        // Special handling for YMM registers using the new formatting utility
         __m256i ymmValue = regs.getYmm(regName);
         ss << format_ymm_register(ymmValue, current_ymm_view_mode, current_display_base);
         found = true;
     }  else if (auto it = map32.find(regName); it != map32.end()){
       regValue = regs.get32(regName);
-      ss << "0x" << std::hex << std::setfill('0') << std::right << std::setw(8) << regValue;
+      if (regName == "eflags" && show_flags_as_text_) {
+          ss << formatFlags(regValue);
+      } else {
+          ss << "0x" << std::hex << std::setfill('0') << std::right << std::setw(8) << regValue;
+      }
       found = true;
     }
 
     if (found) {
       if (regName == "rip" || regName == "rsp" || regName == "esp") {
-          wattron(win, COLOR_PAIR(2)); // Use green for rip, rsp, esp
+          wattron(win, COLOR_PAIR(2));
       } else {
-          wattron(win, COLOR_PAIR(1)); // Use yellow for others
+          wattron(win, COLOR_PAIR(1));
       }
       mvwprintw(win, row++, 2, "%s", ss.str().c_str());
-      wattroff(win, A_COLOR); // Turn off any color attribute
+      wattroff(win, A_COLOR);
     }
   }
 }
-void UIManager::drawRegisters(const RegisterMap& regs) {
+
+void UIManager::drawMainRegisters(const RegisterMap& regs) {
   drawRegisterWindow(win32_, "32-bit Registers", regs, RegisterDisplayOrder32, YmmViewMode::HEX_256, DisplayBase::HEX);
   drawRegisterWindow(win64_, "64-bit Registers", regs, RegisterDisplayOrder64, YmmViewMode::HEX_256, DisplayBase::HEX);
-  drawRegisterWindow(win_ymm_, "YMM Registers", regs, RegisterDisplayOrderYMM_, ymm_view_mode_, display_base_);
-  drawLegend();
+}
+
+void UIManager::drawYmmRegisters(const RegisterMap& regs) {
+    if (current_view_ == UIView::kNormal) {
+        drawRegisterWindow(win_ymm_, "YMM Registers (Peek)", regs, RegisterDisplayOrderYMM_, ymm_view_mode_, display_base_, ymm_scroll_offset_, 8);
+    } else {
+        drawRegisterWindow(win_ymm_, "YMM Registers (Expanded)", regs, RegisterDisplayOrderYMM_, ymm_view_mode_, display_base_);
+    }
 }
 void UIManager::drawTextWindow(address_t current_rip) {
   drawTextSegment(win_text_segment_, "Program", current_rip);
-}
-
-void UIManager::drawLegend() {
-    werase(win_legend_);
-    box(win_legend_, 0, 0);
-    mvwprintw(win_legend_, 1, 2, "n: step | b: back | q: quit");
-    mvwprintw(win_legend_, 2, 2, "up/down: scroll | v: cycle YMM view");
-    mvwprintw(win_legend_, 3, 2, "d: dec | x: hex | o: oct");
 }
 
 void UIManager::drawInstructionDescription(address_t current_rip, const RegisterMap& regs) {
@@ -232,6 +300,14 @@ void UIManager::refreshAll() {
     doupdate();
 }
 
+void UIManager::drawLegend() {
+    werase(win_legend_);
+    box(win_legend_, 0, 0);
+    mvwprintw(win_legend_, 1, 2, "n: step | q: quit | m: toggle view");
+    mvwprintw(win_legend_, 2, 2, "up/down: scroll text | +/-: scroll YMM");
+    mvwprintw(win_legend_, 3, 2, "v: YMM view | d/x/o: base | f: flags");
+}
+
 bool UIManager::waitForInput() {
     while (true) {
         int ch = getch();
@@ -241,14 +317,47 @@ bool UIManager::waitForInput() {
                 return false;
             case 'n':
                 return true; // continue simulation
-            case 'b':
-                // Step-back functionality is not implemented in the core simulator.
-                // For now, this key does nothing.
+            case 'f':
+                show_flags_as_text_ = !show_flags_as_text_;
+                if (current_regs_) {
+                    drawMainRegisters(*current_regs_);
+                    refreshAll();
+                }
+                break;
+            case 'm':
+                current_view_ = (current_view_ == UIView::kNormal) ? UIView::kYmmExpanded : UIView::kNormal;
+                arrangeWindows();
+                if (current_regs_) {
+                    drawMainRegisters(*current_regs_);
+                    drawYmmRegisters(*current_regs_);
+                    drawTextWindow(current_regs_->get64("rip"));
+                    drawInstructionDescription(current_regs_->get64("rip"), *current_regs_);
+                    drawLegend();
+                }
+                refreshAll();
+                break;
+            case '+':
+                if (ymm_scroll_offset_ < RegisterDisplayOrderYMM_.size() - 3) {
+                    ymm_scroll_offset_++;
+                }
+                if (current_regs_) {
+                    drawYmmRegisters(*current_regs_);
+                }
+                refreshAll();
+                break;
+            case '-':
+                if (ymm_scroll_offset_ > 0) {
+                    ymm_scroll_offset_--;
+                }
+                if (current_regs_) {
+                    drawYmmRegisters(*current_regs_);
+                }
+                refreshAll();
                 break;
             case 'v': { // Cycle YMM view mode
                 ymm_view_mode_ = static_cast<YmmViewMode>((static_cast<int>(ymm_view_mode_) + 1) % 5); // 5 modes
                 if (current_regs_) { // Redraw YMM window if regs are available
-                    drawRegisters(*current_regs_);
+                    drawYmmRegisters(*current_regs_);
                     refreshAll();
                 }
                 break;
@@ -256,21 +365,21 @@ bool UIManager::waitForInput() {
             case 'd': // Set display base to Decimal
                 display_base_ = DisplayBase::DEC;
                 if (current_regs_) {
-                    drawRegisters(*current_regs_);
+                    drawYmmRegisters(*current_regs_);
                     refreshAll();
                 }
                 break;
             case 'x': // Set display base to Hexadecimal
                 display_base_ = DisplayBase::HEX;
                 if (current_regs_) {
-                    drawRegisters(*current_regs_);
+                    drawYmmRegisters(*current_regs_);
                     refreshAll();
                 }
                 break;
             case 'o': // Set display base to Octal
                 display_base_ = DisplayBase::OCT;
                 if (current_regs_) {
-                    drawRegisters(*current_regs_);
+                    drawYmmRegisters(*current_regs_);
                     refreshAll();
                 }
                 break;
