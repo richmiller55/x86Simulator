@@ -13,7 +13,7 @@ TEST(ProgramDecoderTest, DecodeSimpleProgram) {
     mem.write_text(mem.get_text_segment_start() + 4, 0x00);
     // nop
     mem.write_text(mem.get_text_segment_start() + 5, 0x90);
-    mem.set_text_segment_size(6);
+    mem.set_text_segment_size(5 + 1); // mov is 5 bytes, nop is 1 byte
 
     ProgramDecoder decoder(mem);
     decoder.decode();
@@ -29,6 +29,6 @@ TEST(ProgramDecoderTest, DecodeSimpleProgram) {
 
     const auto& address_map = decoder.getAddressToIndexMap();
     ASSERT_EQ(address_map.size(), 2);
-    EXPECT_EQ(address_map.at(mem.get_text_segment_start() + 5), 0);
-    EXPECT_EQ(address_map.at(mem.get_text_segment_start() + 6), 1);
+    EXPECT_EQ(address_map.at(mem.get_text_segment_start() + 0), 0);
+    EXPECT_EQ(address_map.at(mem.get_text_segment_start() + 5), 1);
 }

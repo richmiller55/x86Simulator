@@ -7,7 +7,6 @@
 class InstructionDescriberTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        regs.init();
     }
 
     RegisterMap regs;

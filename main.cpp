@@ -8,7 +8,7 @@ int main() {
         std::cerr << "Error: DB_CONN_STR environment variable not set." << std::endl;
         return 1;
     }
-    DatabaseManager dbManager(conn_str_env);
+    DatabaseManager dbManager(conn_str_env); // This is the concrete implementation
 
     int session_id = dbManager.createSession("testPrg");
 

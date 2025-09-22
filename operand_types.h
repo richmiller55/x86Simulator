@@ -4,6 +4,7 @@
 enum class OperandType {
   IMMEDIATE,
     REGISTER,
+    XMM_REGISTER,
     YMM_REGISTER,
     MEMORY,
     LABEL,

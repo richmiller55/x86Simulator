@@ -66,6 +66,28 @@ Decoder::Decoder() {
         {{1, 0x77}, "VZEROUPPER"},
         // VADDPS
         {{1, 0x58}, "VADDPS"},
+        // VDIVPS
+        {{1, 0x5E}, "VDIVPS"},
+        // VMAXPS
+        {{1, 0x5F}, "VMAXPS"},
+        // VPANDN
+        {{1, 0xDF}, "VPANDN"},
+        // VPAND
+        {{1, 0xDB}, "VPAND"},
+        // VPMULLW
+        {{1, 0xD5}, "VPMULLW"},
+        // VMINPS
+        {{1, 0x5D}, "VMINPS"},
+        // VPXOR
+        {{1, 0xEF}, "VPXOR"},
+        // VRCPPS
+        {{1, 0x53}, "VRCPPS"},
+        // VSQRTPS
+        {{1, 0x51}, "VSQRTPS"},
+        // VSUBPS
+        {{1, 0x5C}, "VSUBPS"},
+        // VPOR
+        {{1, 0xEB}, "VPOR"},
     };
 
     mnemonic_to_opcode = {
@@ -314,18 +336,19 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
     uint8_t reg = (modrm >> 3) & 0x07;
     uint8_t rm  = modrm & 0x07;
 
-    if (instr.mnemonic == "vaddps") {
+    if (instr.mnemonic == "vaddps" || instr.mnemonic == "vdivps" || instr.mnemonic == "vmaxps" || instr.mnemonic == "vpandn" || instr.mnemonic == "vpand" || instr.mnemonic == "vpmullw" || instr.mnemonic == "vminps" || instr.mnemonic == "vpxor" || instr.mnemonic == "vsubps" || instr.mnemonic == "vpor") {
         DecodedOperand dest, src1, src2;
+        std::string reg_prefix = vex_prefix.L ? "ymm" : "xmm";
 
-        dest.type = OperandType::YMM_REGISTER;
-        dest.text = "ymm" + std::to_string(reg);
+        dest.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+        dest.text = reg_prefix + std::to_string(reg);
 
-        src1.type = OperandType::YMM_REGISTER;
-        src1.text = "ymm" + std::to_string(vex_prefix.vvvv);
+        src1.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+        src1.text = reg_prefix + std::to_string(vex_prefix.vvvv);
 
         if (mod == 0b11) { // Register-to-register
-            src2.type = OperandType::YMM_REGISTER;
-            src2.text = "ymm" + std::to_string(rm);
+            src2.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+            src2.text = reg_prefix + std::to_string(rm);
         } else {
             // Memory operand decoding not implemented yet.
         }
@@ -333,7 +356,19 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
         instr.operands.push_back(dest);
         instr.operands.push_back(src1);
         instr.operands.push_back(src2);
-    }
+    } else if (instr.mnemonic == "vrcpps" || instr.mnemonic == "vsqrtps") {
+        DecodedOperand dest, src;
+        std::string reg_prefix = vex_prefix.L ? "ymm" : "xmm";
+
+        dest.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+        dest.text = reg_prefix + std::to_string(reg);
+
+        src.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+        src.text = reg_prefix + std::to_string(rm);
+
+        instr.operands.push_back(dest);
+        instr.operands.push_back(src);
+    } 
 }
 
 VEX_Prefix Decoder::decodeVEXPrefix(const Memory& memory, address_t& address) {

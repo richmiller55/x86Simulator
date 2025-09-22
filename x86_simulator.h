@@ -95,6 +95,7 @@ public:
   void waitForInput();
   uint64_t pop();
   void push(uint64_t value); 
+  RegisterMap& getRegisterMapForTesting() { return register_map_; }
 private:
   DatabaseManager& dbManager_;
   RegisterMap register_map_;
@@ -123,8 +124,21 @@ private:
   void handleXor(const DecodedInstruction& decoded_instr);
   void handleNot(const DecodedInstruction& decoded_instr);
   void handleSub(const DecodedInstruction& decoded_instr);
+  void handleVaddps(const DecodedInstruction& decoded_instr);
+  void handleVdivps(const DecodedInstruction& decoded_instr);
+  void handleVmaxps(const DecodedInstruction& decoded_instr);
+  void handleVpandn(const DecodedInstruction& decoded_instr);
+  void handleVpand(const DecodedInstruction& decoded_instr);
+  void handleVpmullw(const DecodedInstruction& decoded_instr);
+  void handleVminps(const DecodedInstruction& decoded_instr);
+  void handleVpxor(const DecodedInstruction& decoded_instr);
+  void handleVrcpps(const DecodedInstruction& decoded_instr);
+  void handleVsqrtps(const DecodedInstruction& decoded_instr);
+  void handleVsubps(const DecodedInstruction& decoded_instr);
+  void handleVpor(const DecodedInstruction& decoded_instr);
   std::vector<std::string> parseLine(const std::string& line);
   
 };
 
 #endif // X86SIMULATOR_H
+
