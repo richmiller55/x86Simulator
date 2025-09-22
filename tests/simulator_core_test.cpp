@@ -112,7 +112,7 @@ TEST_F(SimulatorCoreTest, VpandnExecution) {
     // VPANDN ymm0, ymm1, ymm2
     // Initialize ymm1 and ymm2 registers
     __m256i val1 = _mm256_set_epi32(0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000, 0xF0F0F0F0, 0x0F0F0F0F, 0xAAAAAAAA, 0x55555555);
-    __m256i val2 = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000, 0xFF00FF00, 0xFF00FF00, 0xCCCCCCCC, 0CCCCCCCC);
+    __m256i val2 = _mm256_set_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000, 0xFF00FF00, 0xFF00FF00, 0xCCCCCCCC, 0xCCCCCCCC);
     simulator.getRegisterMapForTesting().setYmm("ymm1", val1);
     simulator.getRegisterMapForTesting().setYmm("ymm2", val2);
 
