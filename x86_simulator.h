@@ -60,7 +60,7 @@ const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
 class X86Simulator {
 public:
     // Constructor, other public methods
-  X86Simulator(IDatabaseManager& dbManager, int session_id);
+  X86Simulator(IDatabaseManager& dbManager, int session_id, bool headless = false);
   ~X86Simulator();
   
   void init(const std::string& program_name);
@@ -96,6 +96,7 @@ public:
   uint64_t pop();
   void push(uint64_t value); 
   RegisterMap& getRegisterMapForTesting() { return register_map_; }
+  bool is_headless() const;
 private:
   IDatabaseManager& dbManager_;
   RegisterMap register_map_;
@@ -104,6 +105,7 @@ private:
   std::unique_ptr<UIManager> ui_;
   uint64_t rflags_;
   int session_id_;
+  bool headless_;
   address_t program_size_in_bytes_; 
 
   std::vector<std::string> programLines_; // raw

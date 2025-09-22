@@ -1,4 +1,4 @@
-#include "x86_simulator.h"
+#include "system_bus.h"
 #include "DatabaseManager.h"
 #include "i_database_manager.h"
 #include <iostream>
@@ -10,21 +10,9 @@ int main() {
         std::cerr << "Error: DB_CONN_STR environment variable not set." << std::endl;
         return 1;
     }
-    DatabaseManager dbManager(conn_str_env); // This is the concrete implementation
-
-    int session_id = dbManager.createSession("testPrg");
-
-    X86Simulator sim(dbManager, session_id);
-  sim.loadProgram("./programs/testBeta.asm");
-  sim.firstPass();
-  sim.secondPass(); // This now sets RIP to the start address
-  sim.dumpTextSegment("text_segment_dump.txt");
-
-  uint64_t instruction_pointer = sim.getRegister("rip");
-  sim.log(session_id, "Loaded program, starting execution", "INFO", instruction_pointer, "main.cpp", 21);
-
-  sim.runProgram();
-
-
-  return 0;
+    DatabaseManager dbManager(conn_str_env);
+    SystemBus system_bus(dbManager);
+    system_bus.load_configuration("system_bus.json");
+    system_bus.run();
+    return 0;
 }

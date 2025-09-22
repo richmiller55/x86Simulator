@@ -4,36 +4,42 @@
 #include "i_database_manager.h"
 
 // Constructor with DatabaseManager injection
-X86Simulator::X86Simulator(IDatabaseManager& dbManager, int session_id)
+X86Simulator::X86Simulator(IDatabaseManager& dbManager, int session_id, bool headless)
     : dbManager_(dbManager),
       register_map_(),
       memory_(),
       rflags_(0),
-      session_id_(session_id) {
-  ui_ = std::make_unique<UIManager>(memory_);
+      session_id_(session_id),
+      headless_(headless) {
+  if (!headless_) {
+    ui_ = std::make_unique<UIManager>(memory_);
+    ui_->setRegisterMap(&register_map_);
+  }
   rflags_ |= (1ULL << RFLAGS_ALWAYS_SET_BIT_1);
-  ui_->setRegisterMap(&register_map_);
-
-};
+}
 
 X86Simulator::~X86Simulator() {
-    ui_->tearDown();
+    if (ui_) {
+        ui_->tearDown();
+    }
 }
 
 void X86Simulator::init(const std::string& program_name) {
   session_id_ = dbManager_.createSession(program_name);
-};
+}
 
  int X86Simulator::get_session_id() const {
     return session_id_;
- };
+ }
 
 void X86Simulator::updateDisplay() {
-  address_t current_rip = register_map_.get64("rip");
-  ui_->drawRegisters(register_map_);
-  ui_->drawTextWindow(current_rip);
-  ui_->drawInstructionDescription(current_rip, register_map_);
-  ui_->refreshAll();
+  if (ui_) {
+    address_t current_rip = register_map_.get64("rip");
+    ui_->drawRegisters(register_map_);
+    ui_->drawTextWindow(current_rip);
+    ui_->drawInstructionDescription(current_rip, register_map_);
+    ui_->refreshAll();
+  }
 }
 // X86Simulator.cpp (using the new RegisterMap)
 void X86Simulator::push(uint64_t value) {
@@ -83,4 +89,8 @@ void X86Simulator::log(int session_id,
 			  const std::string& source_file,
 			  int source_line) {
   dbManager_.log(session_id, message, level, instruction_pointer, source_file, source_line);
+}
+
+bool X86Simulator::is_headless() const {
+    return headless_;
 }
