@@ -13,13 +13,18 @@
 
 struct DecodedInstruction; // Forward declaration
 
+struct WindowLayout {
+    int y, x, height, width;
+};
+
 class UIManager {
 public:
   UIManager(const Memory& memory_instance);
   ~UIManager();
 
   void tearDown();
-  void drawRegisters(const RegisterMap& regs);
+  void drawMainRegisters(const RegisterMap& regs);
+  void drawYmmRegisters(const RegisterMap& regs);
   void drawTextWindow(address_t current_rip);
   void drawInstructionDescription(address_t current_rip, const RegisterMap& regs);
   void drawLegend();
@@ -29,10 +34,15 @@ public:
   void setRegisterMap(const RegisterMap* regs); // New method to set current RegisterMap
 
 private:
+  enum class UIView { kNormal, kYmmExpanded };
+
+  std::string formatFlags(uint64_t flags_value);
+  void arrangeWindows();
   void drawRegisterWindow(WINDOW* win, const std::string& title,
 			  const RegisterMap& regs,
-			  std::vector<std::string> order,
-			  YmmViewMode current_ymm_view_mode, DisplayBase current_display_base);
+			  const std::vector<std::string>& order,
+			  YmmViewMode current_ymm_view_mode, DisplayBase current_display_base,
+			  size_t scroll_offset = 0, int max_regs = -1);
   void drawTextSegment(WINDOW* win, const std::string& title, address_t current_rip);
 
   WINDOW *win32_;
@@ -43,7 +53,10 @@ private:
   WINDOW *win_legend_;
   const Memory& memory_;
   size_t text_scroll_offset_;
+  size_t ymm_scroll_offset_ = 0;
 
+  UIView current_view_ = UIView::kNormal;
+  bool show_flags_as_text_ = true;
   YmmViewMode ymm_view_mode_;
   DisplayBase display_base_;
   const RegisterMap* current_regs_; // Pointer to the current RegisterMap for input handling

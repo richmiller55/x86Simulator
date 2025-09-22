@@ -35,9 +35,11 @@ void X86Simulator::init(const std::string& program_name) {
 void X86Simulator::updateDisplay() {
   if (ui_) {
     address_t current_rip = register_map_.get64("rip");
-    ui_->drawRegisters(register_map_);
+    ui_->drawMainRegisters(register_map_);
+    ui_->drawYmmRegisters(register_map_);
     ui_->drawTextWindow(current_rip);
     ui_->drawInstructionDescription(current_rip, register_map_);
+    ui_->drawLegend();
     ui_->refreshAll();
   }
 }
