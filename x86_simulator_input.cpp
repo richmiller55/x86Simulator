@@ -138,3 +138,4 @@ void X86Simulator::waitForInput() {
     ui_->waitForInput();
   }
 }
+

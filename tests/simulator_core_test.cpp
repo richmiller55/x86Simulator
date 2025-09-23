@@ -501,3 +501,49 @@ TEST_F(SimulatorCoreTest, VporExecution) {
         EXPECT_EQ(actual_ints[i], expected_ints[i]);
     }
 }
+
+TEST_F(SimulatorCoreTest, RflagsUpdateOnAdd) {
+    // This test verifies that rflags (and by extension eflags) are updated correctly.
+    // We will perform an ADD that results in a negative number, setting the Sign Flag (SF).
+    // We will also perform an ADD that results in zero, setting the Zero Flag (ZF).
+
+    // --- Test 1: Setting the Sign Flag (SF) ---
+    // ADD eax, ebx where eax = -10 and ebx = 5. Result should be -5.
+    simulator.getRegisterMapForTesting().set32("eax", static_cast<uint32_t>(-10));
+    simulator.getRegisterMapForTesting().set32("ebx", 5);
+
+    DecodedInstruction decoded_instr_sf;
+    decoded_instr_sf.mnemonic = "add";
+    decoded_instr_sf.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    decoded_instr_sf.operands.push_back({ "ebx", 0, OperandType::REGISTER });
+
+    simulator.executeInstruction(decoded_instr_sf);
+    // Manually sync flags from the internal rflags_ to the register map for testing.
+    // In normal execution, runSingleInstruction handles this.
+    simulator.update_rflags_in_register_map();
+
+    uint64_t rflags_after_sf = simulator.getRegisterMapForTesting().get64("rflags");
+    EXPECT_EQ(simulator.getRegisterMapForTesting().get32("eax"), static_cast<uint32_t>(-5));
+    EXPECT_NE((rflags_after_sf & (1ULL << RFLAGS_SF_BIT)), 0); // Check if SF is set
+    EXPECT_EQ((rflags_after_sf & (1ULL << RFLAGS_ZF_BIT)), 0);  // Check if ZF is not set
+
+    // --- Test 2: Setting the Zero Flag (ZF) ---
+    // ADD eax, ebx where eax = -5 and ebx = 5. Result should be 0.
+    simulator.getRegisterMapForTesting().set32("eax", static_cast<uint32_t>(-5));
+    simulator.getRegisterMapForTesting().set32("ebx", 5);
+
+    DecodedInstruction decoded_instr_zf;
+    decoded_instr_zf.mnemonic = "add";
+    decoded_instr_zf.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    decoded_instr_zf.operands.push_back({ "ebx", 0, OperandType::REGISTER });
+
+    simulator.executeInstruction(decoded_instr_zf);
+
+    // Manually sync flags from the internal rflags_ to the register map for testing.
+    simulator.update_rflags_in_register_map();
+
+    uint64_t rflags_after_zf = simulator.getRegisterMapForTesting().get64("rflags");
+    EXPECT_EQ(simulator.getRegisterMapForTesting().get32("eax"), 0);
+    EXPECT_EQ((rflags_after_zf & (1ULL << RFLAGS_SF_BIT)), 0);  // Check if SF is not set
+    EXPECT_NE((rflags_after_zf & (1ULL << RFLAGS_ZF_BIT)), 0); // Check if ZF is set
+}

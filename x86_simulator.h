@@ -95,6 +95,7 @@ public:
   void waitForInput();
   uint64_t pop();
   void push(uint64_t value); 
+  void update_rflags_in_register_map();
   RegisterMap& getRegisterMapForTesting() { return register_map_; }
   bool is_headless() const;
 private:
