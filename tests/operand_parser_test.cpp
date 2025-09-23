@@ -47,3 +47,35 @@ TEST(OperandParserTest, CombinedOperands) {
     EXPECT_EQ(parser.get_operand(0), "eax");
     EXPECT_EQ(parser.get_operand(1), "ebx");
 }
+
+TEST(OperandParserTest, PushInstruction) {
+    std::vector<std::string> tokens = {"PUSH", "eax"};
+    OperandParser parser(tokens);
+    EXPECT_EQ(parser.operand_count(), 1);
+    EXPECT_EQ(parser.get_operand(0), "eax");
+}
+
+TEST(OperandParserTest, PopInstruction) {
+    std::vector<std::string> tokens = {"POP", "ebp"};
+    OperandParser parser(tokens);
+    EXPECT_EQ(parser.operand_count(), 1);
+    EXPECT_EQ(parser.get_operand(0), "ebp");
+}
+
+TEST(OperandParserTest, ThreeOperandsVEX) {
+    std::vector<std::string> tokens = {"VADDPS", "ymm0,", "ymm1,", "ymm2"};
+    OperandParser parser(tokens);
+    EXPECT_EQ(parser.operand_count(), 3);
+    EXPECT_EQ(parser.get_operand(0), "ymm0");
+    EXPECT_EQ(parser.get_operand(1), "ymm1");
+    EXPECT_EQ(parser.get_operand(2), "ymm2");
+}
+
+TEST(OperandParserTest, ThreeOperandsVEXCombined) {
+    std::vector<std::string> tokens = {"VADDPS", "ymm0,ymm1,ymm2"};
+    OperandParser parser(tokens);
+    EXPECT_EQ(parser.operand_count(), 3);
+    EXPECT_EQ(parser.get_operand(0), "ymm0");
+    EXPECT_EQ(parser.get_operand(1), "ymm1");
+    EXPECT_EQ(parser.get_operand(2), "ymm2");
+}

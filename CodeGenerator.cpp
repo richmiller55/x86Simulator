@@ -217,6 +217,22 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         // For now, hardcoding for `not eax` -> ModR/M is D0
         machine_code_.push_back(0xD0);
         current_address_ += 2;
+    } else if (mnemonic == "push" || mnemonic == "pop") {
+        if (operands.operand_count() < 1) return;
+        std::string reg = operands.get_operand(0);
+        
+        static const std::map<std::string, uint8_t> reg_to_idx = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_idx.find(reg);
+        if (it != reg_to_idx.end()) {
+            uint8_t base_opcode = (mnemonic == "push") ? 0x50 : 0x58;
+            uint8_t opcode = base_opcode + it->second;
+            machine_code_.push_back(opcode);
+            current_address_ += 1;
+        }
     }
 }
 

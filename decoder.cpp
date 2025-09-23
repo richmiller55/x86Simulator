@@ -37,8 +37,8 @@ Decoder::Decoder() {
     opcode_to_mnemonic = {
         {0x90, "NOP"},
         {0x66, "TWO_BYTE_OPCODE_PREFIX"}, // Example prefix
-        {0x5D, "POP"},
-        {0x55, "PUSH"},
+        {0x50, "PUSH"}, {0x51, "PUSH"}, {0x52, "PUSH"}, {0x53, "PUSH"}, {0x54, "PUSH"}, {0x55, "PUSH"}, {0x56, "PUSH"}, {0x57, "PUSH"},
+        {0x58, "POP"}, {0x59, "POP"}, {0x5A, "POP"}, {0x5B, "POP"}, {0x5C, "POP"}, {0x5D, "POP"}, {0x5E, "POP"}, {0x5F, "POP"},
         {0x01, "ADD"},
         {0x29, "SUB"},
         {0xEB, "JMP"},
@@ -287,6 +287,20 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             op.text = ss.str();
             decoded_instr->operands.push_back(op);
             // Operand is the target address
+        } else if (opcode >= 0x50 && opcode <= 0x57) { // PUSH r32
+            decoded_instr->mnemonic = "push";
+            decoded_instr->length_in_bytes = 1;
+            DecodedOperand reg;
+            reg.type = OperandType::REGISTER;
+            reg.text = getRegisterName(opcode - 0x50);
+            decoded_instr->operands.push_back(reg);
+        } else if (opcode >= 0x58 && opcode <= 0x5F) { // POP r32
+            decoded_instr->mnemonic = "pop";
+            decoded_instr->length_in_bytes = 1;
+            DecodedOperand reg;
+            reg.type = OperandType::REGISTER;
+            reg.text = getRegisterName(opcode - 0x58);
+            decoded_instr->operands.push_back(reg);
         } else if (opcode == 0xCD) { // INT imm8
             decoded_instr->length_in_bytes = 2;
             uint8_t imm_value = memory.read_text(current_address);
