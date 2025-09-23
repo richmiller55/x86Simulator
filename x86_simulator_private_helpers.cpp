@@ -79,22 +79,36 @@ void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& dest_operand = decoded_instr.operands[0];
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
-    uint64_t destValue = 0;
+    uint32_t destValue = 0;
     // Get the destination register value using its text representation from register_map_
     try {
-        destValue = register_map_.get64(dest_operand.text);
+        destValue = register_map_.get32(dest_operand.text);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid destination operand in SUB: " + dest_operand.text;
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
-    // The source value is available directly from the DecodedOperand
-    const uint64_t sourceValue = src_operand.value;
+    uint32_t sourceValue = 0;
+    if (src_operand.type == OperandType::REGISTER) {
+        sourceValue = register_map_.get32(src_operand.text);
+    } else {
+        sourceValue = src_operand.value;
+    }
+
+    uint32_t result = destValue - sourceValue;
+
+    set_ZF(result == 0);
+    set_SF((result & 0x80000000) != 0);
+    set_CF(destValue < sourceValue); // Set if borrow was needed
+    bool dest_sign = (destValue & 0x80000000);
+    bool src_sign = (sourceValue & 0x80000000);
+    bool result_sign = (result & 0x80000000);
+    set_OF((dest_sign != src_sign) && (dest_sign != result_sign));
 
     // Perform subtraction and update destination using register_map_
     try {
-        register_map_.set64(dest_operand.text, destValue - sourceValue);
+        register_map_.set32(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid destination operand in SUB: " + dest_operand.text;
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);

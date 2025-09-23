@@ -189,6 +189,9 @@ void X86Simulator::runSingleInstruction() {
         // This is a good place to set a halt flag
         // isRunning_ = false;
     }
+
+    // After execution, update the rflags in the register map so the UI is correct.
+    update_rflags_in_register_map();
 }
 
 void X86Simulator::runProgram() {

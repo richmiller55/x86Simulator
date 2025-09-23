@@ -22,3 +22,7 @@ void X86Simulator::set_OF(bool value) {
   if (value) rflags_ |= (1ULL << RFLAGS_OF_BIT);
   else rflags_ &= ~(1ULL << RFLAGS_OF_BIT);
 }
+
+void X86Simulator::update_rflags_in_register_map() {
+    register_map_.set64("rflags", rflags_);
+}
