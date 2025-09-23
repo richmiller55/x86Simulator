@@ -22,7 +22,8 @@ LIB_SRCS = \
 	register_rflags.cpp \
 	register_map.cpp \
 	DatabaseManager.cpp \
-	ui_manager.cpp \
+	file_system_device.cpp \
+ 	ui_manager.cpp \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
@@ -65,6 +66,9 @@ formatting_utils.o: formatting_utils.cpp
 x86_simulator_private_helpers.o: x86_simulator_private_helpers.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
+file_system_device.o: file_system_device.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
+
 tests/formatting_utils_test.o: tests/formatting_utils_test.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
@@ -83,7 +87,8 @@ TEST_SRCS = \
 	tests/formatting_utils_test.cpp \
 	tests/simulator_core_test.cpp \
 	tests/mock_database_manager.cpp \
-	tests/system_bus_test.cpp
+	tests/system_bus_test.cpp \
+	tests/file_system_device.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 

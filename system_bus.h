@@ -2,6 +2,7 @@
 #define SYSTEM_BUS_H
 
 #include "i_database_manager.h"
+#include "file_system_device.h"
 #include "x86_simulator.h"
 #include <vector>
 #include <string>
@@ -29,6 +30,7 @@ private:
     IDatabaseManager& db_manager_;
     std::vector<std::unique_ptr<X86Simulator>> processes_;
     std::vector<DeviceInfo> devices_;
+    std::unique_ptr<FileSystemDevice> file_system_;
 };
 
 #endif // SYSTEM_BUS_H

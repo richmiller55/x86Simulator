@@ -6,6 +6,7 @@
 using json = nlohmann::json;
 
 SystemBus::SystemBus(IDatabaseManager& db_manager) : db_manager_(db_manager) {
+    file_system_ = std::make_unique<FileSystemDevice>();
 }
 
 SystemBus::~SystemBus() {
