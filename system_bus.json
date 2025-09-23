@@ -3,7 +3,7 @@
   "processes": [
     {
       "name": "my_program",
-      "path": "./programs/testBeta.asm"
+      "path": "./programs/popPush.asm"
     }
   ],
   "devices": [

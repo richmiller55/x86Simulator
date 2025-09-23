@@ -93,10 +93,9 @@ public:
 	   int source_line);
   void updateDisplay(); // This function now implicitly uses the current RIP
   void waitForInput();
-  uint64_t pop();
-  void push(uint64_t value); 
   void update_rflags_in_register_map();
   RegisterMap& getRegisterMapForTesting() { return register_map_; }
+  Memory& getMemoryForTesting() { return memory_; }
   bool is_headless() const;
 private:
   IDatabaseManager& dbManager_;
@@ -127,6 +126,8 @@ private:
   void handleXor(const DecodedInstruction& decoded_instr);
   void handleNot(const DecodedInstruction& decoded_instr);
   void handleSub(const DecodedInstruction& decoded_instr);
+  void handlePush(const DecodedInstruction& decoded_instr);
+  void handlePop(const DecodedInstruction& decoded_instr);
   void handleVaddps(const DecodedInstruction& decoded_instr);
   void handleVdivps(const DecodedInstruction& decoded_instr);
   void handleVmaxps(const DecodedInstruction& decoded_instr);

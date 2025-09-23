@@ -115,6 +115,96 @@ void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
     }
 }
 
+void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 1) {
+        log(session_id_, "PUSH instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& src_operand = decoded_instr.operands[0];
+    uint64_t src_value = 0;
+    size_t operand_size = 0;
+
+    if (src_operand.type == OperandType::REGISTER) {
+        const auto& reg_name = src_operand.text;
+        if (register_map_.getRegisterNameMap64().count(reg_name)) {
+            operand_size = 8;
+            src_value = register_map_.get64(reg_name);
+        } else if (register_map_.getRegisterNameMap32().count(reg_name)) {
+            operand_size = 4;
+            src_value = register_map_.get32(reg_name);
+        } else {
+            log(session_id_, "Unsupported register size for PUSH: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            return;
+        }
+    } else if (src_operand.type == OperandType::IMMEDIATE) {
+        operand_size = 8; // Assume 64-bit push for immediates
+        src_value = src_operand.value;
+    } else {
+        log(session_id_, "PUSH only supports register or immediate operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    uint64_t rsp = register_map_.get64("rsp");
+    rsp -= operand_size;
+    register_map_.set64("rsp", rsp);
+
+    if (rsp < memory_.stack_segment_start) {
+        log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    // Write value to the stack (little-endian)
+    for (size_t i = 0; i < operand_size; ++i) {
+        memory_.main_memory->at(rsp + i) = (src_value >> (i * 8)) & 0xFF;
+    }
+}
+
+void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 1) {
+        log(session_id_, "POP instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    if (dest_operand.type != OperandType::REGISTER) {
+        log(session_id_, "POP only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const auto& reg_name = dest_operand.text;
+    size_t operand_size = 0;
+
+    if (register_map_.getRegisterNameMap64().count(reg_name)) {
+        operand_size = 8;
+    } else if (register_map_.getRegisterNameMap32().count(reg_name)) {
+        operand_size = 4;
+    } else {
+        log(session_id_, "Unsupported register size for POP: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    uint64_t rsp = register_map_.get64("rsp");
+
+    if (rsp + operand_size > memory_.stack_bottom) {
+        log(session_id_, "Stack underflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    uint64_t value = 0;
+    for (size_t i = 0; i < operand_size; ++i) {
+        value |= static_cast<uint64_t>(memory_.main_memory->at(rsp + i)) << (i * 8);
+    }
+
+    if (operand_size == 8) {
+        register_map_.set64(reg_name, value);
+    } else { // operand_size is 4
+        register_map_.set32(reg_name, static_cast<uint32_t>(value));
+    }
+
+    register_map_.set64("rsp", rsp + operand_size);
+}
+
 void X86Simulator::handleJmp(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
         log(session_id_, "JMP instruction requires a target.", "ERROR",

@@ -15,6 +15,7 @@ X86Simulator::X86Simulator(IDatabaseManager& dbManager, int session_id, bool hea
     ui_ = std::make_unique<UIManager>(memory_);
     ui_->setRegisterMap(&register_map_);
   }
+  register_map_.set64("rsp", memory_.get_stack_bottom());
   rflags_ |= (1ULL << RFLAGS_ALWAYS_SET_BIT_1);
 }
 
@@ -42,19 +43,6 @@ void X86Simulator::updateDisplay() {
     ui_->drawLegend();
     ui_->refreshAll();
   }
-}
-// X86Simulator.cpp (using the new RegisterMap)
-void X86Simulator::push(uint64_t value) {
-    uint64_t current_rsp = register_map_.get64("rsp");
-    current_rsp -= 8;
-    register_map_.set64("rsp", current_rsp);
-
-    // Stack overflow check (example, adjust as needed)
-    if (current_rsp < memory_.stack_bottom) { // stack grows down
-        throw std::runtime_error("Stack overflow");
-    }
-    // 8 is the size of a pushed value (64-bit)
-    memory_.write_stack(current_rsp, value);
 }
 
 // Get the value of a register, handling different sizes with fallthrough

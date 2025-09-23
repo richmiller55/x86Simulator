@@ -547,3 +547,76 @@ TEST_F(SimulatorCoreTest, RflagsUpdateOnAdd) {
     EXPECT_EQ((rflags_after_zf & (1ULL << RFLAGS_SF_BIT)), 0);  // Check if SF is not set
     EXPECT_NE((rflags_after_zf & (1ULL << RFLAGS_ZF_BIT)), 0); // Check if ZF is set
 }
+
+
+TEST_F(SimulatorCoreTest, PushPopExecution) {
+    auto& register_map = simulator.getRegisterMapForTesting();
+    auto& memory = simulator.getMemoryForTesting();
+    uint64_t initial_rsp = memory.get_stack_bottom();
+
+    // --- Test 64-bit PUSH/POP ---
+    const uint64_t rax_val = 0x1122334455667788;
+    register_map.set64("rsp", initial_rsp);
+    register_map.set64("rax", rax_val);
+    register_map.set64("rbx", 0); // Clear rbx before pop
+
+    // PUSH RAX
+    DecodedInstruction push_rax_instr;
+    push_rax_instr.mnemonic = "push";
+    push_rax_instr.operands.push_back({ "rax", 0, OperandType::REGISTER });
+    simulator.executeInstruction(push_rax_instr);
+
+    uint64_t rsp_after_push = register_map.get64("rsp");
+    EXPECT_EQ(rsp_after_push, initial_rsp - 8);
+
+    // POP RBX
+    DecodedInstruction pop_rbx_instr;
+    pop_rbx_instr.mnemonic = "pop";
+    pop_rbx_instr.operands.push_back({ "rbx", 0, OperandType::REGISTER });
+    simulator.executeInstruction(pop_rbx_instr);
+
+    uint64_t rsp_after_pop = register_map.get64("rsp");
+    EXPECT_EQ(rsp_after_pop, initial_rsp);
+    EXPECT_EQ(register_map.get64("rbx"), rax_val);
+
+    // --- Test 32-bit PUSH/POP ---
+    const uint32_t ecx_val = 0xAABBCCDD;
+    register_map.set64("rsp", initial_rsp);
+    register_map.set32("ecx", ecx_val);
+    register_map.set32("edx", 0); // Clear edx before pop
+
+    // PUSH ECX
+    DecodedInstruction push_ecx_instr;
+    push_ecx_instr.mnemonic = "push";
+    push_ecx_instr.operands.push_back({ "ecx", 0, OperandType::REGISTER });
+    simulator.executeInstruction(push_ecx_instr);
+
+    rsp_after_push = register_map.get64("rsp");
+    EXPECT_EQ(rsp_after_push, initial_rsp - 4);
+
+    // To verify the 32-bit push, we pop it into another register.
+    // POP EDX
+    DecodedInstruction pop_edx_instr;
+    pop_edx_instr.mnemonic = "pop";
+    pop_edx_instr.operands.push_back({ "edx", 0, OperandType::REGISTER });
+    simulator.executeInstruction(pop_edx_instr);
+
+    rsp_after_pop = register_map.get64("rsp");
+    EXPECT_EQ(rsp_after_pop, initial_rsp);
+    EXPECT_EQ(register_map.get32("edx"), ecx_val);
+}
+TEST_F(SimulatorCoreTest, PushCrashTest) {
+    auto& register_map = simulator.getRegisterMapForTesting();
+    auto& memory = simulator.getMemoryForTesting();
+    uint64_t initial_rsp = memory.get_stack_bottom();
+    const uint32_t eax_val = 0x11223344;
+    const uint32_t ecx_val = 0x55667788;
+    DecodedInstruction push_ecx_instr;
+    push_ecx_instr.mnemonic = "push";
+    push_ecx_instr.operands.push_back({ "ecx", 0, OperandType::REGISTER });
+    simulator.executeInstruction(push_ecx_instr);
+
+    auto rsp_after_push = register_map.get32("rsp");
+    EXPECT_EQ(rsp_after_push, initial_rsp - 4);
+}
+
