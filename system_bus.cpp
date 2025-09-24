@@ -40,6 +40,7 @@ void SystemBus::load_configuration(const std::string& config_path) {
             simulator->loadProgram(program_path);
             simulator->firstPass();
             simulator->secondPass();
+	    simulator->dumpTextSegment("text_segment_dump.txt");
             processes_.push_back(std::move(simulator));
         }
     }

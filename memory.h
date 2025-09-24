@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <memory>
+#include <immintrin.h>
 
 typedef uint64_t address_t;
 
@@ -21,6 +22,15 @@ public:
 
   uint32_t read_text_dword(address_t address) const;
   void write_text_dword(address_t address, uint32_t value);
+
+  uint8_t read_data(address_t address) const;
+  void write_data(address_t address, uint8_t value);
+
+  uint32_t read_data_dword(address_t address) const;
+  void write_data_dword(address_t address, uint32_t value);
+
+  __m256i read_ymm(address_t address) const;
+  void write_ymm(address_t address, __m256i value);
 
   uint64_t read64(address_t address) const;
   void write64(address_t address, uint64_t value);

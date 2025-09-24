@@ -9,13 +9,37 @@
 #include <immintrin.h> // For __m256i
 #include "register_enums.h"
 
+// Custom allocator for aligned memory
+template <typename T, size_t Alignment>
+class AlignedAllocator : public std::allocator<T> {
+public:
+    using pointer = T*;
+
+    template <typename U>
+    struct rebind {
+        using other = AlignedAllocator<U, Alignment>;
+    };
+
+    pointer allocate(size_t n) {
+        void* p = _mm_malloc(n * sizeof(T), Alignment);
+        if (!p) {
+            throw std::bad_alloc();
+        }
+        return static_cast<pointer>(p);
+    }
+
+    void deallocate(pointer p, size_t) {
+        _mm_free(p);
+    }
+};
+
 class RegisterMap {
 private:
   std::map<std::string, Reg64> register_name_map_64_;
   std::map<std::string, Reg32> register_name_map_32_;
   std::map<std::string, RegYMM> register_name_map_ymm_;
   std::vector<uint64_t> registers64_; 
-  std::vector<__m256i> registers_ymm_; // YMM registers
+  std::vector<__m256i, AlignedAllocator<__m256i, 32>> registers_ymm_; // YMM registers
   std::vector<uint16_t> RegSeg_;
 public:
   RegisterMap();

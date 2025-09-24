@@ -1,6 +1,7 @@
 #include "CodeGenerator.h"
 #include "decoder.h"
 #include "operand_parser.h"
+#include <string>
 #include <sstream>
 #include <algorithm>
 #include <iostream>
@@ -258,6 +259,91 @@ void CodeGenerator::process_line(const std::string& line_raw) {
                 machine_code_.push_back(value);
                 current_address_ += 1;
             } catch (const std::exception&) { /* error */ }
+        }
+    } else if (mnemonic == "vpxor") {
+        if (operands.operand_count() < 3) return;
+        try {
+            std::string dest_str = operands.get_operand(0);
+            std::string src1_str = operands.get_operand(1);
+            std::string src2_str = operands.get_operand(2);
+
+            // Extract register indices from strings like "ymm0", "ymm1", etc.
+            uint8_t dest_reg = std::stoi(dest_str.substr(3));
+            uint8_t src1_reg = std::stoi(src1_str.substr(3));
+            uint8_t src2_reg = std::stoi(src2_str.substr(3));
+
+            // VEX prefix (2-byte form: 0xC5)
+            machine_code_.push_back(0xC5);
+
+            // VEX byte 2: [R|vvvv|L|pp]
+            // R=~0=1 (assuming registers 0-7), vvvv=~src1_reg, L=1 (256-bit), pp=01 (from map_select=1)
+            uint8_t vex_byte2 = (1 << 7) | ((~src1_reg & 0b1111) << 3) | (1 << 2) | 1;
+            machine_code_.push_back(vex_byte2);
+
+            // Opcode
+            machine_code_.push_back(0xEF);
+
+            // ModR/M byte: [mod|reg|rm]
+            // mod=11 (register-to-register), reg=dest_reg, rm=src2_reg
+            uint8_t modrm = (0b11 << 6) | ((dest_reg & 0b111) << 3) | (src2_reg & 0b111);
+            machine_code_.push_back(modrm);
+
+            current_address_ += 4; // 2(VEX) + 1(opcode) + 1(ModR/M)
+        } catch (const std::exception& e) {
+            // Error handling for stoi
+        }
+    } else if (mnemonic == "vmovups") {
+        if (operands.operand_count() < 2) return;
+        try {
+            std::string op1_str = operands.get_operand(0);
+            std::string op2_str = operands.get_operand(1);
+
+            bool is_load = op1_str.find("ymm") == 0;
+            std::string reg_str = is_load ? op1_str : op2_str;
+            std::string mem_str = is_load ? op2_str : op1_str;
+
+            uint8_t reg_idx = std::stoi(reg_str.substr(3));
+            std::string label = mem_str.substr(1, mem_str.length() - 2);
+
+            // VEX Prefix (2-byte form: 0xC5)
+            machine_code_.push_back(0xC5);
+
+            // VEX byte 2: [R|vvvv|L|pp]
+            // R: 0 for ymm0-ymm7
+            // vvvv: 1111 (unused for 2-operand)
+            // L: 1 (256-bit)
+            // pp: 01 (66h prefix)
+            uint8_t vex_byte2 = (0b1111 << 3) | (1 << 2) | 0b01;
+            machine_code_.push_back(vex_byte2);
+
+            // Opcode (0x10 for load, 0x11 for store)
+            machine_code_.push_back(is_load ? 0x10 : 0x11);
+
+            // ModR/M byte: [mod|reg|rm]
+            // mod=00, rm=101 for RIP-relative [disp32]
+            uint8_t modrm = (0b00 << 6) | ((reg_idx & 0b111) << 3) | 0b101;
+            machine_code_.push_back(modrm);
+
+            // Displacement (RIP-relative address)
+            auto it = symbol_table_.find(label);
+            if (it != symbol_table_.end()) {
+                address_t target_addr = it->second;
+                address_t rip_at_disp = current_address_ + 8; // Instruction length is 8
+                int32_t disp = static_cast<int32_t>(target_addr - rip_at_disp);
+                
+                // Insert 32-bit little-endian displacement
+                machine_code_.push_back((uint8_t)disp);
+                machine_code_.push_back((uint8_t)(disp >> 8));
+                machine_code_.push_back((uint8_t)(disp >> 16));
+                machine_code_.push_back((uint8_t)(disp >> 24));
+            } else {
+                // Error handle for label not found
+                machine_code_.insert(machine_code_.end(), { 0, 0, 0, 0 });
+            }
+
+            current_address_ += 8;
+        } catch (const std::exception& e) {
+            // Error handling
         }
     }
 }

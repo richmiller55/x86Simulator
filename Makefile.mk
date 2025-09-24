@@ -23,7 +23,7 @@ LIB_SRCS = \
 	register_map.cpp \
 	DatabaseManager.cpp \
 	file_system_device.cpp \
- 	ui_manager.cpp \
+	ui_manager.cpp \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
@@ -67,6 +67,9 @@ x86_simulator_private_helpers.o: x86_simulator_private_helpers.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
 file_system_device.o: file_system_device.cpp
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
+
+memory.o: memory.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
 tests/formatting_utils_test.o: tests/formatting_utils_test.cpp

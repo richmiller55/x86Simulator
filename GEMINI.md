@@ -11,6 +11,8 @@ This project is an x86 simulator built in C++17, designed to execute x86 instruc
 *   **Build System:** `Make`
 *   **Database:** PostgreSQL (using `libpqxx`)
 *   **UI:** `ncurses`
+*   **json:** `nlohmann/json`
+*   **serialization:** `cereal`
 *   **Test Framework:** `gtest`
 
 ### Architecture
@@ -23,6 +25,8 @@ The simulator is structured around these key classes:
 *   `Memory`: Simulates the computer's memory for instruction and data storage.
 *   `UIManager`: Manages the ncurses-based text user interface.
 *   `Decoder`: Responsible for decoding x86 instructions for execution.
+*   `SystemBus`: Responsible for setting the container which the simulator exists
+
 
 ## Building and Running
 
@@ -32,10 +36,20 @@ To compile the source files and create the `x86simulator` executable, use the fo
 
 ```bash
 make -f Makefile.mk
+```
+
+### Running Tests
+
+To run the test suite, use the following command:
+
+```bash
+make -f Makefile.mk test
+```
 
 
 Task Requirements: Adding a New Instruction
-To add a new x86 instruction to the simulator, the following files and functions need to be updated:
+To add a new x86 instruction to the simulator,
+the following files and functions need to be updated:
 CodeGenerator.cpp: Update the process_line function.
 decoder.cpp: Add logic to the Decoder() constructor.
 instruction_describer.cpp: Add a new case to the describe function.
@@ -50,5 +64,19 @@ Filenames: Use snake_case.cpp for all source files.
 General Style: The code uses header guards and separates concerns into different classes for clarity. 
 Database Integration
 Connection String: The connection to the PostgreSQL database is configured via the DB_CONN_STR environment variable.
-Testing
-Test Framework: The project uses the gtest framework for unit testing. New instructions should be acco
+Testing:
+Test Framework: The project uses gtest
+tests/decoder_test.cpp
+tests/formatting_utils_test.cpp
+tests/instruction_describer_test.cpp
+tests/memory_test.cpp
+tests/mock_database_manager.cpp
+tests/operand_parser_test.cpp
+tests/program_decoder_test.cpp
+tests/register_map_test.cpp
+tests/rflags_test.cpp
+tests/simulator_core_test.cpp
+tests/system_bus_test.cpp
+tests/test_main.cpp
+Errors:
+/home/rmiller/src/cpp/simulators/x86/error.log

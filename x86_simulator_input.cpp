@@ -51,8 +51,14 @@ std::vector<std::string> X86Simulator::parseLine(const std::string& line) {
 }
 
 bool X86Simulator::firstPass() {
-    // First pass is now only for building the symbol table.
-    address_t location_counter = 0;
+    symbolTable_.clear();
+    
+    address_t text_lc = memory_.get_text_segment_start();
+    address_t data_lc = memory_.get_data_segment_start();
+    address_t bss_lc = memory_.get_bss_segment_start();
+
+    address_t* current_lc = &text_lc; 
+
     for (const std::string& line_raw : programLines_) {
         std::string line = trim(line_raw);
         if (line.empty() || line[0] == ';') {
@@ -64,34 +70,61 @@ bool X86Simulator::firstPass() {
             continue;
         }
 
-        std::string& mnemonic = tokens[0];
-        std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(),
+        std::string first_token = tokens[0];
+        std::transform(first_token.begin(), first_token.end(), first_token.begin(),
                        [](unsigned char c){ return std::tolower(c); });
-        if (mnemonic.back() == ':') {
-            std::string label = mnemonic.substr(0, mnemonic.size() - 1);
-            symbolTable_[label] = location_counter;
+        
+        // Handle labels
+        if (first_token.back() == ':') {
+            std::string label = first_token.substr(0, first_token.size() - 1);
+            symbolTable_[label] = *current_lc;
+            // Handle labels on the same line as an instruction/directive
+            if (tokens.size() > 1) {
+                // Remove the label token and reprocess the rest of the line
+                tokens.erase(tokens.begin());
+                first_token = tokens[0];
+                std::transform(first_token.begin(), first_token.end(), first_token.begin(),
+                               [](unsigned char c){ return std::tolower(c); });
+            } else {
+                continue; // Processed a label on its own line
+            }
         }
-        // Handle assembler directives
-        else if (mnemonic == "section" || mnemonic == "global") {
-            // These directives do not generate code and do not advance the location counter.
-            // We can just ignore them for the purpose of address calculation.
-            // A more advanced assembler might use 'section' to switch between .text, .data, etc.
-            // and 'global' to adjust symbol visibility, but for now, we can skip.
-            continue;
+        
+        // Handle section directives
+        if (first_token == "section") {
+            if (tokens.size() > 1) {
+                std::string section_name = tokens[1];
+                if (section_name == ".text") {
+                    current_lc = &text_lc;
+                } else if (section_name == ".data") {
+                    current_lc = &data_lc;
+                } else if (section_name == ".bss") {
+                    current_lc = &bss_lc;
+                } else {
+                    log(session_id_, "Unknown section directive: " + section_name, "ERROR", 0, __FILE__, __LINE__);
+                    return false;
+                }
+            }
         }
-        // The CodeGenerator will determine the actual location counter during the second pass.
-        // To keep the symbol table correct, we must simulate the address calculation here.
+        // Handle data directives
+        else if (*current_lc == data_lc) {
+            *current_lc += calculate_data_size(tokens);
+        }
+        // Handle BSS directives
+        else if (*current_lc == bss_lc) {
+            *current_lc += calculate_bss_size(tokens);
+        }
+        // Handle instructions in the text segment
         else {
-            // To get the correct address for labels, we must calculate the size of each instruction.
-            // We use a CodeGenerator for this, as it has the sizing logic.
-            // With the refactoring, we no longer need a temporary Memory object.
-            CodeGenerator temp_gen(symbolTable_);
-            std::vector<std::string> single_line_vec = { line_raw };
-            std::vector<uint8_t> code = temp_gen.generate_code(single_line_vec);
-            size_t instruction_size = code.size();
-            location_counter += instruction_size;
+            CodeGenerator temp_gen(symbolTable_); // Will now have data labels
+            std::vector<uint8_t> code = temp_gen.generate_code({line_raw});
+            *current_lc += code.size();
         }
     }
+    
+    // Update the memory object with the final text segment size
+    memory_.set_text_segment_size(text_lc - memory_.get_text_segment_start());
+
     return true;
 }
 

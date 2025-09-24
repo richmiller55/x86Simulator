@@ -80,6 +80,9 @@ Decoder::Decoder() {
         {{1, 0xD5}, "VPMULLW"},
         // VMINPS
         {{1, 0x5D}, "VMINPS"},
+        // VMOVUPS
+        {{1, 0x10}, "VMOVUPS"},
+        {{1, 0x11}, "VMOVUPS"},
         // VPXOR
         {{1, 0xEF}, "VPXOR"},
         // VRCPPS
@@ -186,9 +189,13 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             decoded_instr->mnemonic = "avx_instruction_unknown";
         }
         decodeAVXOperands(*decoded_instr, vex_prefix, memory, current_address);
-        // The length will be determined by the specific AVX instruction.
-        // This is just a placeholder.
-        decoded_instr->length_in_bytes = vex_prefix.bytes + 2; 
+        decoded_instr->length_in_bytes = vex_prefix.bytes + 1 + 1; // VEX + opcode + ModR/M
+        for (const auto& op : decoded_instr->operands) {
+            if (op.type == OperandType::MEMORY) {
+                decoded_instr->length_in_bytes += 4; // 32-bit displacement
+                break;
+            }
+        } 
 
     } else {
         // Existing logic for non-AVX instructions
@@ -402,6 +409,36 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
         instr.operands.push_back(dest);
         instr.operands.push_back(src1);
         instr.operands.push_back(src2);
+    } else if (instr.mnemonic == "vmovups") {
+        DecodedOperand op1, op2;
+        std::string reg_prefix = vex_prefix.L ? "ymm" : "xmm";
+
+        op1.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+        op1.text = reg_prefix + std::to_string(reg);
+
+        if (mod == 0b11) { // Register-to-register
+            op2.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+            op2.text = reg_prefix + std::to_string(rm);
+        } else if (mod == 0b00 && rm == 0b101) { // Memory operand with 32-bit displacement
+            // This is RIP-relative addressing. The value in memory is a 32-bit displacement
+            // from the address of the *next* instruction.
+            op2.type = OperandType::MEMORY;
+            int32_t disp = memory.read_text_dword(opcode_address + 2);
+            address_t next_instr_addr = instr.address + vex_prefix.bytes + 1 + 1 + 4;
+            op2.value = next_instr_addr + disp;
+            std::stringstream ss;
+            ss << "[0x" << std::hex << op2.value << "]";
+            op2.text = ss.str();
+        }
+
+        uint8_t vex_opcode = memory.read_text(opcode_address);
+        if (vex_opcode == 0x10) { // Load from memory
+            instr.operands.push_back(op1); // dest is register
+            instr.operands.push_back(op2); // src is memory/register
+        } else { // Store to memory
+            instr.operands.push_back(op2); // dest is memory/register
+            instr.operands.push_back(op1); // src is register
+        }
     } else if (instr.mnemonic == "vrcpps" || instr.mnemonic == "vsqrtps") {
         DecodedOperand dest, src;
         std::string reg_prefix = vex_prefix.L ? "ymm" : "xmm";
@@ -443,3 +480,4 @@ VEX_Prefix Decoder::decodeVEXPrefix(const Memory& memory, address_t& address) {
 
     return prefix;
 }
+
