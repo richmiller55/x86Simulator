@@ -92,6 +92,14 @@ void Memory::write64(address_t address, uint64_t value) {
     }
 }
 
+uint32_t Memory::read_dword(address_t address) const {
+    uint32_t value = 0;
+    for (int i = 0; i < 4; ++i) {
+        value |= static_cast<uint32_t>(main_memory->at(address + i)) << (i * 8);
+    }
+    return value;
+}
+
 void Memory::reset() {
     // Bulletproof reset: Recalculate the entire memory layout from constructor constants
     // to defend against memory corruption that was invalidating size-related members.

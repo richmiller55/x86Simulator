@@ -58,7 +58,9 @@ Decoder::Decoder() {
         // The below are for simple cases, but the group is more accurate
         {0x40, "INC"}, 
         {0xFF, "INC"},
-        {0xCD, "INT"}
+        {0xCD, "INT"},
+        {0xE4, "IN"},
+        {0xE6, "OUT"}
     };
 
     vex_opcode_to_mnemonic = {
@@ -105,7 +107,9 @@ Decoder::Decoder() {
         {"JNE", 0x75},
         {"MOV", 0xB8},
         {"INC", 0x40},
-        {"INT", 0xCD}
+        {"INT", 0xCD},
+        {"IN", 0xE4},
+        {"OUT", 0xE6}
     };
 
     instruction_lengths = {
@@ -130,7 +134,9 @@ Decoder::Decoder() {
         {0xFF, 2}, // INC r/m32
         {0x48, 1}, // DEC EAX (Legacy)
         {0xF7, 2}, // Group F7
-        {0xCD, 2}  // INT imm8
+        {0xCD, 2},
+        {0xE4, 2},
+        {0xE6, 2}
     };
 }
 
@@ -311,6 +317,32 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             ss << "0x" << std::hex << (int)imm_value;
             imm.text = ss.str();
             decoded_instr->operands.push_back(imm);
+        } else if (opcode == 0xE4) { // IN AL, imm8
+            decoded_instr->length_in_bytes = 2;
+            uint8_t imm_value = memory.read_text(current_address);
+            DecodedOperand reg, imm;
+            reg.type = OperandType::REGISTER;
+            reg.text = "al";
+            imm.type = OperandType::IMMEDIATE;
+            imm.value = imm_value;
+            std::stringstream ss;
+            ss << "0x" << std::hex << (int)imm_value;
+            imm.text = ss.str();
+            decoded_instr->operands.push_back(reg);
+            decoded_instr->operands.push_back(imm);
+        } else if (opcode == 0xE6) { // OUT imm8, AL
+            decoded_instr->length_in_bytes = 2;
+            uint8_t imm_value = memory.read_text(current_address);
+            DecodedOperand imm, reg;
+            imm.type = OperandType::IMMEDIATE;
+            imm.value = imm_value;
+            std::stringstream ss;
+            ss << "0x" << std::hex << (int)imm_value;
+            imm.text = ss.str();
+            reg.type = OperandType::REGISTER;
+            reg.text = "al";
+            decoded_instr->operands.push_back(imm);
+            decoded_instr->operands.push_back(reg);
         } else {
             decoded_instr->length_in_bytes = getInstructionLength(opcode);
             // No specific operand decoding for this instruction yet

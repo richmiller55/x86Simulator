@@ -24,6 +24,8 @@ public:
   void set64(const std::string& reg_name, uint64_t value);
   uint64_t get32(const std::string& reg_name) const;
   void set32(const std::string& reg_name, uint64_t value);
+  uint8_t get8(const std::string& reg_name) const;
+  void set8(const std::string& reg_name, uint8_t value);
   __m256i getYmm(const std::string& reg_name) const;
   void setYmm(const std::string& reg_name, __m256i value);
   const std::map<std::string, Reg64>& getRegisterNameMap64() const;

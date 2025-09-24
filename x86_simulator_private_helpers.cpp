@@ -1007,3 +1007,54 @@ void X86Simulator::handleVpor(const DecodedInstruction& decoded_instr) {
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
+
+void X86Simulator::handleIn(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "IN instruction requires two operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& src_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || dest_operand.text != "al") {
+        log(session_id_, "IN instruction currently only supports AL as destination.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    if (src_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "IN instruction currently only supports immediate for port.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    // In a real scenario, this would read from an I/O port.
+    // Here, we'll simulate reading a character from standard input.
+    char input_char;
+    std::cin >> input_char;
+    register_map_.set8("al", static_cast<uint8_t>(input_char));
+}
+
+void X86Simulator::handleOut(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "OUT instruction requires two operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& src_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "OUT instruction currently only supports immediate for port.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    if (src_operand.type != OperandType::REGISTER || src_operand.text != "al") {
+        log(session_id_, "OUT instruction currently only supports AL as source.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    // In a real scenario, this would write to an I/O port.
+    // Here, we'll simulate writing a character to standard output.
+    uint8_t output_char = register_map_.get8("al");
+    std::cout << static_cast<char>(output_char);
+}

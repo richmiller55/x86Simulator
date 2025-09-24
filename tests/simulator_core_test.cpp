@@ -605,18 +605,61 @@ TEST_F(SimulatorCoreTest, PushPopExecution) {
     EXPECT_EQ(rsp_after_pop, initial_rsp);
     EXPECT_EQ(register_map.get32("edx"), ecx_val);
 }
-TEST_F(SimulatorCoreTest, PushCrashTest) {
+TEST_F(SimulatorCoreTest, PushEcxTest) {
     auto& register_map = simulator.getRegisterMapForTesting();
     auto& memory = simulator.getMemoryForTesting();
     uint64_t initial_rsp = memory.get_stack_bottom();
-    const uint32_t eax_val = 0x11223344;
     const uint32_t ecx_val = 0x55667788;
+    register_map.set32("ecx", ecx_val);
+
     DecodedInstruction push_ecx_instr;
     push_ecx_instr.mnemonic = "push";
     push_ecx_instr.operands.push_back({ "ecx", 0, OperandType::REGISTER });
     simulator.executeInstruction(push_ecx_instr);
 
-    auto rsp_after_push = register_map.get32("rsp");
+    uint64_t rsp_after_push = register_map.get64("rsp");
     EXPECT_EQ(rsp_after_push, initial_rsp - 4);
+
+    uint32_t pushed_value = memory.read_dword(rsp_after_push);
+    EXPECT_EQ(pushed_value, ecx_val);
+}
+
+TEST_F(SimulatorCoreTest, InInstructionExecution) {
+    // Redirect cin
+    std::stringstream input;
+    input << "A";
+    std::streambuf* old_cin = std::cin.rdbuf(input.rdbuf());
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "in";
+    decoded_instr.operands.push_back({ "al", 0, OperandType::REGISTER });
+    decoded_instr.operands.push_back({ "0x60", 0x60, OperandType::IMMEDIATE });
+
+    simulator.executeInstruction(decoded_instr);
+
+    EXPECT_EQ(simulator.getRegisterMapForTesting().get8("al"), 'A');
+
+    // Restore cin
+    std::cin.rdbuf(old_cin);
+}
+
+TEST_F(SimulatorCoreTest, OutInstructionExecution) {
+    // Redirect cout
+    std::stringstream output;
+    std::streambuf* old_cout = std::cout.rdbuf(output.rdbuf());
+
+    simulator.getRegisterMapForTesting().set8("al", 'B');
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "out";
+    decoded_instr.operands.push_back({ "0x61", 0x61, OperandType::IMMEDIATE });
+    decoded_instr.operands.push_back({ "al", 0, OperandType::REGISTER });
+
+    simulator.executeInstruction(decoded_instr);
+
+    EXPECT_EQ(output.str(), "B");
+
+    // Restore cout
+    std::cout.rdbuf(old_cout);
 }
 

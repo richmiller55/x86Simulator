@@ -128,6 +128,8 @@ private:
   void handleSub(const DecodedInstruction& decoded_instr);
   void handlePush(const DecodedInstruction& decoded_instr);
   void handlePop(const DecodedInstruction& decoded_instr);
+  void handleIn(const DecodedInstruction& decoded_instr);
+  void handleOut(const DecodedInstruction& decoded_instr);
   void handleVaddps(const DecodedInstruction& decoded_instr);
   void handleVdivps(const DecodedInstruction& decoded_instr);
   void handleVmaxps(const DecodedInstruction& decoded_instr);

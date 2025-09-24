@@ -36,6 +36,18 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
         if (instr.operands.size() == 1) {
             ss << "Pops a value from the stack into " << instr.operands[0].text << ".";
         }
+    } else if (mnemonic == "in") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Transfers data from port " << src.text << " to " << dest.text << ".";
+        }
+    } else if (mnemonic == "out") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Transfers data from " << src.text << " to port " << dest.text << ".";
+        }
     } else if (mnemonic == "vaddps") {
         if (instr.operands.size() == 3) {
             const auto& dest = instr.operands[0];

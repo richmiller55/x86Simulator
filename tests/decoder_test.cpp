@@ -97,3 +97,43 @@ TEST_F(DecoderTest, DecodeVEXInstruction) {
     EXPECT_EQ(decoded_instruction->operands[1].text, "ymm1"); // This is the non-destructive source from VEX.vvvv
     EXPECT_EQ(decoded_instruction->operands[2].text, "ymm2"); // This is from ModRM.rm
 }
+
+TEST_F(DecoderTest, DecodeInInstruction) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x100;
+
+    // Test IN AL, 0x60 instruction (E4 60)
+    std::vector<uint8_t> instruction_bytes = {0xE4, 0x60};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "in");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 2);
+    EXPECT_EQ(decoded_instruction->address, start_address);
+    ASSERT_EQ(decoded_instruction->operands.size(), 2);
+    EXPECT_EQ(decoded_instruction->operands[0].text, "al");
+    EXPECT_EQ(decoded_instruction->operands[1].text, "0x60");
+}
+
+TEST_F(DecoderTest, DecodeOutInstruction) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x100;
+
+    // Test OUT 0x61, AL instruction (E6 61)
+    std::vector<uint8_t> instruction_bytes = {0xE6, 0x61};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "out");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 2);
+    EXPECT_EQ(decoded_instruction->address, start_address);
+    ASSERT_EQ(decoded_instruction->operands.size(), 2);
+    EXPECT_EQ(decoded_instruction->operands[0].text, "0x61");
+    EXPECT_EQ(decoded_instruction->operands[1].text, "al");
+}
