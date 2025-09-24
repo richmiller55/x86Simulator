@@ -56,6 +56,7 @@ const uint64_t RFLAGS_OF_BIT = 11;  // Overflow Flag
 const uint64_t RFLAGS_ALWAYS_SET_BIT_1 = 1; // Reserved, always set to 1
 const uint64_t RFLAGS_ALWAYS_UNSET_BIT_3 = 3; // Reserved, always unset
 const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
+bool is_number(const std::string& s);
 
 class X86Simulator {
 public:
@@ -97,6 +98,11 @@ public:
   RegisterMap& getRegisterMapForTesting() { return register_map_; }
   Memory& getMemoryForTesting() { return memory_; }
   bool is_headless() const;
+  size_t calculate_data_size(const std::vector<std::string>& tokens);
+  size_t calculate_bss_size(const std::vector<std::string>& tokens);  
+  void dumpDataSegment(const std::string& filename);
+  void dumpBssSegment(const std::string& filename);
+
 private:
   IDatabaseManager& dbManager_;
   RegisterMap register_map_;
@@ -107,7 +113,7 @@ private:
   int session_id_;
   bool headless_;
   address_t program_size_in_bytes_; 
-
+  void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
   std::vector<std::string> programLines_; // raw
   std::map<std::string, address_t> symbolTable_;
   std::string entryPointLabel_ = "_start"; // Default entry point
@@ -136,9 +142,9 @@ private:
   void handleVpandn(const DecodedInstruction& decoded_instr);
   void handleVpand(const DecodedInstruction& decoded_instr);
   void handleVpmullw(const DecodedInstruction& decoded_instr);
-  void handleVminps(const DecodedInstruction& decoded_instr);
-  void handleVpxor(const DecodedInstruction& decoded_instr);
-  void handleVrcpps(const DecodedInstruction& decoded_instr);
+      void handleVminps(const DecodedInstruction& decoded_instr);
+      void handleVmovups(const DecodedInstruction& decoded_instr);
+      void handleVpxor(const DecodedInstruction& decoded_instr);  void handleVrcpps(const DecodedInstruction& decoded_instr);
   void handleVsqrtps(const DecodedInstruction& decoded_instr);
   void handleVsubps(const DecodedInstruction& decoded_instr);
   void handleVpor(const DecodedInstruction& decoded_instr);

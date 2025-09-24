@@ -837,6 +837,29 @@ void X86Simulator::handleVminps(const DecodedInstruction& decoded_instr) {
     }
 }
 
+void X86Simulator::handleVmovups(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& src_operand = decoded_instr.operands[1];
+    address_t data_segment_start = memory_.get_data_segment_start();
+
+    if (dest_operand.type == OperandType::YMM_REGISTER && src_operand.type == OperandType::MEMORY) {
+        // Load from memory
+        __m256i value = memory_.read_ymm(src_operand.value);
+        register_map_.setYmm(dest_operand.text, value);
+    } else if (dest_operand.type == OperandType::MEMORY && src_operand.type == OperandType::YMM_REGISTER) {
+        // Store to memory
+        __m256i value = register_map_.getYmm(src_operand.text);
+        memory_.write_ymm(dest_operand.value, value);
+    } else {
+        log(session_id_, "Unsupported operand combination for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
 void X86Simulator::handleVpxor(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
         log(session_id_, "Invalid number of operands for VPXOR", "ERROR", instructionPointer_, __FILE__, __LINE__);

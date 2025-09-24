@@ -76,6 +76,49 @@ void Memory::write_text_dword(address_t address, uint32_t value) {
     }
 }
 
+uint8_t Memory::read_data(address_t address) const {
+    if (address < data_segment_start || address >= bss_segment_start) {
+        throw std::out_of_range("Data segment read out of bounds!");
+    }
+    return main_memory->at(address);
+}
+
+void Memory::write_data(address_t address, uint8_t value) {
+    if (address < data_segment_start || address >= bss_segment_start) {
+        throw std::out_of_range("Data segment write out of bounds!");
+    }
+    main_memory->at(address) = value;
+}
+
+uint32_t Memory::read_data_dword(address_t address) const {
+    uint32_t value = 0;
+    for (int i = 0; i < 4; ++i) {
+        value |= static_cast<uint32_t>(read_data(address + i)) << (i * 8);
+    }
+    return value;
+}
+
+void Memory::write_data_dword(address_t address, uint32_t value) {
+    for (int i = 0; i < 4; ++i) {
+        write_data(address + i, (value >> (i * 8)) & 0xFF);
+    }
+}
+
+__m256i Memory::read_ymm(address_t address) const {
+    if (address < data_segment_start || address + 32 > heap_segment_start) {
+        throw std::out_of_range("YMM read out of data segment bounds!");
+    }
+    return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(main_memory->data() + address));
+}
+
+void Memory::write_ymm(address_t address, __m256i value) {
+    if (address < data_segment_start || address + 32 > heap_segment_start) {
+        throw std::out_of_range("YMM write out of data segment bounds!");
+    }
+    _mm256_storeu_si256(reinterpret_cast<__m256i*>(main_memory->data() + address), value);
+}
+
+
 uint64_t Memory::read64(address_t address) const {
     uint64_t value = 0;
     for (int i = 0; i < 8; ++i) {

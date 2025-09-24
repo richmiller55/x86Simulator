@@ -137,3 +137,55 @@ TEST_F(DecoderTest, DecodeOutInstruction) {
     EXPECT_EQ(decoded_instruction->operands[0].text, "0x61");
     EXPECT_EQ(decoded_instruction->operands[1].text, "al");
 }
+
+TEST_F(DecoderTest, DecodeVmovupsLoad) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x100;
+    address_t target_address = 0x2000;
+
+    // vmovups ymm0, [rip + disp]
+    // Target: 0x2000. RIP for calculation is address of next instruction (start_address + 8).
+    // disp = 0x2000 - (0x100 + 8) = 0x1EF8
+    int32_t disp = target_address - (start_address + 8);
+    std::vector<uint8_t> instruction_bytes = {
+        0xC5, 0xFD, 0x10, 0x05, // VEX, opcode, ModR/M for RIP-relative
+        static_cast<uint8_t>(disp), static_cast<uint8_t>(disp >> 8),
+        static_cast<uint8_t>(disp >> 16), static_cast<uint8_t>(disp >> 24)};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "vmovups");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 8);
+    ASSERT_EQ(decoded_instruction->operands.size(), 2);
+    EXPECT_EQ(decoded_instruction->operands[0].text, "ymm0");
+    EXPECT_EQ(decoded_instruction->operands[1].type, OperandType::MEMORY);
+    EXPECT_EQ(decoded_instruction->operands[1].value, target_address);
+}
+
+TEST_F(DecoderTest, DecodeVmovupsStore) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x200;
+    address_t target_address = 0x3000;
+
+    // vmovups [rip + disp], ymm0
+    // Target: 0x3000. RIP for calculation is address of next instruction (start_address + 8).
+    // disp = 0x3000 - (0x200 + 8) = 0x2DF8
+    int32_t disp = target_address - (start_address + 8);
+    std::vector<uint8_t> instruction_bytes = {0xC5, 0xFD, 0x11, 0x05, static_cast<uint8_t>(disp), static_cast<uint8_t>(disp >> 8), static_cast<uint8_t>(disp >> 16), static_cast<uint8_t>(disp >> 24)};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "vmovups");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 8);
+    ASSERT_EQ(decoded_instruction->operands.size(), 2);
+    EXPECT_EQ(decoded_instruction->operands[0].type, OperandType::MEMORY);
+    EXPECT_EQ(decoded_instruction->operands[0].value, target_address);
+    EXPECT_EQ(decoded_instruction->operands[1].text, "ymm0");
+}
+

@@ -97,6 +97,14 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
             const auto& src2 = instr.operands[2];
             ss << "Compares packed single-precision floating-point values in " << src1.text << " and " << src2.text << " and stores the minimum values in " << dest.text << ".";
         }
+    } else if (mnemonic == "vmovups") {
+        if (instr.operands.size() == 2) {
+            const auto& op1 = instr.operands[0];
+            const auto& op2 = instr.operands[1];
+            ss << "Moves unaligned packed single-precision floating-point values from " << op2.text << " to " << op1.text << ".";
+        } else {
+            ss << "Moves unaligned packed single-precision floating-point values.";
+        }
     } else if (mnemonic == "vpxor") {
         if (instr.operands.size() == 3) {
             const auto& dest = instr.operands[0];

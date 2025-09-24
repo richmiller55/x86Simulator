@@ -663,3 +663,110 @@ TEST_F(SimulatorCoreTest, OutInstructionExecution) {
     std::cout.rdbuf(old_cout);
 }
 
+TEST_F(SimulatorCoreTest, VmovupsLoadExecution_1) {
+    // Test VMOVUPS ymm0, [address]
+    address_t mem_addr = simulator.getMemoryForTesting().get_data_segment_start() + 0x100;
+    __m256i test_data = _mm256_set_epi32(8, 7, 6, 5, 4, 3, 2, 1);
+    simulator.getMemoryForTesting().write_ymm(mem_addr, test_data);
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vmovups";
+    DecodedOperand dest, src;
+    dest.type = OperandType::YMM_REGISTER;
+    dest.text = "ymm0";
+    src.type = OperandType::MEMORY;
+    src.value = mem_addr;
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i result = simulator.getRegisterMapForTesting().getYmm("ymm0");
+
+    int32_t* expected_ints = (int32_t*)&test_data;
+    int32_t* actual_ints = (int32_t*)&result;
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_EQ(actual_ints[i], expected_ints[i]);
+    }
+}
+
+TEST_F(SimulatorCoreTest, VmovupsStoreExecution_1) {
+    // Test VMOVUPS [address], ymm0
+    address_t mem_addr = simulator.getMemoryForTesting().get_data_segment_start() + 0x200;
+    __m256i test_data = _mm256_set_epi32(1, 2, 3, 4, 5, 6, 7, 8);
+    simulator.getRegisterMapForTesting().setYmm("ymm0", test_data);
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vmovups";
+    DecodedOperand dest, src;
+    dest.type = OperandType::MEMORY;
+    dest.value = mem_addr;
+    src.type = OperandType::YMM_REGISTER;
+    src.text = "ymm0";
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i mem_data = simulator.getMemoryForTesting().read_ymm(mem_addr);
+
+    int32_t* expected_ints = (int32_t*)&test_data;
+    int32_t* actual_ints = (int32_t*)&mem_data;
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_EQ(actual_ints[i], expected_ints[i]);
+    }
+}
+
+TEST_F(SimulatorCoreTest, VmovupsLoadExecution_2) {
+    // Test VMOVUPS ymm0, [address]
+    address_t mem_addr = simulator.getMemoryForTesting().get_data_segment_start() + 0x300;
+    __m256i test_data = _mm256_set_epi32(8, 7, 6, 5, 4, 3, 2, 1);
+    simulator.getMemoryForTesting().write_ymm(mem_addr, test_data);
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vmovups";
+    DecodedOperand dest, src;
+    dest.type = OperandType::YMM_REGISTER;
+    dest.text = "ymm0";
+    src.type = OperandType::MEMORY;
+    src.value = mem_addr;
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i result = simulator.getRegisterMapForTesting().getYmm("ymm0");
+
+    int32_t* expected_ints = (int32_t*)&test_data;
+    int32_t* actual_ints = (int32_t*)&result;
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_EQ(actual_ints[i], expected_ints[i]);
+    }
+}
+
+TEST_F(SimulatorCoreTest, VmovupsStoreExecution_2) {
+    // Test VMOVUPS [address], ymm0
+    address_t mem_addr = simulator.getMemoryForTesting().get_data_segment_start() + 0x400;
+    __m256i test_data = _mm256_set_epi32(1, 2, 3, 4, 5, 6, 7, 8);
+    simulator.getRegisterMapForTesting().setYmm("ymm0", test_data);
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vmovups";
+    DecodedOperand dest, src;
+    dest.type = OperandType::MEMORY;
+    dest.value = mem_addr;
+    src.type = OperandType::YMM_REGISTER;
+    src.text = "ymm0";
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i mem_data = simulator.getMemoryForTesting().read_ymm(mem_addr);
+
+    int32_t* expected_ints = (int32_t*)&test_data;
+    int32_t* actual_ints = (int32_t*)&mem_data;
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_EQ(actual_ints[i], expected_ints[i]);
+    }
+}
