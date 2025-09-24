@@ -79,3 +79,19 @@ TEST(OperandParserTest, ThreeOperandsVEXCombined) {
     EXPECT_EQ(parser.get_operand(1), "ymm1");
     EXPECT_EQ(parser.get_operand(2), "ymm2");
 }
+
+TEST(OperandParserTest, InInstruction) {
+    std::vector<std::string> tokens = {"IN", "al,", "0x60"};
+    OperandParser parser(tokens);
+    EXPECT_EQ(parser.operand_count(), 2);
+    EXPECT_EQ(parser.get_operand(0), "al");
+    EXPECT_EQ(parser.get_operand(1), "0x60");
+}
+
+TEST(OperandParserTest, OutInstruction) {
+    std::vector<std::string> tokens = {"OUT", "0x61,", "al"};
+    OperandParser parser(tokens);
+    EXPECT_EQ(parser.operand_count(), 2);
+    EXPECT_EQ(parser.get_operand(0), "0x61");
+    EXPECT_EQ(parser.get_operand(1), "al");
+}

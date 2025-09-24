@@ -84,3 +84,18 @@ void RegisterMap::setYmm(const std::string& reg_name, __m256i value) {
 const std::map<std::string, RegYMM>& RegisterMap::getRegisterNameMapYmm() const {
     return register_name_map_ymm_;
 }
+
+uint8_t RegisterMap::get8(const std::string& reg_name) const {
+    if (reg_name == "al") {
+        return static_cast<uint8_t>(registers64_[RAX]);
+    }
+    throw std::out_of_range("Invalid 8-bit register name: " + reg_name);
+}
+
+void RegisterMap::set8(const std::string& reg_name, uint8_t value) {
+    if (reg_name == "al") {
+        registers64_[RAX] = (registers64_[RAX] & 0xFFFFFFFFFFFFFF00) | value;
+        return;
+    }
+    throw std::out_of_range("Invalid 8-bit register name: " + reg_name);
+}

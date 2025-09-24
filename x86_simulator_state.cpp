@@ -96,6 +96,16 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handlePop(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "IN") {
+        if (decoded_instr.operands.size() == 2) {
+            handleIn(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "OUT") {
+        if (decoded_instr.operands.size() == 2) {
+            handleOut(decoded_instr);
+            return true;
+        }
     } else if (normalized_mnemonic == "VADDPS") {
         if (decoded_instr.operands.size() == 3) {
             handleVaddps(decoded_instr);

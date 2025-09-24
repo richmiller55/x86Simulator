@@ -233,6 +233,32 @@ void CodeGenerator::process_line(const std::string& line_raw) {
             machine_code_.push_back(opcode);
             current_address_ += 1;
         }
+    } else if (mnemonic == "in") {
+        if (operands.operand_count() < 2) return;
+        std::string dest = operands.get_operand(0);
+        std::string src = operands.get_operand(1);
+        if (dest == "al") {
+            machine_code_.push_back(0xE4);
+            current_address_ += 1;
+            try {
+                uint8_t value = std::stoul(src, nullptr, 0);
+                machine_code_.push_back(value);
+                current_address_ += 1;
+            } catch (const std::exception&) { /* error */ }
+        }
+    } else if (mnemonic == "out") {
+        if (operands.operand_count() < 2) return;
+        std::string dest = operands.get_operand(0);
+        std::string src = operands.get_operand(1);
+        if (src == "al") {
+            machine_code_.push_back(0xE6);
+            current_address_ += 1;
+            try {
+                uint8_t value = std::stoul(dest, nullptr, 0);
+                machine_code_.push_back(value);
+                current_address_ += 1;
+            } catch (const std::exception&) { /* error */ }
+        }
     }
 }
 
