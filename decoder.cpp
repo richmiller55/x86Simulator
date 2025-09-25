@@ -435,7 +435,7 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
         if (vex_opcode == 0x10) { // Load from memory
             instr.operands.push_back(op1); // dest is register
             instr.operands.push_back(op2); // src is memory/register
-        } else { // Store to memory
+        } else if (vex_opcode == 0x11) { // Store to memory
             instr.operands.push_back(op2); // dest is memory/register
             instr.operands.push_back(op1); // src is register
         }

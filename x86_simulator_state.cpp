@@ -296,39 +296,35 @@ void X86Simulator::dumpMemoryRange(const std::string& filename, address_t start_
     for (size_t i = 0; i < size; ++i) {
         address_t current_address = start_addr + i;
         
-        // Print address at the start of each line
         if (i % bytes_per_line == 0) {
+            if (i > 0) {
+                outfile << std::endl;
+            }
             outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << current_address << ": ";
         }
 
-        // Print byte value
-        outfile << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_data(current_address) << " ";
-        
-        // Print newline at the end of each line
-        if ((i + 1) % bytes_per_line == 0) {
-            outfile << std::endl;
+        if (current_address < memory_.main_memory->size()) {
+            outfile << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.main_memory->at(current_address) << " ";
+        } else {
+            outfile << "?? ";
         }
     }
-    
-    // Ensure a newline at the end of the file if the last line wasn't full
-    if (size % bytes_per_line != 0) {
-        outfile << std::endl;
-    }
-
+    outfile << std::endl;
     outfile.close();
 }
+
 void X86Simulator::dumpDataSegment(const std::string& filename) {
-    // Calculate the size of the data segment
-    size_t data_size = memory_.get_bss_segment_start() - memory_.get_data_segment_start();
-    
-    // Call the helper function
-    dumpMemoryRange(filename, memory_.get_data_segment_start(), data_size);
+    // Dump the first 256 bytes of the data segment to inspect active memory.
+    const size_t active_memory_size = 256;
+    dumpMemoryRange(filename, memory_.get_data_segment_start(), active_memory_size);
 }
 
 void X86Simulator::dumpBssSegment(const std::string& filename) {
-    // The BSS segment goes from its start to the heap start
-    size_t bss_size = memory_.get_heap_segment_start() - memory_.get_bss_segment_start();
-    
-    // Call the helper function
-    dumpMemoryRange(filename, memory_.get_bss_segment_start(), bss_size);
+    std::ofstream outfile(filename);
+    if (!outfile.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << " for writing." << std::endl;
+        return;
+    }
+    outfile << "BSS segment dump not implemented." << std::endl;
+    outfile.close();
 }

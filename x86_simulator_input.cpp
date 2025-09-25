@@ -107,11 +107,41 @@ bool X86Simulator::firstPass() {
             }
         }
         // Handle data directives
-        else if (*current_lc == data_lc) {
-            *current_lc += calculate_data_size(tokens);
+        else if (current_lc == &data_lc) {
+            std::vector<std::string> data_tokens = tokens;
+            if (tokens[0].back() == ':') {
+                data_tokens.erase(data_tokens.begin());
+            }
+
+            if (!data_tokens.empty() && data_tokens[0] == "dd") {
+                for (size_t i = 1; i < data_tokens.size(); ++i) {
+                    std::string val_str = data_tokens[i];
+                    if (val_str.back() == ',') {
+                        val_str.pop_back();
+                    }
+                    if (val_str.empty()) continue;
+
+                    uint32_t val_to_write = 0;
+                    if (val_str.find('.') != std::string::npos) {
+                        float f = std::stof(val_str);
+                        val_to_write = *reinterpret_cast<uint32_t*>(&f);
+                    } else {
+                        val_to_write = static_cast<uint32_t>(std::stoll(val_str));
+                    }
+
+                    for (int j = 0; j < 4; ++j) {
+                        if (*current_lc + j < memory_.main_memory->size()) {
+                            memory_.main_memory->at(*current_lc + j) = (val_to_write >> (j * 8)) & 0xFF;
+                        }
+                    }
+                    *current_lc += 4;
+                }
+            } else {
+                *current_lc += calculate_data_size(tokens);
+            }
         }
         // Handle BSS directives
-        else if (*current_lc == bss_lc) {
+        else if (current_lc == &bss_lc) {
             *current_lc += calculate_bss_size(tokens);
         }
         // Handle instructions in the text segment

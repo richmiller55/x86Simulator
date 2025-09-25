@@ -855,6 +855,9 @@ void X86Simulator::handleVmovups(const DecodedInstruction& decoded_instr) {
         // Store to memory
         __m256i value = register_map_.getYmm(src_operand.text);
         memory_.write_ymm(dest_operand.value, value);
+    } else if (dest_operand.type == OperandType::YMM_REGISTER && src_operand.type == OperandType::YMM_REGISTER) {
+        __m256i value = register_map_.getYmm(src_operand.text);
+        register_map_.setYmm(dest_operand.text, value);
     } else {
         log(session_id_, "Unsupported operand combination for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
