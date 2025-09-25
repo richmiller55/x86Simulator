@@ -3,7 +3,7 @@
   "processes": [
     {
       "name": "my_program",
-      "path": "./programs/vpxor_vpsubps.asm"
+      "path": "./programs/vpxor_vmovups.asm"
     }
   ],
   "devices": [

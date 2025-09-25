@@ -146,3 +146,36 @@ TEST(ProgramDecoderTest, DecodeVEXTwoOperandInstruction) {
     EXPECT_EQ(instr->operands[0].text, "ymm0"); // dest
     EXPECT_EQ(instr->operands[1].text, "ymm1"); // src
 }
+
+TEST(ProgramDecoderTest, DecodeVMOVUPSLoad) {
+    Memory mem;
+    address_t start_addr = mem.get_text_segment_start();
+    size_t current_offset = 0;
+
+    // vmovups ymm0, [rip+0x100]
+    // C5 F8 10 05 00 01 00 00
+    mem.write_text(start_addr + current_offset++, 0xC5);
+    mem.write_text(start_addr + current_offset++, 0xFD); // VEX byte 2: R=~0, vvvv=~0, L=1, pp=01
+    mem.write_text(start_addr + current_offset++, 0x10); // Opcode
+    mem.write_text(start_addr + current_offset++, 0x05); // ModR/M: mod=00, reg=0 (ymm0), rm=101 (rip+disp)
+    mem.write_text_dword(start_addr + current_offset, 0x100);
+    current_offset += 4;
+
+    mem.set_text_segment_size(current_offset);
+
+    ProgramDecoder decoder(mem);
+    decoder.decode();
+
+    const auto& decoded_program = decoder.getDecodedProgram();
+    ASSERT_EQ(decoded_program.size(), 1);
+
+    const auto& instr = decoded_program[0];
+    EXPECT_EQ(instr->mnemonic, "vmovups");
+    EXPECT_EQ(instr->length_in_bytes, 2 + 1 + 1 + 4);
+    ASSERT_EQ(instr->operands.size(), 2);
+    EXPECT_EQ(instr->operands[0].text, "ymm0"); // dest
+    EXPECT_EQ(instr->operands[0].type, OperandType::YMM_REGISTER);
+    EXPECT_EQ(instr->operands[1].type, OperandType::MEMORY);
+    address_t expected_addr = start_addr + 8 + 0x100;
+    EXPECT_EQ(instr->operands[1].value, expected_addr);
+}
