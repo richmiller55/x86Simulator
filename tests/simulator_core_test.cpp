@@ -6,6 +6,7 @@
 #include <vector>
 #include <immintrin.h>
 #include <cmath>
+#include <limits>
 
 class SimulatorCoreTest : public ::testing::Test {
 protected:
@@ -837,5 +838,77 @@ TEST_F(SimulatorCoreTest, VsqrtpsExecutionMemorySource) {
 
     for (int i = 0; i < 8; ++i) {
         EXPECT_NEAR(actual_floats[i], expected_floats[i], 1e-6);
+    }
+}
+
+TEST_F(SimulatorCoreTest, VrcppsExecutionSpecialValues) {
+    // Test VRCPPS with special floating point values
+    float inf = std::numeric_limits<float>::infinity();
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    float zero = 0.0f;
+    float neg_zero = -0.0f;
+
+    __m256 val = _mm256_set_ps(1.0f, nan, inf, neg_zero, zero, -2.0f, 4.0f, 1.0f);
+    simulator.getRegisterMapForTesting().setYmm("ymm1", _mm256_castps_si256(val));
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vrcpps";
+    DecodedOperand dest, src;
+    dest.type = OperandType::YMM_REGISTER; dest.text = "ymm0";
+    src.type = OperandType::YMM_REGISTER; src.text = "ymm1";
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i result_i = simulator.getRegisterMapForTesting().getYmm("ymm0");
+    __m256 result_ps = _mm256_castsi256_ps(result_i);
+
+    float actual_floats[8];
+    _mm256_storeu_ps(actual_floats, result_ps);
+
+    // _mm256_set_ps order is reversed.
+    // val = [1.0, 4.0, -2.0, 0.0, -0.0, inf, nan, 1.0]
+    // rcp(val) = [1.0, 0.25, -0.5, inf, -inf, 0.0, nan, 1.0]
+
+    EXPECT_NEAR(actual_floats[0], 1.0f, 0.001);
+    EXPECT_NEAR(actual_floats[1], 0.25f, 0.001);
+    EXPECT_NEAR(actual_floats[2], -0.5f, 0.001);
+    EXPECT_EQ(actual_floats[3], std::numeric_limits<float>::infinity());
+    EXPECT_EQ(actual_floats[4], -std::numeric_limits<float>::infinity());
+    EXPECT_EQ(actual_floats[5], 0.0f);
+    EXPECT_TRUE(std::isnan(actual_floats[6]));
+    EXPECT_NEAR(actual_floats[7], 1.0f, 0.001);
+}
+
+TEST_F(SimulatorCoreTest, VrcppsExecutionMemorySource) {
+    // Test VRCPPS ymm0, [address]
+    address_t mem_addr = simulator.getMemoryForTesting().get_data_segment_start() + 0x600;
+    __m256 val = _mm256_set_ps(1.0f, 2.0f, 4.0f, 8.0f, 0.5f, 0.25f, -2.0f, -4.0f);
+    simulator.getMemoryForTesting().write_ymm(mem_addr, _mm256_castps_si256(val));
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vrcpps";
+    DecodedOperand dest, src;
+    dest.type = OperandType::YMM_REGISTER;
+    dest.text = "ymm0";
+    src.type = OperandType::MEMORY;
+    src.value = mem_addr;
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i result_i = simulator.getRegisterMapForTesting().getYmm("ymm0");
+    __m256 result_ps = _mm256_castsi256_ps(result_i);
+
+    __m256 expected_ps = _mm256_rcp_ps(val);
+
+    float expected_floats[8], actual_floats[8];
+    _mm256_storeu_ps(expected_floats, expected_ps);
+    _mm256_storeu_ps(actual_floats, result_ps);
+
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_NEAR(actual_floats[i], expected_floats[i], 0.001);
     }
 }
