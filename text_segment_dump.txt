@@ -1,8 +1,0 @@
-0x00000000: c5 7d 10 05 38 00 20 00  vmovups ymm0 [0x200040]
-0x80000000: c5 7d 10 0d f0 ff 1f 00  vmovups ymm1 [0x200000]
-0x10000000: c5 f5 ef c0 000000 vpxor ymm0 ymm1 ymm0
-0x14000000: c5 7d 11 05 44 00 20 00  vmovups [0x200060] ymm0
-0x1c000000: c5 7d 10 05 dc ff 1f 00  vmovups ymm0 [0x200000]
-0x24000000: c5 7d 10 0d f4 ff 1f 00  vmovups ymm1 [0x200020]
-0x2c000000: c5 7d 11 05 4c 00 20 00  vmovups [0x200080] ymm0
-0x34000000: b8 3c 00 00 00 000 mov eax 0x3c

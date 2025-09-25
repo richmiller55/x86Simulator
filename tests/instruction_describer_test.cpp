@@ -36,3 +36,17 @@ TEST_F(InstructionDescriberTest, DescribeMOV) {
     std::string description = InstructionDescriber::describe(*decoded_instr, regs);
     EXPECT_EQ(description, expected_description);
 }
+
+TEST_F(InstructionDescriberTest, DescribeVsqrtps) {
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vsqrtps";
+    DecodedOperand dest, src;
+    dest.text = "ymm0";
+    src.text = "ymm1";
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    std::string expected_description = "Computes the square roots of packed single-precision floating-point values in ymm1 and stores the results in ymm0.";
+    std::string description = InstructionDescriber::describe(decoded_instr, regs);
+    EXPECT_EQ(description, expected_description);
+}
