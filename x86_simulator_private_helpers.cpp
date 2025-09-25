@@ -1,5 +1,6 @@
 #include "x86_simulator.h"
 #include "decoder.h"
+#include <immintrin.h>
 
 // In x86_simulator_private_helpers.cpp or x86_simulator.cpp (depending on where they are defined)
 
@@ -938,28 +939,36 @@ void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
         return;
     }
 
-    const DecodedOperand& dest_operand = decoded_instr.operands[0];
-    const DecodedOperand& src_operand = decoded_instr.operands[1];
+    const auto& dest_op = decoded_instr.operands[0];
+    const auto& src_op = decoded_instr.operands[1];
 
-    if (dest_operand.type != OperandType::YMM_REGISTER ||
-        src_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VSQRTPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+    if (dest_op.type != OperandType::YMM_REGISTER) {
+        log(session_id_, "Destination operand for VSQRTPS must be a YMM register", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
-    try {
-        __m256i src_val_i = register_map_.getYmm(src_operand.text);
+    __m256 src_ps;
 
-        __m256 src_val_ps = _mm256_castsi256_ps(src_val_i);
-
-        // Computes square roots
-        __m256 result_ps = _mm256_sqrt_ps(src_val_ps);
-
-        register_map_.setYmm(dest_operand.text, _mm256_castps_si256(result_ps));
-    } catch (const std::out_of_range& e) {
-        std::string logMessage = "Invalid register in VSQRTPS: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    if (src_op.type == OperandType::YMM_REGISTER) {
+        __m256i src_val_i = register_map_.getYmm(src_op.text);
+        src_ps = _mm256_castsi256_ps(src_val_i);
+    } else if (src_op.type == OperandType::MEMORY) {
+        __m256i src_val_i = memory_.read_ymm(src_op.value);
+        src_ps = _mm256_castsi256_ps(src_val_i);
+    } else {
+        log(session_id_, "Invalid source operand for VSQRTPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
     }
+
+    // Perform element-wise square root on the packed single-precision floats.
+    // This intrinsic handles special cases like sqrt(-ve) -> NaN, sqrt(-0) -> -0, etc.
+    // It uses the rounding mode specified in the MXCSR register.
+    __m256 result_ps = _mm256_sqrt_ps(src_ps);
+
+    // TODO: The simulator needs to manage the MXCSR register for rounding modes
+    // and handle floating-point exceptions (invalid operation, denormal, etc.).
+
+    register_map_.setYmm(dest_op.text, _mm256_castps_si256(result_ps));
 }
 
 void X86Simulator::handleVsubps(const DecodedInstruction& decoded_instr) {

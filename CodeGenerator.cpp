@@ -313,7 +313,7 @@ void CodeGenerator::process_line(const std::string& line_raw) {
             // vvvv: 1111 (unused for 2-operand)
             // L: 1 (256-bit)
             // pp: 01 (66h prefix)
-            uint8_t vex_byte2 = (0b1111 << 3) | (1 << 2) | 0b01;
+            uint8_t vex_byte2 = (1 << 7) | (0b1111 << 3) | (1 << 2) | 0b01;
             machine_code_.push_back(vex_byte2);
 
             // Opcode (0x10 for load, 0x11 for store)
@@ -342,6 +342,54 @@ void CodeGenerator::process_line(const std::string& line_raw) {
             }
 
             current_address_ += 8;
+        } catch (const std::exception& e) {
+            // Error handling
+        }
+    } else if (mnemonic == "vsqrtps") {
+        if (operands.operand_count() < 2) return;
+        try {
+            std::string dest_str = operands.get_operand(0);
+            std::string src_str = operands.get_operand(1);
+
+            uint8_t dest_reg = std::stoi(dest_str.substr(3));
+            
+            // VEX prefix (2-byte form: 0xC5)
+            machine_code_.push_back(0xC5);
+
+            // VEX byte 2: [R|vvvv|L|pp]
+            // R=1 (for ymm0-7), vvvv=1111 (not used for 2-op), L=1 (256-bit), pp=00
+            uint8_t vex_byte2 = (1 << 7) | (0b1111 << 3) | (1 << 2) | 0;
+            machine_code_.push_back(vex_byte2);
+
+            // Opcode
+            machine_code_.push_back(0x51);
+
+            if (src_str.front() == '[' && src_str.back() == ']') {
+                // Memory operand
+                std::string label = src_str.substr(1, src_str.length() - 2);
+                uint8_t modrm = (0b00 << 6) | ((dest_reg & 0b111) << 3) | 0b101;
+                machine_code_.push_back(modrm);
+
+                auto it = symbol_table_.find(label);
+                if (it != symbol_table_.end()) {
+                    address_t target_addr = it->second;
+                    address_t rip_at_disp = current_address_ + 8;
+                    int32_t disp = static_cast<int32_t>(target_addr - rip_at_disp);
+                    machine_code_.push_back((uint8_t)disp);
+                    machine_code_.push_back((uint8_t)(disp >> 8));
+                    machine_code_.push_back((uint8_t)(disp >> 16));
+                    machine_code_.push_back((uint8_t)(disp >> 24));
+                } else {
+                    machine_code_.insert(machine_code_.end(), { 0, 0, 0, 0 });
+                }
+                current_address_ += 8;
+            } else {
+                // Register operand
+                uint8_t src_reg = std::stoi(src_str.substr(3));
+                uint8_t modrm = (0b11 << 6) | ((dest_reg & 0b111) << 3) | (src_reg & 0b111);
+                machine_code_.push_back(modrm);
+                current_address_ += 4;
+            }
         } catch (const std::exception& e) {
             // Error handling
         }

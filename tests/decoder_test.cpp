@@ -189,3 +189,49 @@ TEST_F(DecoderTest, DecodeVmovupsStore) {
     EXPECT_EQ(decoded_instruction->operands[1].text, "ymm0");
 }
 
+TEST_F(DecoderTest, DecodeVsqrtpsReg) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x300;
+
+    // vsqrtps ymm1, ymm2  (C5 FC 51 CA)
+    std::vector<uint8_t> instruction_bytes = {0xC5, 0xFC, 0x51, 0xCA};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "vsqrtps");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 4);
+    ASSERT_EQ(decoded_instruction->operands.size(), 2);
+    EXPECT_EQ(decoded_instruction->operands[0].text, "ymm1");
+    EXPECT_EQ(decoded_instruction->operands[1].text, "ymm2");
+}
+
+TEST_F(DecoderTest, DecodeVsqrtpsMem) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x310;
+    address_t target_address = 0x4000;
+
+    // vsqrtps ymm0, [rip + disp]
+    // Target: 0x4000. RIP for calculation is address of next instruction (start_address + 8).
+    // disp = 0x4000 - (0x310 + 8) = 0x3CE8
+    int32_t disp = target_address - (start_address + 8);
+    std::vector<uint8_t> instruction_bytes = {
+        0xC5, 0xFC, 0x51, 0x05, // VEX, opcode, ModR/M for RIP-relative
+        static_cast<uint8_t>(disp), static_cast<uint8_t>(disp >> 8),
+        static_cast<uint8_t>(disp >> 16), static_cast<uint8_t>(disp >> 24)};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "vsqrtps");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 8);
+    ASSERT_EQ(decoded_instruction->operands.size(), 2);
+    EXPECT_EQ(decoded_instruction->operands[0].text, "ymm0");
+    EXPECT_EQ(decoded_instruction->operands[1].type, OperandType::MEMORY);
+    EXPECT_EQ(decoded_instruction->operands[1].value, target_address);
+}
+

@@ -181,13 +181,23 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
     if (opcode == 0xC4 || opcode == 0xC5) {
         VEX_Prefix vex_prefix = decodeVEXPrefix(memory, current_address);
         uint8_t vex_opcode = memory.read_text(current_address);
+
+        std::cout << "\n--- VEX DECODE TRACE ---" << std::endl;
+        std::cout << "Address: 0x" << std::hex << address << std::endl;
+        std::cout << "VEX Opcode: 0x" << std::hex << (int)vex_opcode << std::endl;
+        std::cout << "Map Select: " << std::dec << vex_prefix.map_select << std::endl;
+
         if (auto it = vex_opcode_to_mnemonic.find({vex_prefix.map_select, vex_opcode}); it != vex_opcode_to_mnemonic.end()) {
             std::string mnemonic = it->second;
+            std::cout << "Mnemonic Found: " << mnemonic << std::endl;
             std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
             decoded_instr->mnemonic = mnemonic;
         } else {
+            std::cout << "Mnemonic NOT Found" << std::endl;
             decoded_instr->mnemonic = "avx_instruction_unknown";
         }
+        std::cout << "------------------------" << std::endl;
+
         decodeAVXOperands(*decoded_instr, vex_prefix, memory, current_address);
         decoded_instr->length_in_bytes = vex_prefix.bytes + 1 + 1; // VEX + opcode + ModR/M
         for (const auto& op : decoded_instr->operands) {
@@ -397,7 +407,7 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
         dest.text = reg_prefix + std::to_string(reg);
 
         src1.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
-        src1.text = reg_prefix + std::to_string(vex_prefix.vvvv);
+        src1.text = reg_prefix + std::to_string(~vex_prefix.vvvv & 0b1111);
 
         if (mod == 0b11) { // Register-to-register
             src2.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
@@ -446,8 +456,18 @@ void Decoder::decodeAVXOperands(DecodedInstruction& instr, const VEX_Prefix& vex
         dest.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
         dest.text = reg_prefix + std::to_string(reg);
 
-        src.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
-        src.text = reg_prefix + std::to_string(rm);
+        if (mod == 0b11) { // Register source
+            src.type = vex_prefix.L ? OperandType::YMM_REGISTER : OperandType::XMM_REGISTER;
+            src.text = reg_prefix + std::to_string(rm);
+        } else if (mod == 0b00 && rm == 0b101) { // Memory source (RIP-relative)
+            src.type = OperandType::MEMORY;
+            int32_t disp = memory.read_text_dword(opcode_address + 2);
+            address_t next_instr_addr = instr.address + vex_prefix.bytes + 1 + 1 + 4;
+            src.value = next_instr_addr + disp;
+            std::stringstream ss;
+            ss << "[0x" << std::hex << src.value << "]";
+            src.text = ss.str();
+        }
 
         instr.operands.push_back(dest);
         instr.operands.push_back(src);
@@ -463,7 +483,7 @@ VEX_Prefix Decoder::decodeVEXPrefix(const Memory& memory, address_t& address) {
         uint8_t byte2 = memory.read_text(address + 1);
         prefix.map_select = 1; // Implied 0F
         prefix.L = (byte2 >> 2) & 1;
-        prefix.vvvv = (~byte2 >> 3) & 0b1111;
+        prefix.vvvv = (byte2 >> 3) & 0b1111;
         address += 2;
     } else if (byte1 == 0xC4) { // 3-byte VEX
         prefix.bytes = 3;
@@ -471,7 +491,7 @@ VEX_Prefix Decoder::decodeVEXPrefix(const Memory& memory, address_t& address) {
         uint8_t byte3 = memory.read_text(address + 2);
         prefix.map_select = byte2 & 0b11111;
         prefix.L = (byte3 >> 2) & 1;
-        prefix.vvvv = (~byte3 >> 3) & 0b1111;
+        prefix.vvvv = (byte3 >> 3) & 0b1111;
         address += 3;
     } else {
         // This is not a VEX prefix.

@@ -5,6 +5,7 @@
 #include "mock_database_manager.h"
 #include <vector>
 #include <immintrin.h>
+#include <cmath>
 
 class SimulatorCoreTest : public ::testing::Test {
 protected:
@@ -768,5 +769,73 @@ TEST_F(SimulatorCoreTest, VmovupsStoreExecution_2) {
     int32_t* actual_ints = (int32_t*)&mem_data;
     for (int i = 0; i < 8; ++i) {
         EXPECT_EQ(actual_ints[i], expected_ints[i]);
+    }
+}
+
+TEST_F(SimulatorCoreTest, VsqrtpsExecutionSpecialValues) {
+    // Test VSQRTPS with special floating point values
+    float inf = std::numeric_limits<float>::infinity();
+    float nan = std::numeric_limits<float>::quiet_NaN();
+    float neg_one = -1.0f;
+    float neg_zero = -0.0f;
+
+    __m256 val = _mm256_set_ps(1.0f, 1.0f, nan, neg_one, inf, neg_zero, 0.0f, neg_one);
+    simulator.getRegisterMapForTesting().setYmm("ymm1", _mm256_castps_si256(val));
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vsqrtps";
+    DecodedOperand dest, src;
+    dest.type = OperandType::YMM_REGISTER; dest.text = "ymm0";
+    src.type = OperandType::YMM_REGISTER; src.text = "ymm1";
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i result_i = simulator.getRegisterMapForTesting().getYmm("ymm0");
+    __m256 result_ps = _mm256_castsi256_ps(result_i);
+
+    float actual_floats[8];
+    _mm256_storeu_ps(actual_floats, result_ps);
+
+    EXPECT_TRUE(std::isnan(actual_floats[0])); // sqrt(-1.0)
+    EXPECT_EQ(actual_floats[1], 0.0f); // sqrt(0.0)
+    EXPECT_EQ(actual_floats[2], -0.0f); // sqrt(-0.0)
+    EXPECT_EQ(actual_floats[3], inf); // sqrt(+inf)
+    EXPECT_TRUE(std::isnan(actual_floats[4])); // sqrt(-1.0)
+    EXPECT_TRUE(std::isnan(actual_floats[5])); // sqrt(NaN)
+    EXPECT_FLOAT_EQ(actual_floats[6], 1.0f);
+    EXPECT_FLOAT_EQ(actual_floats[7], 1.0f);
+}
+
+TEST_F(SimulatorCoreTest, VsqrtpsExecutionMemorySource) {
+    // Test VSQRTPS ymm0, [address]
+    address_t mem_addr = simulator.getMemoryForTesting().get_data_segment_start() + 0x500;
+    __m256 val = _mm256_set_ps(1.0f, 4.0f, 9.0f, 16.0f, 25.0f, 36.0f, 49.0f, 64.0f);
+    simulator.getMemoryForTesting().write_ymm(mem_addr, _mm256_castps_si256(val));
+
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "vsqrtps";
+    DecodedOperand dest, src;
+    dest.type = OperandType::YMM_REGISTER;
+    dest.text = "ymm0";
+    src.type = OperandType::MEMORY;
+    src.value = mem_addr;
+    decoded_instr.operands.push_back(dest);
+    decoded_instr.operands.push_back(src);
+
+    simulator.executeInstruction(decoded_instr);
+
+    __m256i result_i = simulator.getRegisterMapForTesting().getYmm("ymm0");
+    __m256 result_ps = _mm256_castsi256_ps(result_i);
+
+    __m256 expected_ps = _mm256_sqrt_ps(val);
+
+    float expected_floats[8], actual_floats[8];
+    _mm256_storeu_ps(expected_floats, expected_ps);
+    _mm256_storeu_ps(actual_floats, result_ps);
+
+    for (int i = 0; i < 8; ++i) {
+        EXPECT_NEAR(actual_floats[i], expected_floats[i], 1e-6);
     }
 }
