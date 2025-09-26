@@ -278,6 +278,125 @@ void X86Simulator::handleJl(const DecodedInstruction& decoded_instr) {
     // If SF == OF, do nothing and let the instruction pointer advance normally.
 }
 
+void X86Simulator::handleJb(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JB instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_CF() == true) { // If Carry Flag is set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If CF is not set, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJae(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JAE instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_CF() == false) { // If Carry Flag is not set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If CF is set, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJbe(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JBE instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_CF() == true || get_ZF() == true) { // If Carry Flag is set OR Zero Flag is set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If CF is 0 and ZF is 0, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJs(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JS instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_SF() == true) { // If Sign Flag is set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If SF is not set, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJns(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JNS instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_SF() == false) { // If Sign Flag is not set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If SF is set, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJo(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JO instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_OF() == true) { // If Overflow Flag is set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If OF is not set, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJno(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JNO instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_OF() == false) { // If Overflow Flag is not set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If OF is set, do nothing and let the instruction pointer advance normally.
+}
+
 void X86Simulator::handleJge(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
         log(session_id_, "JGE instruction requires a target.", "ERROR",
@@ -476,6 +595,98 @@ void X86Simulator::handleMul(const DecodedInstruction& decoded_instr) {
 
     set_CF(register_map_.get32("edx") != 0);
     set_OF(register_map_.get32("edx") != 0);
+}
+
+void X86Simulator::handleImul(const DecodedInstruction& decoded_instr) {
+    // This handles the one-operand form: IMUL r/m32
+    if (decoded_instr.operands.size() != 1) {
+        log(session_id_, "IMUL (one-operand) requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& src_operand = decoded_instr.operands[0];
+    int32_t src_val = 0;
+
+    if (src_operand.type == OperandType::REGISTER) {
+        try {
+            src_val = register_map_.get32(src_operand.text);
+        } catch (const std::out_of_range& e) {
+            log(session_id_, "Invalid register in IMUL: " + src_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            return;
+        }
+    } else {
+        log(session_id_, "IMUL only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    int64_t val_eax = static_cast<int32_t>(register_map_.get32("eax"));
+    int64_t result = val_eax * static_cast<int64_t>(src_val);
+
+    uint32_t result_low = static_cast<uint32_t>(result & 0xFFFFFFFF);
+    uint32_t result_high = static_cast<uint32_t>(result >> 32);
+
+    register_map_.set32("eax", result_low);
+    register_map_.set32("edx", result_high);
+
+    // Set CF and OF if the high part of the result (EDX) is not a sign-extension of the low part (EAX).
+    // This means the result did not fit into 32 bits.
+    if (result_high == 0 && (result_low & 0x80000000) == 0) { // Positive result fits
+        set_CF(false);
+        set_OF(false);
+    } else if (result_high == 0xFFFFFFFF && (result_low & 0x80000000) != 0) { // Negative result fits
+        set_CF(false);
+        set_OF(false);
+    } else { // Result does not fit
+        set_CF(true);
+        set_OF(true);
+    }
+}
+
+void X86Simulator::handleIdiv(const DecodedInstruction& decoded_instr) {
+    // This handles the one-operand form: IDIV r/m32
+    if (decoded_instr.operands.size() != 1) {
+        log(session_id_, "IDIV (one-operand) requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& divisor_operand = decoded_instr.operands[0];
+    int32_t divisor = 0;
+
+    if (divisor_operand.type == OperandType::REGISTER) {
+        try {
+            divisor = register_map_.get32(divisor_operand.text);
+        } catch (const std::out_of_range& e) {
+            log(session_id_, "Invalid register in IDIV: " + divisor_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            return;
+        }
+    } else {
+        log(session_id_, "IDIV only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    if (divisor == 0) {
+        log(session_id_, "Divide error: Division by zero.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        // In a real CPU, this would trigger a #DE exception.
+        return;
+    }
+
+    int64_t dividend = (static_cast<int64_t>(register_map_.get32("edx")) << 32) | register_map_.get32("eax");
+
+    int64_t quotient_64 = dividend / divisor;
+    int64_t remainder_64 = dividend % divisor;
+
+    // Check for overflow. The quotient must fit within a 32-bit signed integer.
+    if (quotient_64 > std::numeric_limits<int32_t>::max() || quotient_64 < std::numeric_limits<int32_t>::min()) {
+        log(session_id_, "Divide error: Quotient overflows EAX.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        // This also triggers a #DE exception.
+        return;
+    }
+
+    register_map_.set32("eax", static_cast<int32_t>(quotient_64));
+    register_map_.set32("edx", static_cast<int32_t>(remainder_64));
+
+    // The state of CF, OF, SF, ZF, AF, and PF is undefined after IDIV.
+    // We can choose to leave them as they are or clear them. For now, we'll leave them.
 }
 
 void X86Simulator::handleDec(const DecodedInstruction& decoded_instr) {
@@ -683,6 +894,466 @@ void X86Simulator::handleNot(const DecodedInstruction& decoded_instr) {
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in NOT: " + operand.text;
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleShl(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for SHL", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& count_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "SHL currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        uint32_t dest_value = register_map_.get32(dest_operand.text);
+        uint8_t count = count_operand.value & 0x1F; // Mask to 5 bits for 32-bit operands
+
+        if (count == 0) {
+            // No operation, flags are not affected
+            return;
+        }
+
+        uint32_t result = dest_value << count;
+        register_map_.set32(dest_operand.text, result);
+
+        // Update RFLAGS
+        // CF is the last bit shifted out
+        set_CF((dest_value >> (32 - count)) & 1);
+
+        // OF is defined only for 1-bit shifts.
+        if (count == 1) {
+            // OF is set if the top two bits of the original value were different.
+            set_OF(((dest_value >> 31) & 1) != ((dest_value >> 30) & 1));
+        }
+
+        set_ZF(result == 0);
+        set_SF((result & 0x80000000) != 0);
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in SHL: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleShr(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for SHR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& count_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "SHR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        uint32_t dest_value = register_map_.get32(dest_operand.text);
+        uint8_t count = count_operand.value & 0x1F; // Mask to 5 bits for 32-bit operands
+
+        if (count == 0) {
+            // No operation, flags are not affected
+            return;
+        }
+
+        uint32_t result = dest_value >> count;
+        register_map_.set32(dest_operand.text, result);
+
+        // Update RFLAGS
+        // CF is the last bit shifted out
+        set_CF((dest_value >> (count - 1)) & 1);
+
+        // OF is defined only for 1-bit shifts.
+        if (count == 1) {
+            // For SHR, OF is set to the most-significant bit of the original operand.
+            set_OF((dest_value & 0x80000000) != 0);
+        }
+
+        set_ZF(result == 0);
+        set_SF((result & 0x80000000) != 0); // SHR clears the MSB, so SF will be 0.
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in SHR: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleSar(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for SAR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& count_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "SAR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        int32_t dest_value = register_map_.get32(dest_operand.text); // Treat as signed
+        uint8_t count = count_operand.value & 0x1F; // Mask to 5 bits for 32-bit operands
+
+        if (count == 0) {
+            // No operation, flags are not affected
+            return;
+        }
+
+        int32_t result = dest_value >> count; // C++ >> on signed types is an arithmetic shift
+        register_map_.set32(dest_operand.text, result);
+
+        // Update RFLAGS
+        // CF is the last bit shifted out
+        set_CF((dest_value >> (count - 1)) & 1);
+
+        // OF is cleared for multi-bit shifts. For a 1-bit SAR, OF is always 0.
+        if (count == 1) {
+            set_OF(false);
+        }
+
+        set_ZF(result == 0);
+        set_SF((result & 0x80000000) != 0);
+
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in SAR: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleRol(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for ROL", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& count_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "ROL currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        uint32_t dest_value = register_map_.get32(dest_operand.text);
+        uint8_t count = count_operand.value & 0x1F; // Mask to 5 bits for 32-bit operands
+
+        if (count == 0) {
+            // No operation, flags are not affected
+            return;
+        }
+
+        uint32_t result = (dest_value << count) | (dest_value >> (32 - count));
+        register_map_.set32(dest_operand.text, result);
+
+        // Update RFLAGS
+        // CF is the last bit rotated out (which is the new LSB of the result)
+        set_CF(result & 1);
+
+        // OF is defined only for 1-bit rotates.
+        if (count == 1) {
+            // OF is set if the new sign bit is different from the new carry flag.
+            bool new_sf = (result & 0x80000000) != 0;
+            set_OF(new_sf != get_CF());
+        }
+        // For multi-bit rotates, OF is undefined. We'll leave it unmodified.
+
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in ROL: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleRor(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for ROR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& count_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "ROR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        uint32_t dest_value = register_map_.get32(dest_operand.text);
+        uint8_t count = count_operand.value & 0x1F; // Mask to 5 bits for 32-bit operands
+
+        if (count == 0) {
+            // No operation, flags are not affected
+            return;
+        }
+
+        uint32_t result = (dest_value >> count) | (dest_value << (32 - count));
+        register_map_.set32(dest_operand.text, result);
+
+        // Update RFLAGS
+        // CF is the last bit rotated out (which is the new MSB of the result)
+        set_CF((result & 0x80000000) != 0);
+
+        // OF is defined only for 1-bit rotates.
+        if (count == 1) {
+            // OF is set if the two most-significant bits of the result are different.
+            bool msb = (result & 0x80000000) != 0;
+            bool msb_minus_1 = (result & 0x40000000) != 0;
+            set_OF(msb != msb_minus_1);
+        }
+        // For multi-bit rotates, OF is undefined. We'll leave it unmodified.
+
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in ROR: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleLea(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for LEA", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_operand = decoded_instr.operands[0];
+    const DecodedOperand& src_operand = decoded_instr.operands[1];
+
+    if (dest_operand.type != OperandType::REGISTER || src_operand.type != OperandType::MEMORY) {
+        log(session_id_, "LEA requires a register destination and memory source.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    // For LEA, the "source" is an address calculation, not a value from memory.
+    // We need to parse the memory operand text to figure out the address.
+    // This is a simplified implementation for formats like `[reg]`
+    const std::string& mem_text = src_operand.text;
+    if (mem_text.length() > 2 && mem_text.front() == '[' && mem_text.back() == ']') {
+        std::string reg_name = mem_text.substr(1, mem_text.length() - 2);
+        try {
+            // The "effective address" is simply the value in the base register.
+            uint32_t effective_address = register_map_.get32(reg_name);
+
+            // Store this calculated address into the destination register.
+            register_map_.set32(dest_operand.text, effective_address);
+
+        } catch (const std::out_of_range& e) {
+            std::string logMessage = "Invalid register in LEA memory operand: " + reg_name;
+            log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        }
+    } else {
+        log(session_id_, "Unsupported memory addressing mode in LEA: " + mem_text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleXchg(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for XCHG", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& op1 = decoded_instr.operands[0];
+    const DecodedOperand& op2 = decoded_instr.operands[1];
+
+    if (op1.type != OperandType::REGISTER || op2.type != OperandType::REGISTER) {
+        log(session_id_, "XCHG currently supports register-to-register exchange.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        // Assuming 32-bit registers for now
+        uint32_t val1 = register_map_.get32(op1.text);
+        uint32_t val2 = register_map_.get32(op2.text);
+
+        // Swap the values
+        uint32_t temp = val1;
+        val1 = val2;
+        val2 = temp;
+
+        // Write the swapped values back to the registers
+        register_map_.set32(op1.text, val1);
+        register_map_.set32(op2.text, val2);
+
+        // XCHG does not affect any flags.
+
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in XCHG: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleMovsx(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for MOVSX", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_op = decoded_instr.operands[0];
+    const DecodedOperand& src_op = decoded_instr.operands[1];
+
+    // We are implementing MOVSX r32, r/m8
+    if (dest_op.type != OperandType::REGISTER || src_op.type != OperandType::REGISTER) {
+        log(session_id_, "MOVSX currently supports register-to-register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        // Get the 8-bit source value
+        uint8_t src_value = register_map_.get8(src_op.text);
+
+        // Sign-extend the 8-bit value to 32 bits.
+        // Cast the 8-bit value to a signed 8-bit integer (int8_t).
+        // Then, assign it to a signed 32-bit integer (int32_t).
+        // The compiler will handle the sign extension automatically.
+        int32_t extended_value = static_cast<int8_t>(src_value);
+
+        // Write the 32-bit result to the destination register.
+        register_map_.set32(dest_op.text, extended_value);
+
+        // MOVSX does not affect any flags.
+
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in MOVSX: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleMovzx(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.size() != 2) {
+        log(session_id_, "Invalid number of operands for MOVZX", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& dest_op = decoded_instr.operands[0];
+    const DecodedOperand& src_op = decoded_instr.operands[1];
+
+    // We are implementing MOVZX r32, r/m8
+    if (dest_op.type != OperandType::REGISTER || src_op.type != OperandType::REGISTER) {
+        log(session_id_, "MOVZX currently supports register-to-register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    try {
+        // Get the 8-bit source value
+        uint8_t src_value = register_map_.get8(src_op.text);
+
+        // Zero-extend the 8-bit value to 32 bits.
+        // A simple cast from uint8_t to uint32_t achieves this.
+        uint32_t extended_value = static_cast<uint32_t>(src_value);
+
+        // Write the 32-bit result to the destination register.
+        register_map_.set32(dest_op.text, extended_value);
+
+        // MOVZX does not affect any flags.
+
+    } catch (const std::out_of_range& e) {
+        std::string logMessage = "Invalid register in MOVZX: " + std::string(e.what());
+        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleMovsb(const DecodedInstruction& decoded_instr) {
+    // MOVSB: Move byte from [RSI] to [RDI]
+    // RSI and RDI are then adjusted based on the Direction Flag (DF).
+
+    try {
+        address_t src_addr = register_map_.get64("rsi");
+        address_t dest_addr = register_map_.get64("rdi");
+
+        // Read the byte from the source address.
+        // We assume it can be in any segment, so we read from main_memory directly.
+        uint8_t byte_to_move = memory_.main_memory->at(src_addr);
+
+        // Write the byte to the destination address.
+        memory_.main_memory->at(dest_addr) = byte_to_move;
+
+        // Adjust RSI and RDI based on the Direction Flag (DF).
+        int8_t increment = get_DF() ? -1 : 1;
+        register_map_.set64("rsi", src_addr + increment);
+        register_map_.set64("rdi", dest_addr + increment);
+
+        // MOVSB does not affect any flags other than the implicit update of RSI/RDI.
+
+    } catch (const std::out_of_range& e) {
+        log(session_id_, "Memory access out of bounds during MOVSB.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleMovsw(const DecodedInstruction& decoded_instr) {
+    // MOVSW: Move word from [RSI] to [RDI]
+    // RSI and RDI are then adjusted by 2 based on the Direction Flag (DF).
+
+    try {
+        address_t src_addr = register_map_.get64("rsi");
+        address_t dest_addr = register_map_.get64("rdi");
+
+        // Check for memory bounds for a 2-byte read/write
+        if (src_addr + 1 >= memory_.get_total_memory_size() || dest_addr + 1 >= memory_.get_total_memory_size()) {
+            throw std::out_of_range("Memory access out of bounds during MOVSW.");
+        }
+
+        // Read the word (2 bytes) from the source address.
+        uint8_t byte1 = memory_.main_memory->at(src_addr);
+        uint8_t byte2 = memory_.main_memory->at(src_addr + 1);
+
+        // Write the word to the destination address.
+        memory_.main_memory->at(dest_addr) = byte1;
+        memory_.main_memory->at(dest_addr + 1) = byte2;
+
+        // Adjust RSI and RDI by 2 based on the Direction Flag (DF).
+        int8_t increment = get_DF() ? -2 : 2;
+        register_map_.set64("rsi", src_addr + increment);
+        register_map_.set64("rdi", dest_addr + increment);
+
+        // MOVSW does not affect any flags other than the implicit update of RSI/RDI.
+
+    } catch (const std::out_of_range& e) {
+        log(session_id_, "Memory access out of bounds during MOVSW.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+    }
+}
+
+void X86Simulator::handleMovsd(const DecodedInstruction& decoded_instr) {
+    // MOVSD: Move doubleword from [RSI] to [RDI]
+    // RSI and RDI are then adjusted by 4 based on the Direction Flag (DF).
+
+    try {
+        address_t src_addr = register_map_.get64("rsi");
+        address_t dest_addr = register_map_.get64("rdi");
+
+        // Check for memory bounds for a 4-byte read/write
+        if (src_addr + 3 >= memory_.get_total_memory_size() || dest_addr + 3 >= memory_.get_total_memory_size()) {
+            throw std::out_of_range("Memory access out of bounds during MOVSD.");
+        }
+
+        // Read the doubleword (4 bytes) from the source address.
+        uint8_t byte1 = memory_.main_memory->at(src_addr);
+        uint8_t byte2 = memory_.main_memory->at(src_addr + 1);
+        uint8_t byte3 = memory_.main_memory->at(src_addr + 2);
+        uint8_t byte4 = memory_.main_memory->at(src_addr + 3);
+
+        // Write the doubleword to the destination address.
+        memory_.main_memory->at(dest_addr) = byte1;
+        memory_.main_memory->at(dest_addr + 1) = byte2;
+        memory_.main_memory->at(dest_addr + 2) = byte3;
+        memory_.main_memory->at(dest_addr + 3) = byte4;
+
+        // Adjust RSI and RDI by 4 based on the Direction Flag (DF).
+        int8_t increment = get_DF() ? -4 : 4;
+        register_map_.set64("rsi", src_addr + increment);
+        register_map_.set64("rdi", dest_addr + increment);
+
+        // MOVSD does not affect any flags other than the implicit update of RSI/RDI.
+
+    } catch (const std::out_of_range& e) {
+        log(session_id_, "Memory access out of bounds during MOVSD.", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 

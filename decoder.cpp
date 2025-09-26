@@ -6,6 +6,13 @@
 #include <iomanip>
 #include <algorithm>
 
+// Helper to get 8-bit register name from index
+const char* getRegisterName8(uint8_t index) {
+    static const char* registers[] = {"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh"};
+    if (index < 8) return registers[index];
+    return "err";
+}
+
 std::unique_ptr<Decoder> Decoder::instance;
 
 // Helper to get 32-bit register name from index
@@ -16,17 +23,18 @@ const char* getRegisterName(uint8_t index) {
 }
 
 // Helper to decode ModR/M byte
-void decodeModRM(uint8_t modrm, DecodedInstruction& instr) {
-    [[maybe_unused]] uint8_t mod = (modrm >> 6) & 0x03;
-    [[maybe_unused]] uint8_t reg = (modrm >> 3) & 0x07;
+void decodeModRM(uint8_t modrm, DecodedInstruction& instr, bool is_lea = false) {
+    uint8_t mod = (modrm >> 6) & 0x03;
+    uint8_t reg_field = (modrm >> 3) & 0x07;
     uint8_t rm  = modrm & 0x07;
 
     if (mod == 0b11) { // Register-to-register
         DecodedOperand dest, src;
         dest.type = OperandType::REGISTER;
-        dest.text = getRegisterName(rm);
+        // For LEA, the reg field is the destination. For others, it's often the source.
+        dest.text = getRegisterName(is_lea ? reg_field : rm);
         src.type = OperandType::REGISTER;
-        src.text = getRegisterName(reg);
+        src.text = getRegisterName(is_lea ? rm : reg_field);
         instr.operands.push_back(dest);
         instr.operands.push_back(src);
     }
@@ -50,11 +58,23 @@ Decoder::Decoder() {
         {0x83, "CMP"},
         {0x75, "JNE"},
         {0x74, "JE"},
+        {0x72, "JB"},
         {0x7C, "JL"},
         {0x7D, "JGE"},
+        {0x73, "JAE"},
+        {0x76, "JBE"},
+        {0x78, "JS"},
+        {0x79, "JNS"},
+        {0x70, "JO"},
+        {0x71, "JNO"},
+        {0x87, "XCHG"},
+        {0x8D, "LEA"},
+        {0xC1, "GROUP_C1"}, // SHL, SHR, etc.
         {0x7F, "JG"},
         {0x77, "JA"},
         {0xB8, "MOV"},
+        {0xA4, "MOVSB"},
+        {0xA5, "MOVSD"}, // MOVSW is 66 A5
         {0xB9, "MOV"},
         {0xBB, "MOV"},
         {0x89, "MOV"},
@@ -69,7 +89,9 @@ Decoder::Decoder() {
     };
 
     two_byte_opcode_to_mnemonic = {
-        {0x8E, "JLE"}
+        {0x8E, "JLE"},
+        {0xBE, "MOVSX"},
+        {0xB6, "MOVZX"}
     };
 
     vex_opcode_to_mnemonic = {
@@ -118,11 +140,32 @@ Decoder::Decoder() {
         {"CMP", 0x39},
         {"JNE", 0x75},
         {"JE", 0x74},
+        {"JB", 0x72},
         {"JL", 0x7C},
         {"JGE", 0x7D},
+        {"JAE", 0x73},
+        {"JBE", 0x76},
+        {"JS", 0x78},
+        {"JNS", 0x79},
+        {"JO", 0x70},
         {"JLE", 0x8E},
+        {"JNO", 0x71},
+        {"SHL", 0xC1},
+        {"SHR", 0xC1},
+        {"SAR", 0xC1},
+        {"ROL", 0xC1},
+        {"ROR", 0xC1},
+        {"XCHG", 0x87},
+        {"IMUL", 0xF7},
+        {"IDIV", 0xF7},
+        {"MOVZX", 0xB6}, // As part of 0F prefix
+        {"MOVSX", 0xBE}, // As part of 0F prefix
+        {"LEA", 0x8D},
         {"JG", 0x7F},
         {"JA", 0x77},
+        {"MOVSB", 0xA4},
+        {"MOVSD", 0xA5},
+        {"MOVSW", 0xA5},
         {"MOV", 0xB8},
         {"INC", 0x40},
         {"INT", 0xCD},
@@ -149,11 +192,30 @@ Decoder::Decoder() {
         {0x83, 3}, // CMP r/m32, imm8
         {0x75, 2}, // JNE rel8
         {0x74, 2}, // JE rel8
+        {0x72, 2}, // JB rel8
         {0x7C, 2}, // JL rel8
         {0x7D, 2}, // JGE rel8
+        {0x73, 2}, // JAE rel8
+        {0x76, 2}, // JBE rel8
+        {0x78, 2}, // JS rel8
+        {0x79, 2}, // JNS rel8
+        {0x70, 2}, // JO rel8
+        {0x71, 2}, // JNO rel8
+        {0xC1, 3}, // SHL r/m32, imm8
+        {0xC1, 3}, // SHR r/m32, imm8
+        {0xC1, 3}, // SAR r/m32, imm8
+        {0xC1, 3}, // ROL r/m32, imm8
+        {0xC1, 3}, // ROR r/m32, imm8
+        {0x87, 2}, // XCHG r/m32, r32
+        {0x8D, 2}, // LEA r32, m
         {0x8E, 6}, // JLE rel32
+        {0xB6, 3}, // MOVZX r32, r/m8 (with 0F prefix)
+        {0xBE, 3}, // MOVSX r32, r/m8 (with 0F prefix)
         {0x7F, 2}, // JG rel8
         {0x40, 1}, // INC EAX (Legacy)
+        {0xA5, 1}, // MOVSD
+        {0x66, 2}, // MOVSW (66 A5)
+        {0xA4, 1}, // MOVSB
         {0xFF, 2}, // INC r/m32
         {0x48, 1}, // DEC EAX (Legacy)
         {0xF7, 2}, // Group F7
@@ -230,6 +292,13 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
     } else if (opcode == 0x0F) {
         current_address++;
         uint8_t next_byte = memory.read_text(current_address);
+        if (next_byte == 0xB6) { // MOVZX
+            decoded_instr->mnemonic = "movzx";
+        } else if (next_byte == 0xBE) { // MOVSX
+            decoded_instr->mnemonic = "movsx";
+        } else if (next_byte == 0x8E) { // JLE
+            decoded_instr->mnemonic = "jle";
+        }
         auto it = two_byte_opcode_to_mnemonic.find(next_byte);
         if (it != two_byte_opcode_to_mnemonic.end()) {
             decoded_instr->mnemonic = it->second;
@@ -247,7 +316,48 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
                 ss << "0x" << std::hex << target_address;
                 op.text = ss.str();
                 decoded_instr->operands.push_back(op);
+            } else if (decoded_instr->mnemonic == "movsx") {
+                decoded_instr->length_in_bytes = 3; // 0F + BE + ModRM
+                current_address++;
+                uint8_t modrm = memory.read_text(current_address);
+                uint8_t mod = (modrm >> 6) & 0x03;
+                uint8_t reg_field = (modrm >> 3) & 0x07;
+                uint8_t rm = modrm & 0x07;
+
+                DecodedOperand dest, src;
+                dest.type = OperandType::REGISTER;
+                dest.text = getRegisterName(reg_field); // Destination is r32
+
+                src.type = OperandType::REGISTER;
+                src.text = getRegisterName8(rm); // Source is r8
+
+                decoded_instr->operands.push_back(dest);
+                decoded_instr->operands.push_back(src);
+            } else if (decoded_instr->mnemonic == "movzx") {
+                decoded_instr->length_in_bytes = 3; // 0F + B6 + ModRM
+                current_address++;
+                uint8_t modrm = memory.read_text(current_address);
+                uint8_t mod = (modrm >> 6) & 0x03;
+                uint8_t reg_field = (modrm >> 3) & 0x07;
+                uint8_t rm = modrm & 0x07;
+
+                DecodedOperand dest, src;
+                dest.type = OperandType::REGISTER;
+                dest.text = getRegisterName(reg_field); // Destination is r32
+
+                src.type = OperandType::REGISTER;
+                src.text = getRegisterName8(rm); // Source is r8
+
+                decoded_instr->operands.push_back(dest);
+                decoded_instr->operands.push_back(src);
             }
+        }
+    } else if (opcode == 0x66) { // Operand-size override prefix
+        current_address++;
+        uint8_t next_byte = memory.read_text(current_address);
+        if (next_byte == 0xA5) {
+            decoded_instr->mnemonic = "movsw";
+            decoded_instr->length_in_bytes = 2;
         }
     } else {
         // Existing logic for non-AVX instructions
@@ -272,10 +382,33 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             imm.text = ss.str();
             decoded_instr->operands.push_back(reg);
             decoded_instr->operands.push_back(imm);
-        } else if (opcode == 0x89 || opcode == 0x01 || opcode == 0x29 || opcode == 0x39 || opcode == 0x21 || opcode == 0x09 || opcode == 0x31) { // Register-register operations
+        } else if (opcode == 0x89 || opcode == 0x01 || opcode == 0x29 || opcode == 0x39 || opcode == 0x21 || opcode == 0x09 || opcode == 0x31 || opcode == 0x87) { // Register-register operations
             decoded_instr->length_in_bytes = 2;
             uint8_t modrm = memory.read_text(current_address);
-            decodeModRM(modrm, *decoded_instr);
+            decodeModRM(modrm, *decoded_instr, false);
+        } else if (opcode == 0x8D) { // LEA r32, m
+            decoded_instr->length_in_bytes = 2; // Base length
+            uint8_t modrm = memory.read_text(current_address);
+            uint8_t mod = (modrm >> 6) & 0x03;
+            uint8_t reg_field = (modrm >> 3) & 0x07;
+            uint8_t rm = modrm & 0x07;
+
+            DecodedOperand dest_reg, src_mem;
+
+            dest_reg.type = OperandType::REGISTER;
+            dest_reg.text = getRegisterName(reg_field);
+
+            src_mem.type = OperandType::MEMORY;
+            // This is a simplified decoder for [reg] form
+            if (mod == 0b00 && rm != 0b101) {
+                src_mem.text = "[" + std::string(getRegisterName(rm)) + "]";
+            } else {
+                // More complex ModR/M forms (with displacement, SIB byte) would be handled here.
+                src_mem.text = "[mem]";
+            }
+
+            decoded_instr->operands.push_back(dest_reg);
+            decoded_instr->operands.push_back(src_mem);
         } else if (opcode == 0xFF) { // INC r/m32
             decoded_instr->length_in_bytes = 2;
             uint8_t modrm = memory.read_text(current_address);
@@ -295,7 +428,9 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             uint8_t reg_field = (modrm >> 3) & 0x07;
             if (reg_field == 2) decoded_instr->mnemonic = "not";
             else if (reg_field == 4) decoded_instr->mnemonic = "mul";
+            else if (reg_field == 5) decoded_instr->mnemonic = "imul";
             else if (reg_field == 6) decoded_instr->mnemonic = "div";
+            else if (reg_field == 7) decoded_instr->mnemonic = "idiv";
             // other group members...
 
             uint8_t rm = modrm & 0x07;
@@ -328,6 +463,36 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             imm_op.text = ss.str();
             decoded_instr->operands.push_back(reg);
             decoded_instr->operands.push_back(imm_op);
+        } else if (opcode == 0xC1) { // Group with SHL, SHR, etc. with imm8
+            decoded_instr->length_in_bytes = 3;
+            uint8_t modrm = memory.read_text(current_address++);
+            uint8_t imm = memory.read_text(current_address);
+            uint8_t reg_field = (modrm >> 3) & 0x07;
+
+            // Decode the specific instruction from the /reg field
+            if (reg_field == 0) {
+                decoded_instr->mnemonic = "rol";
+            } else if (reg_field == 1) {
+                decoded_instr->mnemonic = "ror";
+            }else if (reg_field == 4) {
+                decoded_instr->mnemonic = "shl";
+            } else if (reg_field == 5) {
+                decoded_instr->mnemonic = "shr";
+            } else if (reg_field == 7) {
+                decoded_instr->mnemonic = "sar";
+            }
+            // Other instructions in this group (SHR, SAR, ROL, etc.) can be added here.
+
+            DecodedOperand reg, imm_op;
+            reg.type = OperandType::REGISTER;
+            reg.text = getRegisterName(modrm & 0x07);
+            imm_op.type = OperandType::IMMEDIATE;
+            imm_op.value = imm;
+            std::stringstream ss;
+            ss << "0x" << std::hex << (int)imm;
+            imm_op.text = ss.str();
+            decoded_instr->operands.push_back(reg);
+            decoded_instr->operands.push_back(imm_op);
         } else if (opcode == 0x75) { // JNE rel8
             decoded_instr->length_in_bytes = 2;
             int8_t offset = memory.read_text(current_address);
@@ -341,6 +506,83 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             decoded_instr->operands.push_back(op);
             // Operand is the target address
         } else if (opcode == 0x74) { // JE rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x72) { // JB rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x73) { // JAE rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x76) { // JBE rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x78) { // JS rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x79) { // JNS rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x70) { // JO rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x71) { // JNO rel8
             decoded_instr->length_in_bytes = 2;
             int8_t offset = memory.read_text(current_address);
             address_t target_address = address + decoded_instr->length_in_bytes + offset;
@@ -586,4 +828,3 @@ VEX_Prefix Decoder::decodeVEXPrefix(const Memory& memory, address_t& address) {
 
     return prefix;
 }
-
