@@ -46,6 +46,36 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleJne(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "JE") {
+        if (!decoded_instr.operands.empty()) {
+            handleJe(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JL") {
+        if (!decoded_instr.operands.empty()) {
+            handleJl(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JGE") {
+        if (!decoded_instr.operands.empty()) {
+            handleJge(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JLE") {
+        if (!decoded_instr.operands.empty()) {
+            handleJle(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JG") {
+        if (!decoded_instr.operands.empty()) {
+            handleJg(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JA") {
+        if (!decoded_instr.operands.empty()) {
+            handleJa(decoded_instr);
+            return true;
+        }
     } else if (normalized_mnemonic == "INT") {
         if (!decoded_instr.operands.empty()) {
             handleInt(decoded_instr);

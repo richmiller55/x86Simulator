@@ -244,6 +244,108 @@ void X86Simulator::handleJne(const DecodedInstruction& decoded_instr) {
     // If ZF is set, do nothing and let the instruction pointer advance normally.
 }
 
+void X86Simulator::handleJe(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JE instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_ZF() == true) { // If Zero Flag is set, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If ZF is not set, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJl(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JL instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_SF() != get_OF()) { // If SF != OF, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If SF == OF, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJge(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JGE instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_SF() == get_OF()) { // If SF == OF, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If SF != OF, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJle(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JLE instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (get_ZF() || (get_SF() != get_OF())) { // If ZF is set, or if SF != OF, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If ZF is not set and SF == OF, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJg(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JG instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (!get_ZF() && (get_SF() == get_OF())) { // If ZF is 0 and SF == OF, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If ZF is 1 or SF != OF, do nothing and let the instruction pointer advance normally.
+}
+
+void X86Simulator::handleJa(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "JA instruction requires a target.", "ERROR",
+	    instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (!get_CF() && !get_ZF()) { // If CF is 0 and ZF is 0, then jump
+        // The target address is calculated during decoding and stored in the operand's value.
+        address_t targetAddress = target_operand.value;
+        register_map_.set64("rip", targetAddress);
+
+    }
+    // If CF is 1 or ZF is 1, do nothing and let the instruction pointer advance normally.
+}
+
 void X86Simulator::handleInc(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
         log(session_id_, "INC instruction requires an operand.", "ERROR",

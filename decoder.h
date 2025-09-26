@@ -47,6 +47,7 @@ private:
   static std::unique_ptr<Decoder> instance;
 
   std::map<uint8_t, std::string> opcode_to_mnemonic;
+  std::map<uint8_t, std::string> two_byte_opcode_to_mnemonic;
   std::map<std::tuple<int, uint8_t>, std::string> vex_opcode_to_mnemonic;
   std::map<std::string, uint8_t> mnemonic_to_opcode;
   std::map<uint8_t, size_t> instruction_lengths;

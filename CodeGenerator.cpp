@@ -130,6 +130,89 @@ void CodeGenerator::process_line(const std::string& line_raw) {
              machine_code_.push_back(0x00); // placeholder offset
              current_address_ += 2;
         }
+    } else if (mnemonic == "je") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for je rel8
+            machine_code_.push_back(0x74);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x74); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jl") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jl rel8
+            machine_code_.push_back(0x7C);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x7C); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jge") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jge rel8
+            machine_code_.push_back(0x7D);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x7D); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jle") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int32_t offset = target_address - (current_address_ + 6); // 6 bytes for jle rel32
+            machine_code_.push_back(0x0F);
+            machine_code_.push_back(0x8E);
+            current_address_ += 2;
+            machine_code_.insert(machine_code_.end(), { (uint8_t)offset, (uint8_t)(offset >> 8), (uint8_t)(offset >> 16), (uint8_t)(offset >> 24) });
+            current_address_ += 4; // dword
+        } else {
+            // Sizing pass for a forward reference. Assume near jump size.
+            machine_code_.push_back(0x0F); // placeholder opcode
+            machine_code_.push_back(0x8E); // placeholder opcode
+            machine_code_.insert(machine_code_.end(), {0,0,0,0}); // placeholder offset
+            current_address_ += 6;
+        }
+    } else if (mnemonic == "jg") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jg rel8
+            machine_code_.push_back(0x7F);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x7F); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
     } else if (mnemonic == "jmp") {
         if (operands.operand_count() < 1) return;
         std::string label = operands.get_operand(0);

@@ -24,6 +24,31 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
             const auto& target = instr.operands[0];
             ss << "Unconditionally jumps to the address " << target.text << ".";
         }
+    } else if (mnemonic == "je") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Zero Flag (ZF) is set.";
+        }
+    } else if (mnemonic == "jl") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is not equal to the Overflow Flag (OF).";
+        }
+    } else if (mnemonic == "jge") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is equal to the Overflow Flag (OF).";
+        }
+    } else if (mnemonic == "jle") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Zero Flag (ZF) is set, or if the Sign Flag (SF) is not equal to the Overflow Flag (OF).";
+        }
+    } else if (mnemonic == "jg") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Zero Flag (ZF) is 0 and the Sign Flag (SF) is equal to the Overflow Flag (OF).";
+        }
     } else if (mnemonic == "nop") {
         ss << "No operation. This instruction does nothing.";
     } else if (mnemonic == "ret") {
