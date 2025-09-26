@@ -56,6 +56,41 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleJl(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "JB") {
+        if (!decoded_instr.operands.empty()) {
+            handleJb(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JAE") {
+        if (!decoded_instr.operands.empty()) {
+            handleJae(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JBE") {
+        if (!decoded_instr.operands.empty()) {
+            handleJbe(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JS") {
+        if (!decoded_instr.operands.empty()) {
+            handleJs(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JNS") {
+        if (!decoded_instr.operands.empty()) {
+            handleJns(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JO") {
+        if (!decoded_instr.operands.empty()) {
+            handleJo(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "JNO") {
+        if (!decoded_instr.operands.empty()) {
+            handleJno(decoded_instr);
+            return true;
+        }
     } else if (normalized_mnemonic == "JGE") {
         if (!decoded_instr.operands.empty()) {
             handleJge(decoded_instr);
@@ -86,9 +121,19 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleMul(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "IMUL") {
+        if (!decoded_instr.operands.empty()) {
+            handleImul(decoded_instr);
+            return true;
+        }
     } else if (normalized_mnemonic == "DEC") {
         if (!decoded_instr.operands.empty()) {
             handleDec(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "IDIV") {
+        if (!decoded_instr.operands.empty()) {
+            handleIdiv(decoded_instr);
             return true;
         }
     } else if (normalized_mnemonic == "DIV") {
@@ -116,6 +161,63 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleNot(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "SHL") {
+        if (decoded_instr.operands.size() == 2) {
+            handleShl(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "SHR") {
+        if (decoded_instr.operands.size() == 2) {
+            handleShr(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "SAR") {
+        if (decoded_instr.operands.size() == 2) {
+            handleSar(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "ROL") {
+        if (decoded_instr.operands.size() == 2) {
+            handleRol(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "ROR") {
+        if (decoded_instr.operands.size() == 2) {
+            handleRor(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "LEA") {
+        if (decoded_instr.operands.size() == 2) {
+            handleLea(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "XCHG") {
+        if (decoded_instr.operands.size() == 2) {
+            handleXchg(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "MOVSX") {
+        if (decoded_instr.operands.size() == 2) {
+            handleMovsx(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "MOVZX") {
+        if (decoded_instr.operands.size() == 2) {
+            handleMovzx(decoded_instr);
+            return true;
+        }
+    } else if (normalized_mnemonic == "MOVSB") {
+        // MOVSB has no explicit operands
+        handleMovsb(decoded_instr);
+        return true;
+    } else if (normalized_mnemonic == "MOVSW") {
+        // MOVSW has no explicit operands
+        handleMovsw(decoded_instr);
+        return true;
+    } else if (normalized_mnemonic == "MOVSD") {
+        // MOVSD has no explicit operands
+        handleMovsd(decoded_instr);
+        return true;
     } else if (normalized_mnemonic == "PUSH") {
         if (decoded_instr.operands.size() == 1) {
             handlePush(decoded_instr);
@@ -357,4 +459,6 @@ void X86Simulator::dumpBssSegment(const std::string& filename) {
     }
     outfile << "BSS segment dump not implemented." << std::endl;
     outfile.close();
+
+        return;
 }

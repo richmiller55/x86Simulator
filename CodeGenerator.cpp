@@ -146,6 +146,117 @@ void CodeGenerator::process_line(const std::string& line_raw) {
              machine_code_.push_back(0x00); // placeholder offset
              current_address_ += 2;
         }
+    } else if (mnemonic == "jb") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jb rel8
+            machine_code_.push_back(0x72);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            machine_code_.push_back(0x72);
+            machine_code_.push_back(0x00);
+            current_address_ += 2;
+        }
+    } else if (mnemonic == "jae") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jae rel8
+            machine_code_.push_back(0x73);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x73); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jbe") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jbe rel8
+            machine_code_.push_back(0x76);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x76); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "js") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for js rel8
+            machine_code_.push_back(0x78);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x78); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jns") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jns rel8
+            machine_code_.push_back(0x79);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x79); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jo") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jo rel8
+            machine_code_.push_back(0x70);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x70); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
+    } else if (mnemonic == "jno") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int8_t offset = target_address - (current_address_ + 2); // 2 bytes for jno rel8
+            machine_code_.push_back(0x71);
+            machine_code_.push_back(offset);
+            current_address_ += 2;
+        } else {
+            // Sizing pass for a forward reference. Assume short jump size.
+             machine_code_.push_back(0x71); // placeholder opcode
+             machine_code_.push_back(0x00); // placeholder offset
+             current_address_ += 2;
+        }
     } else if (mnemonic == "jl") {
         if (operands.operand_count() < 1) return;
         std::string label = operands.get_operand(0);
@@ -243,6 +354,34 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         // For now, hardcoding for `mul ebx` -> ModR/M is E3
         machine_code_.push_back(0xE3);
         current_address_ += 2;
+    } else if (mnemonic == "imul") {
+        if (operands.operand_count() < 1) return;
+        // This handles the one-operand form, e.g., imul ebx
+        // IMUL r/m32. Opcode: F7 /5
+        machine_code_.push_back(0xF7);
+        std::string src_reg = operands.get_operand(0);
+        if (src_reg == "ebx") {
+            // ModR/M for `imul ebx` is 11 101 011 -> EB
+            machine_code_.push_back(0xEB);
+        } else {
+            // Placeholder for other registers
+            machine_code_.push_back(0x00);
+        }
+        current_address_ += 2;
+    } else if (mnemonic == "idiv") {
+        if (operands.operand_count() < 1) return;
+        // This handles the one-operand form, e.g., idiv ebx
+        // IDIV r/m32. Opcode: F7 /7
+        machine_code_.push_back(0xF7);
+        std::string src_reg = operands.get_operand(0);
+        if (src_reg == "ebx") {
+            // ModR/M for `idiv ebx` is 11 111 011 -> FB
+            machine_code_.push_back(0xFB);
+        } else {
+            // Placeholder for other registers
+            machine_code_.push_back(0x00);
+        }
+        current_address_ += 2;
     } else if (mnemonic == "dec") {
         if (operands.operand_count() < 1) return;
         // DEC r32. Opcode: FF /1
@@ -301,7 +440,271 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         // For now, hardcoding for `not eax` -> ModR/M is D0
         machine_code_.push_back(0xD0);
         current_address_ += 2;
-    } else if (mnemonic == "push" || mnemonic == "pop") {
+    } else if (mnemonic == "shl") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string count_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_rm = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_rm.find(dest_reg_str);
+        if (it != reg_to_rm.end()) {
+            try {
+                uint8_t count = std::stoul(count_str, nullptr, 0);
+                // SHL r/m32, imm8. Opcode: C1 /4
+                machine_code_.push_back(0xC1);
+                // ModR/M: mod=11, reg=/4, rm=dest_reg
+                uint8_t modrm = (0b11 << 6) | (4 << 3) | it->second;
+                machine_code_.push_back(modrm);
+                machine_code_.push_back(count);
+                current_address_ += 3;
+            } catch (const std::exception&) { /* error */ }
+        }
+    } else if (mnemonic == "shr") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string count_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_rm = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_rm.find(dest_reg_str);
+        if (it != reg_to_rm.end()) {
+            try {
+                uint8_t count = std::stoul(count_str, nullptr, 0);
+                // SHR r/m32, imm8. Opcode: C1 /5
+                machine_code_.push_back(0xC1);
+                // ModR/M: mod=11, reg=/5, rm=dest_reg
+                uint8_t modrm = (0b11 << 6) | (5 << 3) | it->second;
+                machine_code_.push_back(modrm);
+                machine_code_.push_back(count);
+                current_address_ += 3;
+            } catch (const std::exception&) { /* error */ }
+        }
+    }
+    else if (mnemonic == "push" || mnemonic == "pop") {
+    } else if (mnemonic == "shr") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string count_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_rm = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_rm.find(dest_reg_str);
+        if (it != reg_to_rm.end()) {
+            try {
+                uint8_t count = std::stoul(count_str, nullptr, 0);
+                // SHR r/m32, imm8. Opcode: C1 /5
+                machine_code_.push_back(0xC1);
+                // ModR/M: mod=11, reg=/5, rm=dest_reg
+                uint8_t modrm = (0b11 << 6) | (5 << 3) | it->second;
+                machine_code_.push_back(modrm);
+                machine_code_.push_back(count);
+                current_address_ += 3;
+            } catch (const std::exception&) { /* error */ }
+        }
+    } else if (mnemonic == "sar") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string count_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_rm = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_rm.find(dest_reg_str);
+        if (it != reg_to_rm.end()) {
+            try {
+                uint8_t count = std::stoul(count_str, nullptr, 0);
+                // SAR r/m32, imm8. Opcode: C1 /7
+                machine_code_.push_back(0xC1);
+                // ModR/M: mod=11, reg=/7, rm=dest_reg
+                uint8_t modrm = (0b11 << 6) | (7 << 3) | it->second;
+                machine_code_.push_back(modrm);
+                machine_code_.push_back(count);
+                current_address_ += 3;
+            } catch (const std::exception&) { /* error */ }
+        }
+    }
+    else if (mnemonic == "rol") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string count_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_rm = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_rm.find(dest_reg_str);
+        if (it != reg_to_rm.end()) {
+            try {
+                uint8_t count = std::stoul(count_str, nullptr, 0);
+                // ROL r/m32, imm8. Opcode: C1 /0
+                machine_code_.push_back(0xC1);
+                // ModR/M: mod=11, reg=/0, rm=dest_reg
+                uint8_t modrm = (0b11 << 6) | (0 << 3) | it->second;
+                machine_code_.push_back(modrm);
+                machine_code_.push_back(count);
+                current_address_ += 3;
+            } catch (const std::exception&) { /* error */ }
+        }
+    }
+    else if (mnemonic == "ror") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string count_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_rm = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto it = reg_to_rm.find(dest_reg_str);
+        if (it != reg_to_rm.end()) {
+            try {
+                uint8_t count = std::stoul(count_str, nullptr, 0);
+                // ROR r/m32, imm8. Opcode: C1 /1
+                machine_code_.push_back(0xC1);
+                // ModR/M: mod=11, reg=/1, rm=dest_reg
+                uint8_t modrm = (0b11 << 6) | (1 << 3) | it->second;
+                machine_code_.push_back(modrm);
+                machine_code_.push_back(count);
+                current_address_ += 3;
+            } catch (const std::exception&) { /* error */ }
+        }
+    }
+    else if (mnemonic == "lea") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string src_mem_str = operands.get_operand(1);
+
+        // Basic parsing for "[reg]" format
+        if (src_mem_str.front() == '[' && src_mem_str.back() == ']') {
+            std::string src_reg_str = src_mem_str.substr(1, src_mem_str.length() - 2);
+
+            static const std::map<std::string, uint8_t> reg_to_code = {
+                {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+                {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+            };
+
+            auto dest_it = reg_to_code.find(dest_reg_str);
+            auto src_it = reg_to_code.find(src_reg_str);
+
+            if (dest_it != reg_to_code.end() && src_it != reg_to_code.end()) {
+                // LEA r32, [r32]. Opcode: 8D
+                machine_code_.push_back(0x8D);
+                // ModR/M: mod=00 (no disp), reg=dest_reg, rm=src_reg
+                uint8_t modrm = (0b00 << 6) | (dest_it->second << 3) | src_it->second;
+                machine_code_.push_back(modrm);
+                current_address_ += 2;
+            }
+        }
+    }
+    else if (mnemonic == "xchg") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string src_reg_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg_to_code = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+
+        auto dest_it = reg_to_code.find(dest_reg_str);
+        auto src_it = reg_to_code.find(src_reg_str);
+
+        if (dest_it != reg_to_code.end() && src_it != reg_to_code.end()) {
+            // XCHG r/m32, r32. Opcode: 87
+            machine_code_.push_back(0x87);
+            // ModR/M: mod=11 (reg-reg), reg=src_reg, rm=dest_reg
+            uint8_t modrm = (0b11 << 6) | (src_it->second << 3) | dest_it->second;
+            machine_code_.push_back(modrm);
+            current_address_ += 2;
+        }
+    }
+    else if (mnemonic == "movsx") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string src_reg_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg32_to_code = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+        static const std::map<std::string, uint8_t> reg8_to_code = {
+            {"al", 0}, {"cl", 1}, {"dl", 2}, {"bl", 3},
+            {"ah", 4}, {"ch", 5}, {"dh", 6}, {"bh", 7}
+        };
+
+        auto dest_it = reg32_to_code.find(dest_reg_str);
+        auto src_it = reg8_to_code.find(src_reg_str);
+
+        if (dest_it != reg32_to_code.end() && src_it != reg8_to_code.end()) {
+            // MOVSX r32, r/m8. Opcode: 0F BE /r
+            machine_code_.push_back(0x0F);
+            machine_code_.push_back(0xBE);
+            // ModR/M: mod=11 (reg-reg), reg=dest_reg(r32), rm=src_reg(r8)
+            uint8_t modrm = (0b11 << 6) | (dest_it->second << 3) | src_it->second;
+            machine_code_.push_back(modrm);
+            current_address_ += 3;
+        }
+        // Note: Could add support for r32, m8 here later.
+    }
+    else if (mnemonic == "movzx") {
+        if (operands.operand_count() < 2) return;
+        std::string dest_reg_str = operands.get_operand(0);
+        std::string src_reg_str = operands.get_operand(1);
+
+        static const std::map<std::string, uint8_t> reg32_to_code = {
+            {"eax", 0}, {"ecx", 1}, {"edx", 2}, {"ebx", 3},
+            {"esp", 4}, {"ebp", 5}, {"esi", 6}, {"edi", 7}
+        };
+        static const std::map<std::string, uint8_t> reg8_to_code = {
+            {"al", 0}, {"cl", 1}, {"dl", 2}, {"bl", 3},
+            {"ah", 4}, {"ch", 5}, {"dh", 6}, {"bh", 7}
+        };
+
+        auto dest_it = reg32_to_code.find(dest_reg_str);
+        auto src_it = reg8_to_code.find(src_reg_str);
+
+        if (dest_it != reg32_to_code.end() && src_it != reg8_to_code.end()) {
+            // MOVZX r32, r/m8. Opcode: 0F B6 /r
+            machine_code_.push_back(0x0F);
+            machine_code_.push_back(0xB6);
+            // ModR/M: mod=11 (reg-reg), reg=dest_reg(r32), rm=src_reg(r8)
+            uint8_t modrm = (0b11 << 6) | (dest_it->second << 3) | src_it->second;
+            machine_code_.push_back(modrm);
+            current_address_ += 3;
+        }
+        // Note: Could add support for r32, m8 here later.
+    }
+    else if (mnemonic == "movsb") {
+        // MOVSB has no operands, its opcode is 0xA4
+        machine_code_.push_back(0xA4);
+        current_address_ += 1;
+    }
+    else if (mnemonic == "movsd") {
+        // MOVSD has no operands, its opcode is 0xA5
+        machine_code_.push_back(0xA5);
+        current_address_ += 1;
+    }
+    else if (mnemonic == "movsw") {
+        // MOVSW is 66 A5
+        machine_code_.push_back(0x66);
+        machine_code_.push_back(0xA5);
+        current_address_ += 1;
+    }
+    else if (mnemonic == "push" || mnemonic == "pop") {
         if (operands.operand_count() < 1) return;
         std::string reg = operands.get_operand(0);
         

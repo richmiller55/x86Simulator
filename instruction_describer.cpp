@@ -34,6 +34,41 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
             const auto& target = instr.operands[0];
             ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is not equal to the Overflow Flag (OF).";
         }
+    } else if (mnemonic == "jae") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Carry Flag (CF) is not set.";
+        }
+    } else if (mnemonic == "jb") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Carry Flag (CF) is set.";
+        }
+    } else if (mnemonic == "jbe") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Carry Flag (CF) is set or the Zero Flag (ZF) is set.";
+        }
+    } else if (mnemonic == "js") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is set.";
+        }
+    } else if (mnemonic == "jns") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is not set.";
+        }
+    } else if (mnemonic == "jo") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Overflow Flag (OF) is set.";
+        }
+    } else if (mnemonic == "jno") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Jumps to address " << target.text << " if the Overflow Flag (OF) is not set.";
+        }
     } else if (mnemonic == "jge") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
@@ -162,6 +197,91 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
             const auto& src1 = instr.operands[1];
             const auto& src2 = instr.operands[2];
             ss << "Performs a bitwise OR of " << src1.text << " and " << src2.text << " and stores the result in " << dest.text << ".";
+        }
+    } else if (mnemonic == "shl") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& count = instr.operands[1];
+            ss << "Shifts the bits in " << dest.text << " to the left by " << count.text << " positions. "
+               << "The last bit shifted out is placed in the Carry Flag (CF).";
+        }
+    } else if (mnemonic == "shr") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& count = instr.operands[1];
+            ss << "Shifts the bits in " << dest.text << " to the right by " << count.text << " positions. "
+               << "The last bit shifted out is placed in the Carry Flag (CF).";
+        }
+    } else if (mnemonic == "sar") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& count = instr.operands[1];
+            ss << "Performs a signed right shift on " << dest.text << " by " << count.text << " positions, preserving the sign bit. "
+               << "The last bit shifted out is placed in the Carry Flag (CF).";
+        }
+    } else if (mnemonic == "rol") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& count = instr.operands[1];
+            ss << "Rotates the bits in " << dest.text << " to the left by " << count.text << " positions. "
+               << "The bit rotated out of the MSB is moved to the LSB and also copied to the Carry Flag (CF).";
+        }
+    } else if (mnemonic == "ror") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& count = instr.operands[1];
+            ss << "Rotates the bits in " << dest.text << " to the right by " << count.text << " positions. "
+               << "The bit rotated out of the LSB is moved to the MSB and also copied to the Carry Flag (CF).";
+        }
+    } else if (mnemonic == "lea") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Computes the effective address of the source operand " << src.text 
+               << " and stores it in the destination register " << dest.text << ".";
+        }
+    } else if (mnemonic == "xchg") {
+        if (instr.operands.size() == 2) {
+            const auto& op1 = instr.operands[0];
+            const auto& op2 = instr.operands[1];
+            ss << "Exchanges the contents of " << op1.text << " and " << op2.text << ".";
+        }
+    } else if (mnemonic == "movsx") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Moves the value from " << src.text << " to " << dest.text 
+               << " with sign-extension.";
+        }
+    } else if (mnemonic == "movzx") {
+        if (instr.operands.size() == 2) {
+            const auto& dest = instr.operands[0];
+            const auto& src = instr.operands[1];
+            ss << "Moves the value from " << src.text << " to " << dest.text 
+               << " with zero-extension.";
+        }
+    } else if (mnemonic == "movsb") {
+        ss << "Moves a byte from the location specified by RSI to the location specified by RDI. "
+           << "RSI and RDI are then incremented or decremented based on the Direction Flag (DF).";
+    } else if (mnemonic == "movsw") {
+        ss << "Moves a word (2 bytes) from the location specified by RSI to the location specified by RDI. "
+           << "RSI and RDI are then incremented or decremented by 2 based on the Direction Flag (DF).";
+    } else if (mnemonic == "movsd") {
+        ss << "Moves a doubleword (4 bytes) from the location specified by RSI to the location specified by RDI. "
+           << "RSI and RDI are then incremented or decremented by 4 based on the Direction Flag (DF).";
+    } else if (mnemonic == "imul") {
+        if (instr.operands.size() == 1) {
+            const auto& src = instr.operands[0];
+            ss << "Performs a signed multiplication of EAX by " << src.text 
+               << ". The 64-bit result is stored in EDX:EAX.";
+        }
+        // Other forms of IMUL can be described here
+    }
+    else if (mnemonic == "idiv") {
+        if (instr.operands.size() == 1) {
+            const auto& src = instr.operands[0];
+            ss << "Performs a signed division of the 64-bit value in EDX:EAX by " << src.text
+               << ". The quotient is stored in EAX and the remainder in EDX.";
         }
     }
     // Default case for other instructions
