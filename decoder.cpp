@@ -49,6 +49,11 @@ Decoder::Decoder() {
         {0x39, "CMP"},
         {0x83, "CMP"},
         {0x75, "JNE"},
+        {0x74, "JE"},
+        {0x7C, "JL"},
+        {0x7D, "JGE"},
+        {0x7F, "JG"},
+        {0x77, "JA"},
         {0xB8, "MOV"},
         {0xB9, "MOV"},
         {0xBB, "MOV"},
@@ -61,6 +66,10 @@ Decoder::Decoder() {
         {0xCD, "INT"},
         {0xE4, "IN"},
         {0xE6, "OUT"}
+    };
+
+    two_byte_opcode_to_mnemonic = {
+        {0x8E, "JLE"}
     };
 
     vex_opcode_to_mnemonic = {
@@ -108,6 +117,12 @@ Decoder::Decoder() {
         {"AND", 0x21},
         {"CMP", 0x39},
         {"JNE", 0x75},
+        {"JE", 0x74},
+        {"JL", 0x7C},
+        {"JGE", 0x7D},
+        {"JLE", 0x8E},
+        {"JG", 0x7F},
+        {"JA", 0x77},
         {"MOV", 0xB8},
         {"INC", 0x40},
         {"INT", 0xCD},
@@ -133,6 +148,11 @@ Decoder::Decoder() {
         {0x39, 2}, // CMP r/m32, r32
         {0x83, 3}, // CMP r/m32, imm8
         {0x75, 2}, // JNE rel8
+        {0x74, 2}, // JE rel8
+        {0x7C, 2}, // JL rel8
+        {0x7D, 2}, // JGE rel8
+        {0x8E, 6}, // JLE rel32
+        {0x7F, 2}, // JG rel8
         {0x40, 1}, // INC EAX (Legacy)
         {0xFF, 2}, // INC r/m32
         {0x48, 1}, // DEC EAX (Legacy)
@@ -181,22 +201,22 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
     if (opcode == 0xC4 || opcode == 0xC5) {
         VEX_Prefix vex_prefix = decodeVEXPrefix(memory, current_address);
         uint8_t vex_opcode = memory.read_text(current_address);
-
+	/*
         std::cout << "\n--- VEX DECODE TRACE ---" << std::endl;
         std::cout << "Address: 0x" << std::hex << address << std::endl;
         std::cout << "VEX Opcode: 0x" << std::hex << (int)vex_opcode << std::endl;
         std::cout << "Map Select: " << std::dec << vex_prefix.map_select << std::endl;
-
+	*/
         if (auto it = vex_opcode_to_mnemonic.find({vex_prefix.map_select, vex_opcode}); it != vex_opcode_to_mnemonic.end()) {
             std::string mnemonic = it->second;
-            std::cout << "Mnemonic Found: " << mnemonic << std::endl;
+            // std::cout << "Mnemonic Found: " << mnemonic << std::endl;
             std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
             decoded_instr->mnemonic = mnemonic;
         } else {
-            std::cout << "Mnemonic NOT Found" << std::endl;
+	  //std::cout << "Mnemonic NOT Found" << std::endl;
             decoded_instr->mnemonic = "avx_instruction_unknown";
         }
-        std::cout << "------------------------" << std::endl;
+
 
         decodeAVXOperands(*decoded_instr, vex_prefix, memory, current_address);
         decoded_instr->length_in_bytes = vex_prefix.bytes + 1 + 1; // VEX + opcode + ModR/M
@@ -207,6 +227,28 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             }
         } 
 
+    } else if (opcode == 0x0F) {
+        current_address++;
+        uint8_t next_byte = memory.read_text(current_address);
+        auto it = two_byte_opcode_to_mnemonic.find(next_byte);
+        if (it != two_byte_opcode_to_mnemonic.end()) {
+            decoded_instr->mnemonic = it->second;
+            std::transform(decoded_instr->mnemonic.begin(), decoded_instr->mnemonic.end(), decoded_instr->mnemonic.begin(), ::tolower);
+
+            if (decoded_instr->mnemonic == "jle") {
+                decoded_instr->length_in_bytes = 6;
+                current_address++;
+                int32_t offset = memory.read_text_dword(current_address);
+                address_t target_address = address + decoded_instr->length_in_bytes + offset;
+                DecodedOperand op;
+                op.type = OperandType::IMMEDIATE;
+                op.value = target_address;
+                std::stringstream ss;
+                ss << "0x" << std::hex << target_address;
+                op.text = ss.str();
+                decoded_instr->operands.push_back(op);
+            }
+        }
     } else {
         // Existing logic for non-AVX instructions
         current_address++;
@@ -298,6 +340,50 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             op.text = ss.str();
             decoded_instr->operands.push_back(op);
             // Operand is the target address
+        } else if (opcode == 0x74) { // JE rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x7C) { // JL rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x7D) { // JGE rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
+        } else if (opcode == 0x7F) { // JG rel8
+            decoded_instr->length_in_bytes = 2;
+            int8_t offset = memory.read_text(current_address);
+            address_t target_address = address + decoded_instr->length_in_bytes + offset;
+            DecodedOperand op;
+            op.type = OperandType::IMMEDIATE;
+            op.value = target_address;
+            std::stringstream ss;
+            ss << "0x" << std::hex << target_address;
+            op.text = ss.str();
+            decoded_instr->operands.push_back(op);
         } else if (opcode == 0xE9) { // JMP rel32
             decoded_instr->length_in_bytes = 5;
             int32_t offset = memory.read_text_dword(current_address);

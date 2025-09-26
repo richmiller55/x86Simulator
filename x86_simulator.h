@@ -121,6 +121,12 @@ private:
   void handleAdd(const DecodedInstruction& decoded_instr);
   void handleJmp(const DecodedInstruction& decoded_instr);
   void handleJne(const DecodedInstruction& decoded_instr);
+  void handleJe(const DecodedInstruction& decoded_instr);
+  void handleJl(const DecodedInstruction& decoded_instr);
+  void handleJge(const DecodedInstruction& decoded_instr);
+  void handleJle(const DecodedInstruction& decoded_instr);
+  void handleJg(const DecodedInstruction& decoded_instr);
+  void handleJa(const DecodedInstruction& decoded_instr);
   void handleInc(const DecodedInstruction& decoded_instr);
   void handleCmp(const DecodedInstruction& decoded_instr);
   void handleInt(const DecodedInstruction& decoded_instr);
@@ -142,9 +148,10 @@ private:
   void handleVpandn(const DecodedInstruction& decoded_instr);
   void handleVpand(const DecodedInstruction& decoded_instr);
   void handleVpmullw(const DecodedInstruction& decoded_instr);
-      void handleVminps(const DecodedInstruction& decoded_instr);
-      void handleVmovups(const DecodedInstruction& decoded_instr);
-      void handleVpxor(const DecodedInstruction& decoded_instr);  void handleVrcpps(const DecodedInstruction& decoded_instr);
+  void handleVminps(const DecodedInstruction& decoded_instr);
+  void handleVmovups(const DecodedInstruction& decoded_instr);
+  void handleVpxor(const DecodedInstruction& decoded_instr);
+  void handleVrcpps(const DecodedInstruction& decoded_instr);
   void handleVsqrtps(const DecodedInstruction& decoded_instr);
   void handleVsubps(const DecodedInstruction& decoded_instr);
   void handleVpor(const DecodedInstruction& decoded_instr);
