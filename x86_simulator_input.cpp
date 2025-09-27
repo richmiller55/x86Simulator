@@ -42,11 +42,36 @@ bool X86Simulator::loadProgram(const std::string& filename) {
 
 std::vector<std::string> X86Simulator::parseLine(const std::string& line) {
     std::vector<std::string> tokens;
-    std::stringstream ss(line);
-    std::string token;
-    while (ss >> token) {
-        tokens.push_back(token);
+    std::string current_token;
+    bool in_quotes = false;
+
+    for (char c : line) {
+        if (c == '\'' && !in_quotes) {
+            if (!current_token.empty()) {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+            in_quotes = true;
+            current_token += c;
+        } else if (c == '\'' && in_quotes) {
+            current_token += c;
+            in_quotes = false;
+            tokens.push_back(current_token);
+            current_token.clear();
+        } else if (std::isspace(c) && !in_quotes) {
+            if (!current_token.empty()) {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+        } else {
+            current_token += c;
+        }
     }
+
+    if (!current_token.empty()) {
+        tokens.push_back(current_token);
+    }
+
     return tokens;
 }
 
@@ -63,6 +88,12 @@ bool X86Simulator::firstPass() {
         std::string line = trim(line_raw);
         if (line.empty() || line[0] == ';') {
             continue;
+        }
+
+        auto comment_pos = line.find(';');
+        if (comment_pos != std::string::npos) {
+            line = line.substr(0, comment_pos);
+            line = trim(line);
         }
 
         std::vector<std::string> tokens = parseLine(line);
@@ -108,15 +139,44 @@ bool X86Simulator::firstPass() {
         }
         // Handle data directives
         else if (current_lc == &data_lc) {
-            std::vector<std::string> data_tokens = tokens;
-            if (tokens[0].back() == ':') {
-                data_tokens.erase(data_tokens.begin());
+            std::string label;
+            std::string directive;
+            size_t operand_start_idx = 0;
+
+            if (tokens.size() > 1 && (tokens[1] == "db" || tokens[1] == "dd")) {
+                label = tokens[0];
+                symbolTable_[label] = *current_lc;
+                directive = tokens[1];
+                operand_start_idx = 2;
+            } else if (tokens.size() > 0 && (tokens[0] == "db" || tokens[0] == "dd")) {
+                directive = tokens[0];
+                operand_start_idx = 1;
             }
 
-            if (!data_tokens.empty() && data_tokens[0] == "dd") {
-                for (size_t i = 1; i < data_tokens.size(); ++i) {
-                    std::string val_str = data_tokens[i];
-                    if (val_str.back() == ',') {
+            if (directive == "db") {
+                for (size_t i = operand_start_idx; i < tokens.size(); ++i) {
+                    std::string val_str = tokens[i];
+                    if (!val_str.empty() && val_str.back() == ',') {
+                        val_str.pop_back();
+                    }
+                    if (val_str.empty()) continue;
+
+                    uint8_t val_to_write = 0;
+                    if (val_str.length() >= 3 && val_str.front() == '\'' && val_str.back() == '\'') {
+                        val_to_write = val_str[1];
+                    } else {
+                        val_to_write = static_cast<uint8_t>(std::stoul(val_str));
+                    }
+
+                    if (*current_lc < memory_.main_memory->size()) {
+                        memory_.main_memory->at(*current_lc) = val_to_write;
+                    }
+                    *current_lc += 1;
+                }
+            } else if (directive == "dd") {
+                for (size_t i = operand_start_idx; i < tokens.size(); ++i) {
+                    std::string val_str = tokens[i];
+                    if (!val_str.empty() && val_str.back() == ',') {
                         val_str.pop_back();
                     }
                     if (val_str.empty()) continue;
@@ -137,12 +197,37 @@ bool X86Simulator::firstPass() {
                     *current_lc += 4;
                 }
             } else {
-                *current_lc += calculate_data_size(tokens);
+                if (!tokens.empty() && tokens[0].back() != ':') {
+                     *current_lc += calculate_data_size(tokens);
+                }
             }
         }
         // Handle BSS directives
         else if (current_lc == &bss_lc) {
-            *current_lc += calculate_bss_size(tokens);
+            std::string label;
+            std::string directive;
+            size_t operand_start_idx = 0;
+
+            if (tokens.size() > 1 && (tokens[1] == "resb" || tokens[1] == "resw" || tokens[1] == "resd")) {
+                label = tokens[0];
+                symbolTable_[label] = *current_lc;
+                directive = tokens[1];
+                operand_start_idx = 2;
+            } else if (tokens.size() > 0 && (tokens[0] == "resb" || tokens[0] == "resw" || tokens[0] == "resd")) {
+                directive = tokens[0];
+                operand_start_idx = 1;
+            }
+
+            if (directive == "resb") {
+                if (tokens.size() > operand_start_idx) {
+                    size_t size = std::stoul(tokens[operand_start_idx]);
+                    *current_lc += size;
+                }
+            } else {
+                if (!tokens.empty() && tokens[0].back() != ':') {
+                    *current_lc += calculate_bss_size(tokens);
+                }
+            }
         }
         // Handle instructions in the text segment
         else {

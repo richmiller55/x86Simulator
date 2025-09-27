@@ -24,6 +24,12 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
             const auto& target = instr.operands[0];
             ss << "Unconditionally jumps to the address " << target.text << ".";
         }
+    } else if (mnemonic == "call") {
+        if (instr.operands.size() == 1) {
+            const auto& target = instr.operands[0];
+            ss << "Pushes the return address onto the stack and jumps to the address " << target.text << ".";
+        }
+
     } else if (mnemonic == "je") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];

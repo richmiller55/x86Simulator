@@ -135,6 +135,14 @@ void Memory::write64(address_t address, uint64_t value) {
     }
 }
 
+uint64_t Memory::read_qword(address_t address) const {
+    return read64(address);
+}
+
+void Memory::write_qword(address_t address, uint64_t value) {
+    write64(address, value);
+}
+
 uint32_t Memory::read_dword(address_t address) const {
     uint32_t value = 0;
     for (int i = 0; i < 4; ++i) {

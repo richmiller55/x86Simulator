@@ -279,3 +279,69 @@ TEST_F(DecoderTest, DecodeVrcppsMem) {
     EXPECT_EQ(decoded_instruction->operands[1].value, target_address);
 }
 
+TEST_F(DecoderTest, DecodeCallInstruction) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x100;
+    int32_t relative_offset = 0x12345678;
+    // The target address is calculated relative to the address of the *next* instruction.
+    address_t target_address = start_address + 5 + relative_offset;
+
+    // CALL rel32 (E8 78 56 34 12)
+    std::vector<uint8_t> instruction_bytes = {0xE8, 0x78, 0x56, 0x34, 0x12};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "call");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 5);
+    EXPECT_EQ(decoded_instruction->address, start_address);
+    ASSERT_EQ(decoded_instruction->operands.size(), 1);
+    EXPECT_EQ(decoded_instruction->operands[0].type, OperandType::IMMEDIATE);
+    EXPECT_EQ(decoded_instruction->operands[0].value, target_address);
+}
+
+TEST_F(DecoderTest, DecodeJmpRel32Instruction) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x100;
+    int32_t relative_offset = 0xABC;
+    // The target address is calculated relative to the address of the *next* instruction.
+    address_t target_address = start_address + 5 + relative_offset;
+
+    // JMP rel32 (E9 BC 0A 00 00)
+    std::vector<uint8_t> instruction_bytes = {0xE9, 0xBC, 0x0A, 0x00, 0x00};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "jmp");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 5);
+    ASSERT_EQ(decoded_instruction->operands.size(), 1);
+    EXPECT_EQ(decoded_instruction->operands[0].type, OperandType::IMMEDIATE);
+    EXPECT_EQ(decoded_instruction->operands[0].value, target_address);
+}
+
+TEST_F(DecoderTest, DecodeJgeRel8Instruction) {
+    Memory memory(1024, 1024, 1024);
+    address_t start_address = 0x100;
+    int8_t relative_offset = 0x20;
+    // The target address is calculated relative to the address of the *next* instruction.
+    address_t target_address = start_address + 2 + relative_offset;
+
+    // JGE rel8 (7D 20)
+    std::vector<uint8_t> instruction_bytes = {0x7D, 0x20};
+    for (size_t i = 0; i < instruction_bytes.size(); ++i) {
+        memory.write_text(start_address + i, instruction_bytes[i]);
+    }
+
+    auto decoded_instruction = decoder.decodeInstruction(memory, start_address);
+    ASSERT_NE(decoded_instruction, nullptr);
+    EXPECT_EQ(decoded_instruction->mnemonic, "jge");
+    EXPECT_EQ(decoded_instruction->length_in_bytes, 2);
+    ASSERT_EQ(decoded_instruction->operands.size(), 1);
+    EXPECT_EQ(decoded_instruction->operands[0].type, OperandType::IMMEDIATE);
+    EXPECT_EQ(decoded_instruction->operands[0].value, target_address);
+}
