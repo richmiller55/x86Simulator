@@ -212,7 +212,37 @@ void UIManager::drawYmmRegisters(const RegisterMap& regs) {
         drawRegisterWindow(win_ymm_, "YMM Registers (Expanded)", regs, RegisterDisplayOrderYMM_, ymm_view_mode_, display_base_);
     }
 }
+void UIManager::centerViewOnRip(address_t current_rip) {
+    if (!program_decoder_) return;
+
+    const auto& address_to_index_map = program_decoder_->getAddressToIndexMap();
+    auto it = address_to_index_map.find(current_rip);
+
+    if (it != address_to_index_map.end()) {
+        size_t instruction_index = it->second;
+        int window_height = getmaxy(win_text_segment_);
+        int center_line = (window_height > 3) ? (window_height - 3) / 2 : 0;
+
+        if (instruction_index > static_cast<size_t>(center_line)) {
+            text_scroll_offset_ = instruction_index - center_line;
+        } else {
+            text_scroll_offset_ = 0;
+        }
+
+        size_t program_size = program_decoder_->getDecodedProgram().size();
+        if (window_height > 3 && program_size > static_cast<size_t>(window_height - 3)) {
+            size_t max_offset = program_size - (window_height - 3);
+            if (text_scroll_offset_ > max_offset) {
+                text_scroll_offset_ = max_offset;
+            }
+        } else {
+            text_scroll_offset_ = 0;
+        }
+    }
+}
+
 void UIManager::drawTextWindow(address_t current_rip) {
+  centerViewOnRip(current_rip);
   drawTextSegment(win_text_segment_, "Program", current_rip);
 }
 

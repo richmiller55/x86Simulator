@@ -31,6 +31,11 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
             handleJmp(decoded_instr);
             return true;
         }
+    } else if (normalized_mnemonic == "CALL") {
+        if (!decoded_instr.operands.empty()) {
+            handleCall(decoded_instr);
+            return true;
+        }
     } else if (normalized_mnemonic == "INC") {
         if (!decoded_instr.operands.empty()) {
             handleInc(decoded_instr);
@@ -331,12 +336,10 @@ void X86Simulator::runSingleInstruction() {
     bool success = executeInstruction(*decoded_instr);
 
     if (success) {
-        // If the instruction pointer was not modified by a jump, advance it.
-        // Jumps and conditional jumps will set RIP themselves.
         // We check if RIP is still pointing to the current instruction.
         if (register_map_.get64("rip") == instruction_pointer) {
             register_map_.set64("rip", next_ip);
-        }
+	    }
         // Otherwise, a jump occurred and RIP is already correct.
     } else {
         log(session_id_, "Execution failed for: " + decoded_instr->mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);

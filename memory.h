@@ -34,6 +34,10 @@ public:
 
   uint64_t read64(address_t address) const;
   void write64(address_t address, uint64_t value);
+
+  uint64_t read_qword(address_t address) const;
+  void write_qword(address_t address, uint64_t value);
+
     uint32_t read_dword(address_t address) const;
 
   uint64_t read_stack(address_t address) const;

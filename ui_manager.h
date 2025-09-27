@@ -44,7 +44,7 @@ private:
 			  YmmViewMode current_ymm_view_mode, DisplayBase current_display_base,
 			  size_t scroll_offset = 0, int max_regs = -1);
   void drawTextSegment(WINDOW* win, const std::string& title, address_t current_rip);
-
+  void centerViewOnRip(address_t current_rip);
   WINDOW *win32_;
   WINDOW *win64_;
   WINDOW *win_text_segment_;

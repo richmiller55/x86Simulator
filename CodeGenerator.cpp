@@ -37,7 +37,10 @@ void CodeGenerator::process_line(const std::string& line_raw) {
 
     OperandParser operands(tokens);
 
-    if (mnemonic == "mov") {
+    if (mnemonic == "nop") {
+        machine_code_.push_back(0x90);
+        current_address_ += 1;
+    } else if (mnemonic == "mov") {
         if (operands.operand_count() < 2) return;
         std::string dest = operands.get_operand(0);
         std::string src = operands.get_operand(1);
@@ -73,6 +76,7 @@ void CodeGenerator::process_line(const std::string& line_raw) {
             } else if (dest == "ebx" && src == "eax") { // mov ebx, eax
                 machine_code_.push_back(0x89);
                 machine_code_.push_back(0xC3);
+                current_address_ += 2;
             }
         }
     } else if (mnemonic == "add") {
@@ -137,6 +141,10 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         if (it != symbol_table_.end()) {
             address_t target_address = it->second;
             int8_t offset = target_address - (current_address_ + 2); // 2 bytes for je rel8
+            std::cout << "[CodeGenerator DEBUG] JE to " << label
+                      << ": current_addr=0x" << std::hex << current_address_
+                      << ", target_addr=0x" << target_address
+                      << ", offset=" << static_cast<int>(offset) << std::endl;
             machine_code_.push_back(0x74);
             machine_code_.push_back(offset);
             current_address_ += 2;
@@ -331,6 +339,10 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         if (it != symbol_table_.end()) {
             address_t target_address = it->second;
             int32_t offset = target_address - (current_address_ + 5); // 5 bytes for jmp rel32
+            std::cout << "[CodeGenerator DEBUG] JMP to " << label
+                      << ": current_addr=0x" << std::hex << current_address_
+                      << ", target_addr=0x" << target_address
+                      << ", offset=" << offset << std::endl;
             machine_code_.push_back(0xE9);
             current_address_ += 1;
             machine_code_.insert(machine_code_.end(), { (uint8_t)offset, (uint8_t)(offset >> 8), (uint8_t)(offset >> 16), (uint8_t)(offset >> 24) });
@@ -341,6 +353,24 @@ void CodeGenerator::process_line(const std::string& line_raw) {
             machine_code_.insert(machine_code_.end(), {0,0,0,0}); // placeholder offset
             current_address_ += 5;
         }
+    } else if (mnemonic == "call") {
+        if (operands.operand_count() < 1) return;
+        std::string label = operands.get_operand(0);
+        auto it = symbol_table_.find(label);
+        if (it != symbol_table_.end()) {
+            address_t target_address = it->second;
+            int32_t offset = target_address - (current_address_ + 5); // 5 bytes for call rel32
+            machine_code_.push_back(0xE8);
+            current_address_ += 1;
+            machine_code_.insert(machine_code_.end(), { (uint8_t)offset, (uint8_t)(offset >> 8), (uint8_t)(offset >> 16), (uint8_t)(offset >> 24) });
+            current_address_ += 4; // dword
+        } else {
+            // Sizing pass for a forward reference. Assume near jump size.
+            machine_code_.push_back(0xE8); // placeholder opcode
+            machine_code_.insert(machine_code_.end(), {0,0,0,0}); // placeholder offset
+            current_address_ += 5;
+        }
+
     } else if (mnemonic == "int") {
         if (operands.operand_count() < 1) return;
         // Assuming "int 0x80"
@@ -702,7 +732,7 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         // MOVSW is 66 A5
         machine_code_.push_back(0x66);
         machine_code_.push_back(0xA5);
-        current_address_ += 1;
+        current_address_ += 2;
     }
     else if (mnemonic == "push" || mnemonic == "pop") {
         if (operands.operand_count() < 1) return;
@@ -932,11 +962,36 @@ void CodeGenerator::process_line(const std::string& line_raw) {
 
 std::vector<std::string> CodeGenerator::parse_line(const std::string& line) {
     std::vector<std::string> tokens;
-    std::stringstream ss(line);
-    std::string token;
-    while (ss >> token) {
-        tokens.push_back(token);
+    std::string current_token;
+    bool in_quotes = false;
+
+    for (char c : line) {
+        if (c == '\'' && !in_quotes) {
+            if (!current_token.empty()) {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+            in_quotes = true;
+            current_token += c;
+        } else if (c == '\'' && in_quotes) {
+            current_token += c;
+            in_quotes = false;
+            tokens.push_back(current_token);
+            current_token.clear();
+        } else if (std::isspace(c) && !in_quotes) {
+            if (!current_token.empty()) {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+        } else {
+            current_token += c;
+        }
     }
+
+    if (!current_token.empty()) {
+        tokens.push_back(current_token);
+    }
+
     return tokens;
 }
 

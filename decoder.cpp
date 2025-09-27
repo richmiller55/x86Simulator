@@ -51,6 +51,7 @@ Decoder::Decoder() {
         {0x29, "SUB"},
         {0xEB, "JMP"},
         {0xE9, "JMP"},
+        {0xE8, "CALL"},
         {0x09, "OR"},
         {0x31, "XOR"},
         {0x21, "AND"},
@@ -150,6 +151,7 @@ Decoder::Decoder() {
         {"JO", 0x70},
         {"JLE", 0x8E},
         {"JNO", 0x71},
+        {"CALL", 0xE8},
         {"SHL", 0xC1},
         {"SHR", 0xC1},
         {"SAR", 0xC1},
@@ -185,6 +187,7 @@ Decoder::Decoder() {
         {0x29, 2}, // SUB r/m32, r32
         {0xEB, 2}, // JMP rel8
         {0xE9, 5}, // JMP rel32
+        {0xE8, 5}, // CALL rel32
         {0x09, 2}, // OR r/m32, r32
         {0x31, 2}, // XOR r/m32, r32
         {0x21, 2}, // AND r/m32, r32
@@ -626,7 +629,7 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             ss << "0x" << std::hex << target_address;
             op.text = ss.str();
             decoded_instr->operands.push_back(op);
-        } else if (opcode == 0xE9) { // JMP rel32
+        } else if (opcode == 0xE9 || opcode == 0xE8) { // JMP rel32 or CALL rel32
             decoded_instr->length_in_bytes = 5;
             int32_t offset = memory.read_text_dword(current_address);
             address_t target_address = address + decoded_instr->length_in_bytes + offset;
@@ -637,7 +640,7 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             ss << "0x" << std::hex << target_address;
             op.text = ss.str();
             decoded_instr->operands.push_back(op);
-            // Operand is the target address
+
         } else if (opcode >= 0x50 && opcode <= 0x57) { // PUSH r32
             decoded_instr->mnemonic = "push";
             decoded_instr->length_in_bytes = 1;

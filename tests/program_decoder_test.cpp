@@ -1,6 +1,18 @@
 #include "gtest/gtest.h"
 #include "../program_decoder.h"
 #include "../memory.h"
+#include "../CodeGenerator.h"
+#include <map>
+
+// Helper function to trim strings, needed for the test
+std::string trim_for_test(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t");
+    if (std::string::npos == first) {
+        return str;
+    }
+    size_t last = str.find_last_not_of(" \t");
+    return str.substr(first, (last - first + 1));
+}
 
 TEST(ProgramDecoderTest, DecodeSimpleProgram) {
     Memory mem;
@@ -178,4 +190,85 @@ TEST(ProgramDecoderTest, DecodeVMOVUPSLoad) {
     EXPECT_EQ(instr->operands[1].type, OperandType::MEMORY);
     address_t expected_addr = start_addr + 8 + 0x100;
     EXPECT_EQ(instr->operands[1].value, expected_addr);
+}
+
+TEST(ProgramDecoderTest, AssembleAndDecodeJumps) {
+    std::vector<std::string> program_lines = {
+        "start:",
+        "  mov ecx, 10",
+        "loop:",
+        "  cmp ecx, 0",
+        "  je end",
+        "  dec ecx",
+        "  jmp loop",
+        "end:",
+        "  nop"
+    };
+
+    std::map<std::string, address_t> symbol_table;
+    address_t current_address = 0;
+
+    // Manual first pass to build symbol table
+    for (const auto& line : program_lines) {
+        std::string trimmed_line = trim_for_test(line);
+        if (trimmed_line.empty() || trimmed_line[0] == ';') continue;
+
+        if (trimmed_line.back() == ':') {
+            std::string label = trimmed_line.substr(0, trimmed_line.length() - 1);
+            symbol_table[label] = current_address;
+        } else {
+            std::map<std::string, address_t> empty_symbol_table;
+            CodeGenerator temp_gen(empty_symbol_table);
+            std::vector<uint8_t> temp_code = temp_gen.generate_code({trimmed_line});
+            current_address += temp_code.size();
+        }
+    }
+
+    // --- Second Pass: Generate final code ---
+    CodeGenerator code_gen(symbol_table);
+    std::vector<uint8_t> machine_code = code_gen.generate_code(program_lines);
+
+    // --- Load code into memory and decode ---
+    Memory mem;
+    mem.set_text_segment_size(machine_code.size());
+    for(size_t i = 0; i < machine_code.size(); ++i) {
+        mem.write_text(mem.get_text_segment_start() + i, machine_code[i]);
+    }
+
+    ProgramDecoder decoder(mem);
+    decoder.decode();
+
+    const auto& decoded_program = decoder.getDecodedProgram();
+    ASSERT_EQ(decoded_program.size(), 6);
+
+    // --- Verify Decoded Instructions ---
+    // 1. mov ecx, 10 (address 0, size 5)
+    EXPECT_EQ(decoded_program[0]->mnemonic, "mov");
+    EXPECT_EQ(decoded_program[0]->address, 0);
+
+    // 2. cmp ecx, 0 (address 5, size 3)
+    EXPECT_EQ(decoded_program[1]->mnemonic, "cmp");
+    EXPECT_EQ(decoded_program[1]->address, 5);
+
+    // 3. je end (address 8, size 2)
+    const auto& je_instr = decoded_program[2];
+    EXPECT_EQ(je_instr->mnemonic, "je");
+    EXPECT_EQ(je_instr->address, 8);
+    ASSERT_EQ(je_instr->operands.size(), 1);
+    EXPECT_EQ(je_instr->operands[0].value, symbol_table["end"]);
+
+    // 4. dec ecx (address 10, size 2)
+    EXPECT_EQ(decoded_program[3]->mnemonic, "dec");
+    EXPECT_EQ(decoded_program[3]->address, 10);
+
+    // 5. jmp loop (address 12, size 5)
+    const auto& jmp_instr = decoded_program[4];
+    EXPECT_EQ(jmp_instr->mnemonic, "jmp");
+    EXPECT_EQ(jmp_instr->address, 12);
+    ASSERT_EQ(jmp_instr->operands.size(), 1);
+    EXPECT_EQ(jmp_instr->operands[0].value, symbol_table["loop"]);
+
+    // 6. nop (address 17)
+    EXPECT_EQ(decoded_program[5]->mnemonic, "nop");
+    EXPECT_EQ(decoded_program[5]->address, 17);
 }

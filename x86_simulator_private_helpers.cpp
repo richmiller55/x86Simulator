@@ -227,6 +227,40 @@ void X86Simulator::handleJmp(const DecodedInstruction& decoded_instr) {
     }
 }
 
+void X86Simulator::handleCall(const DecodedInstruction& decoded_instr) {
+    if (decoded_instr.operands.empty()) {
+        log(session_id_, "CALL instruction requires a target.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    const DecodedOperand& target_operand = decoded_instr.operands[0];
+    if (target_operand.type != OperandType::IMMEDIATE) {
+        log(session_id_, "CALL target must be a valid label or address.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        return;
+    }
+
+    // The return address is the address of the instruction immediately following the CALL.
+    uint64_t return_address = decoded_instr.address + decoded_instr.length_in_bytes;
+
+    // Decrement stack pointer
+    uint64_t rsp = register_map_.get64("rsp");
+    rsp -= 8; // Pushing a 64-bit address
+    register_map_.set64("rsp", rsp);
+
+    if (rsp < memory_.stack_segment_start) {
+        log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        register_map_.set64("rsp", rsp + 8); // Attempt to recover stack pointer
+        return;
+    }
+
+    // Push the return address to the stack.
+    memory_.write_qword(rsp, return_address);
+
+    // Jump to target address
+    address_t targetAddress = target_operand.value;
+    register_map_.set64("rip", targetAddress);
+}
+
 void X86Simulator::handleJne(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
         log(session_id_, "JNE instruction requires a target.", "ERROR",

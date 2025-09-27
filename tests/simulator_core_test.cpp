@@ -912,3 +912,147 @@ TEST_F(SimulatorCoreTest, VrcppsExecutionMemorySource) {
         EXPECT_NEAR(actual_floats[i], expected_floats[i], 0.001);
     }
 }
+
+TEST_F(SimulatorCoreTest, CallExecution) {
+    auto& register_map = simulator.getRegisterMapForTesting();
+    auto& memory = simulator.getMemoryForTesting();
+    
+    address_t initial_rip = 0x1000;
+    uint64_t initial_rsp = memory.get_stack_bottom();
+    address_t call_target = 0x2000;
+    // The return address is the address of the instruction immediately following the CALL.
+    address_t return_address = initial_rip + 5; // Length of CALL rel32 is 5 bytes
+
+    register_map.set64("rip", initial_rip);
+    register_map.set64("rsp", initial_rsp);
+
+    // Create a decoded instruction object for CALL
+    DecodedInstruction decoded_instr;
+    decoded_instr.mnemonic = "call";
+    decoded_instr.length_in_bytes = 5;
+    decoded_instr.address = initial_rip;
+    
+    DecodedOperand target;
+    target.type = OperandType::IMMEDIATE;
+    target.value = call_target;
+    decoded_instr.operands.push_back(target);
+
+    // Execute the instruction
+    simulator.executeInstruction(decoded_instr);
+
+    // Verify RIP is updated to the call target
+    EXPECT_EQ(register_map.get64("rip"), call_target);
+
+    // Verify RSP is decremented (assuming 64-bit mode, return address is 8 bytes)
+    uint64_t rsp_after_call = register_map.get64("rsp");
+    EXPECT_EQ(rsp_after_call, initial_rsp - 8);
+
+    // Verify the return address was pushed to the stack
+    uint64_t return_address_from_stack = memory.read64(rsp_after_call);
+    EXPECT_EQ(return_address_from_stack, return_address);
+}
+
+TEST_F(SimulatorCoreTest, JmpExecution) {
+    auto& register_map = simulator.getRegisterMapForTesting();
+    address_t initial_rip = 0x1000;
+    address_t target_address = 0x2000;
+
+    register_map.set64("rip", initial_rip);
+
+    DecodedInstruction jmp_instr;
+    jmp_instr.mnemonic = "jmp";
+    jmp_instr.operands.push_back({ "0x2000", target_address, OperandType::IMMEDIATE });
+
+    simulator.executeInstruction(jmp_instr);
+
+    EXPECT_EQ(register_map.get64("rip"), target_address);
+}
+
+TEST_F(SimulatorCoreTest, JeExecution) {
+    auto& register_map = simulator.getRegisterMapForTesting();
+    address_t initial_rip = 0x1000;
+    address_t target_address = 0x2000;
+
+    // --- Case 1: Jump taken (ZF=1) ---
+    register_map.set64("rip", initial_rip);
+    // Execute `sub eax, eax` to set ZF=1
+    DecodedInstruction sub_instr;
+    sub_instr.mnemonic = "sub";
+    sub_instr.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    sub_instr.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    simulator.executeInstruction(sub_instr);
+
+    DecodedInstruction je_instr_taken;
+    je_instr_taken.mnemonic = "je";
+    je_instr_taken.operands.push_back({ "0x2000", target_address, OperandType::IMMEDIATE });
+    
+    // The RIP is set to the location of the JE instruction before executing it.
+    register_map.set64("rip", initial_rip);
+    simulator.executeInstruction(je_instr_taken);
+    EXPECT_EQ(register_map.get64("rip"), target_address);
+
+    // --- Case 2: Jump not taken (ZF=0) ---
+    register_map.set64("rip", initial_rip);
+    // Execute `mov eax, 1` then `cmp eax, 0` to set ZF=0
+    register_map.set32("eax", 1);
+    DecodedInstruction cmp_instr;
+    cmp_instr.mnemonic = "cmp";
+    cmp_instr.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    cmp_instr.operands.push_back({ "0", 0, OperandType::IMMEDIATE });
+    simulator.executeInstruction(cmp_instr);
+
+    DecodedInstruction je_instr_not_taken;
+    je_instr_not_taken.mnemonic = "je";
+    je_instr_not_taken.operands.push_back({ "0x2000", target_address, OperandType::IMMEDIATE });
+
+    // The RIP is set to the location of the JE instruction before executing it.
+    register_map.set64("rip", initial_rip);
+    simulator.executeInstruction(je_instr_not_taken);
+    // RIP should not be modified by the handler if jump is not taken
+    EXPECT_EQ(register_map.get64("rip"), initial_rip);
+}
+
+TEST_F(SimulatorCoreTest, JgeExecution) {
+    auto& register_map = simulator.getRegisterMapForTesting();
+    address_t initial_rip = 0x1000;
+    address_t target_address = 0x2000;
+
+    // --- Case 1: Jump taken (SF=OF) ---
+    register_map.set64("rip", initial_rip);
+    // Execute `mov eax, 10` then `cmp eax, 5`. Result is 5. SF=0, OF=0. SF==OF.
+    register_map.set32("eax", 10);
+    DecodedInstruction cmp_instr_taken;
+    cmp_instr_taken.mnemonic = "cmp";
+    cmp_instr_taken.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    cmp_instr_taken.operands.push_back({ "5", 5, OperandType::IMMEDIATE });
+    simulator.executeInstruction(cmp_instr_taken);
+
+    DecodedInstruction jge_instr_taken;
+    jge_instr_taken.mnemonic = "jge";
+    jge_instr_taken.operands.push_back({ "0x2000", target_address, OperandType::IMMEDIATE });
+    
+    // The RIP is set to the location of the JGE instruction before executing it.
+    register_map.set64("rip", initial_rip);
+    simulator.executeInstruction(jge_instr_taken);
+    EXPECT_EQ(register_map.get64("rip"), target_address);
+
+    // --- Case 2: Jump not taken (SF!=OF) ---
+    register_map.set64("rip", initial_rip);
+    // Execute `mov eax, 5` then `cmp eax, 10`. Result is -5. SF=1, OF=0. SF!=OF.
+    register_map.set32("eax", 5);
+    DecodedInstruction cmp_instr_not_taken;
+    cmp_instr_not_taken.mnemonic = "cmp";
+    cmp_instr_not_taken.operands.push_back({ "eax", 0, OperandType::REGISTER });
+    cmp_instr_not_taken.operands.push_back({ "10", 10, OperandType::IMMEDIATE });
+    simulator.executeInstruction(cmp_instr_not_taken);
+
+    DecodedInstruction jge_instr_not_taken;
+    jge_instr_not_taken.mnemonic = "jge";
+    jge_instr_not_taken.operands.push_back({ "0x2000", target_address, OperandType::IMMEDIATE });
+
+    // The RIP is set to the location of the JGE instruction before executing it.
+    register_map.set64("rip", initial_rip);
+    simulator.executeInstruction(jge_instr_not_taken);
+    // RIP should not be modified by the handler if jump is not taken
+    EXPECT_EQ(register_map.get64("rip"), initial_rip);
+}

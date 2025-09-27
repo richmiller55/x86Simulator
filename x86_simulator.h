@@ -122,6 +122,7 @@ private:
   void handleMov(const DecodedInstruction& decoded_instr);
   void handleAdd(const DecodedInstruction& decoded_instr);
   void handleJmp(const DecodedInstruction& decoded_instr);
+  void handleCall(const DecodedInstruction& decoded_instr);
   void handleJne(const DecodedInstruction& decoded_instr);
   void handleJe(const DecodedInstruction& decoded_instr);
   void handleJl(const DecodedInstruction& decoded_instr);
