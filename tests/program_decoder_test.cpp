@@ -218,14 +218,14 @@ TEST(ProgramDecoderTest, AssembleAndDecodeJumps) {
             symbol_table[label] = current_address;
         } else {
             std::map<std::string, address_t> empty_symbol_table;
-            CodeGenerator temp_gen(empty_symbol_table);
+            CodeGenerator temp_gen(empty_symbol_table, current_address);
             std::vector<uint8_t> temp_code = temp_gen.generate_code({trimmed_line});
             current_address += temp_code.size();
         }
     }
 
     // --- Second Pass: Generate final code ---
-    CodeGenerator code_gen(symbol_table);
+    CodeGenerator code_gen(symbol_table, 0);
     std::vector<uint8_t> machine_code = code_gen.generate_code(program_lines);
 
     // --- Load code into memory and decode ---

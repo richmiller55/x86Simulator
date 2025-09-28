@@ -7,7 +7,8 @@
 
 class InstructionDescriber {
 public:
-    static std::string describe(const DecodedInstruction& instr, const RegisterMap& regs);
+    static std::string describe(const DecodedInstruction& instr, const RegisterMap& regs,
+                                const std::map<std::string, address_t>* symbol_table);
 };
 
 #endif // INSTRUCTION_DESCRIBER_H

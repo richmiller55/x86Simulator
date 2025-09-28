@@ -73,7 +73,7 @@ public:
   bool secondPass();
   void runProgram();
   void dumpTextSegment(const std::string& filename);
-
+  void dumpSymbolTable(const std::string& filename);
   void displayRegistersWithDiff();
   void displayRegistersControlled();
   std::string trim(const std::string& str) ;
@@ -179,7 +179,6 @@ private:
   void handleVsqrtps(const DecodedInstruction& decoded_instr);
   void handleVsubps(const DecodedInstruction& decoded_instr);
   void handleVpor(const DecodedInstruction& decoded_instr);
-  std::vector<std::string> parseLine(const std::string& line);
   
 };
 

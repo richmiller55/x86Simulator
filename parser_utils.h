@@ -24,4 +24,6 @@ DecodedOperand parse_operand(const std::string& operand_str, const RegisterMap& 
 // - Parsing memory addresses (e.g., "[rax+0x10]") - more complex
 // - Resolving labels to addresses (if your parser needs to do this during an initial pass)
 
+std::vector<std::string> parse_line(const std::string& line);
+
 #endif // PARSER_UTILS_H

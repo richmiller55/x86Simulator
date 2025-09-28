@@ -32,6 +32,7 @@ public:
   bool waitForInput();
   void setProgramDecoder(std::unique_ptr<ProgramDecoder> decoder);
   void setRegisterMap(const RegisterMap* regs); // New method to set current RegisterMap
+  void setSymbolTable(const std::map<std::string, address_t>* symbol_table);
 
 private:
   enum class UIView { kNormal, kYmmExpanded };
@@ -60,6 +61,7 @@ private:
   YmmViewMode ymm_view_mode_;
   DisplayBase display_base_;
   const RegisterMap* current_regs_; // Pointer to the current RegisterMap for input handling
+  const std::map<std::string, address_t>* symbol_table_;
   const std::vector<std::string> RegisterDisplayOrderYMM_ = {
     "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
     "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"

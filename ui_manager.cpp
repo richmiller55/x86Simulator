@@ -22,7 +22,8 @@ UIManager::UIManager(const Memory& memory_instance)
   show_flags_as_text_(true),
   ymm_view_mode_(YmmViewMode::HEX_256),
   display_base_(DisplayBase::HEX),
-  current_regs_(nullptr)
+  current_regs_(nullptr),
+  symbol_table_(nullptr)
 {
     initscr();
     clear();
@@ -106,6 +107,10 @@ void UIManager::arrangeWindows() {
 
 void UIManager::setRegisterMap(const RegisterMap* regs) {
     current_regs_ = regs;
+}
+
+void UIManager::setSymbolTable(const std::map<std::string, address_t>* symbol_table) {
+    symbol_table_ = symbol_table;
 }
 
 UIManager::~UIManager() {
@@ -258,7 +263,7 @@ void UIManager::drawInstructionDescription(address_t current_rip, const Register
     auto it = address_to_index_map.find(current_rip);
     if (it != address_to_index_map.end()) {
         const DecodedInstruction& instr = *decoded_program[it->second];
-        std::string description = InstructionDescriber::describe(instr, regs);
+        std::string description = InstructionDescriber::describe(instr, regs, symbol_table_);
 
         // Truncate description to fit in the window to prevent overflow
         int max_desc_width = getmaxx(win_instruction_description_) - 3;

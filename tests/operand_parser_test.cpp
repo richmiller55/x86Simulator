@@ -4,28 +4,20 @@
 #include <string>
 
 TEST(OperandParserTest, NoOperands) {
-    std::vector<std::string> tokens = {"NOP"};
+    std::vector<std::string> tokens = {"nop"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 0);
 }
 
 TEST(OperandParserTest, OneOperand) {
-    std::vector<std::string> tokens = {"JMP", "0x1234"};
+    std::vector<std::string> tokens = {"jmp", "my_label"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 1);
-    EXPECT_EQ(parser.get_operand(0), "0x1234");
+    EXPECT_EQ(parser.get_operand(0), "my_label");
 }
 
 TEST(OperandParserTest, TwoOperands) {
-    std::vector<std::string> tokens = {"MOV", "EAX,", "EBX"};
-    OperandParser parser(tokens);
-    EXPECT_EQ(parser.operand_count(), 2);
-    EXPECT_EQ(parser.get_operand(0), "eax");
-    EXPECT_EQ(parser.get_operand(1), "ebx");
-}
-
-TEST(OperandParserTest, TwoOperandsWithWhitespace) {
-    std::vector<std::string> tokens = {"MOV", "  EAX  ,", "  EBX  "};
+    std::vector<std::string> tokens = {"mov", "eax", ",", "ebx"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 2);
     EXPECT_EQ(parser.get_operand(0), "eax");
@@ -33,15 +25,7 @@ TEST(OperandParserTest, TwoOperandsWithWhitespace) {
 }
 
 TEST(OperandParserTest, MixedCaseOperands) {
-    std::vector<std::string> tokens = {"mov", "eAx,", "eBx"};
-    OperandParser parser(tokens);
-    EXPECT_EQ(parser.operand_count(), 2);
-    EXPECT_EQ(parser.get_operand(0), "eax");
-    EXPECT_EQ(parser.get_operand(1), "ebx");
-}
-
-TEST(OperandParserTest, CombinedOperands) {
-    std::vector<std::string> tokens = {"ADD", "EAX,EBX"};
+    std::vector<std::string> tokens = {"MOV", "EAX", ",", "EBX"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 2);
     EXPECT_EQ(parser.get_operand(0), "eax");
@@ -49,30 +33,21 @@ TEST(OperandParserTest, CombinedOperands) {
 }
 
 TEST(OperandParserTest, PushInstruction) {
-    std::vector<std::string> tokens = {"PUSH", "eax"};
+    std::vector<std::string> tokens = {"push", "eax"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 1);
     EXPECT_EQ(parser.get_operand(0), "eax");
 }
 
 TEST(OperandParserTest, PopInstruction) {
-    std::vector<std::string> tokens = {"POP", "ebp"};
+    std::vector<std::string> tokens = {"pop", "ebp"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 1);
     EXPECT_EQ(parser.get_operand(0), "ebp");
 }
 
 TEST(OperandParserTest, ThreeOperandsVEX) {
-    std::vector<std::string> tokens = {"VADDPS", "ymm0,", "ymm1,", "ymm2"};
-    OperandParser parser(tokens);
-    EXPECT_EQ(parser.operand_count(), 3);
-    EXPECT_EQ(parser.get_operand(0), "ymm0");
-    EXPECT_EQ(parser.get_operand(1), "ymm1");
-    EXPECT_EQ(parser.get_operand(2), "ymm2");
-}
-
-TEST(OperandParserTest, ThreeOperandsVEXCombined) {
-    std::vector<std::string> tokens = {"VADDPS", "ymm0,ymm1,ymm2"};
+    std::vector<std::string> tokens = {"vaddps", "ymm0", ",", "ymm1", ",", "ymm2"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 3);
     EXPECT_EQ(parser.get_operand(0), "ymm0");
@@ -81,7 +56,7 @@ TEST(OperandParserTest, ThreeOperandsVEXCombined) {
 }
 
 TEST(OperandParserTest, InInstruction) {
-    std::vector<std::string> tokens = {"IN", "al,", "0x60"};
+    std::vector<std::string> tokens = {"in", "al", ",", "0x60"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 2);
     EXPECT_EQ(parser.get_operand(0), "al");
@@ -89,7 +64,7 @@ TEST(OperandParserTest, InInstruction) {
 }
 
 TEST(OperandParserTest, OutInstruction) {
-    std::vector<std::string> tokens = {"OUT", "0x61,", "al"};
+    std::vector<std::string> tokens = {"out", "0x61", ",", "al"};
     OperandParser parser(tokens);
     EXPECT_EQ(parser.operand_count(), 2);
     EXPECT_EQ(parser.get_operand(0), "0x61");

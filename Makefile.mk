@@ -90,7 +90,8 @@ TEST_SRCS = \
 	tests/formatting_utils_test.cpp \
 	tests/simulator_core_test.cpp \
 	tests/mock_database_manager.cpp \
-	tests/system_bus_test.cpp
+	tests/system_bus_test.cpp \
+	tests/parser_utils_test.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 

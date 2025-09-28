@@ -18,6 +18,16 @@ void X86Simulator::handleMov(const DecodedInstruction& decoded_instr) {
     if (src_operand.type == OperandType::REGISTER) {
         // If the source is a register, get its value
         sourceValue = getRegister(src_operand.text);
+    } else if (src_operand.type == OperandType::MEMORY) {
+        // If the source is a memory location, read the value from memory.
+        // Assuming a 32-bit read for now.
+        address_t address = src_operand.value;
+        uint32_t value_from_mem = 0;
+        // Little-endian read
+        for (int i = 0; i < 4; ++i) {
+            value_from_mem |= static_cast<uint32_t>(memory_.main_memory->at(address + i)) << (i * 8);
+        }
+        sourceValue = value_from_mem;
     } else {
         // Otherwise, it's an immediate value
         sourceValue = src_operand.value;
@@ -569,11 +579,12 @@ void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
     set_CF(val1 < val2);
 
     // Set Overflow Flag (OF): Set on signed overflow.
-    // Overflow occurs if signs of operands are different and sign of result is same as source.
+    // For subtraction (a - b), overflow occurs if the operands have different signs
+    // and the result's sign is different from the first operand's sign.
     bool val1_sign = (val1 & 0x80000000);
     bool val2_sign = (val2 & 0x80000000);
     bool result_sign = (result & 0x80000000);
-    set_OF(val1_sign != val2_sign && val2_sign == result_sign);
+    set_OF((val1_sign != val2_sign) && (result_sign != val1_sign));
 }
 
 void X86Simulator::handleInt(const DecodedInstruction& decoded_instr) {

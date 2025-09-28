@@ -8,7 +8,7 @@
 
 class CodeGenerator {
 public:
-    CodeGenerator(std::map<std::string, address_t>& symbol_table);
+    CodeGenerator(std::map<std::string, address_t>& symbol_table, address_t starting_address);
     std::vector<uint8_t> generate_code(const std::vector<std::string>& program_lines);
 
 private:
@@ -17,7 +17,6 @@ private:
     std::vector<uint8_t> machine_code_;
 
     void process_line(const std::string& line);
-    std::vector<std::string> parse_line(const std::string& line);
     std::string trim(const std::string& str);
 };
 

@@ -2,10 +2,30 @@
 #include <sstream>
 #include <algorithm>
 
-std::string InstructionDescriber::describe(const DecodedInstruction& instr, const RegisterMap& regs) {
+std::string InstructionDescriber::describe(const DecodedInstruction& instr, const RegisterMap& regs,
+                                           const std::map<std::string, address_t>* symbol_table) {
     std::stringstream ss;
     std::string mnemonic = instr.mnemonic;
     std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
+
+    // Create a reverse map for address-to-label lookup for convenience
+    std::map<address_t, std::string> address_to_label;
+    if (symbol_table) {
+        for (const auto& pair : *symbol_table) {
+            address_to_label[pair.second] = pair.first;
+        }
+    }
+
+    auto get_target_text = [&](const DecodedOperand& operand) -> std::string {
+        if (operand.type == OperandType::IMMEDIATE || operand.type == OperandType::LABEL) {
+            auto it = address_to_label.find(operand.value);
+            if (it != address_to_label.end()) {
+                return it->second; // Return label
+            }
+        }
+        return operand.text; // Return original text (address)
+    };
+
     // Add more detailed descriptions based on the mnemonic
     if (mnemonic == "mov") {
         if (instr.operands.size() == 2) {
@@ -19,76 +39,82 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
             const auto& src = instr.operands[1];
             ss << "Adds the value of " << src.text << " to " << dest.text << " and stores the result in " << dest.text << ".";
         }
+    } else if (mnemonic == "cmp") {
+        if (instr.operands.size() == 2) {
+            const auto& op1 = instr.operands[0];
+            const auto& op2 = instr.operands[1];
+            ss << "Compares " << op1.text << " and " << op2.text << " and sets the status flags (ZF, SF, OF, CF) accordingly. Does not modify the operands.";
+        }
     } else if (mnemonic == "jmp") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Unconditionally jumps to the address " << target.text << ".";
+            ss << "Unconditionally jumps to " << get_target_text(target) << ".";
         }
     } else if (mnemonic == "call") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Pushes the return address onto the stack and jumps to the address " << target.text << ".";
+            ss << "Pushes the return address onto the stack and jumps to " << get_target_text(target) << ".";
         }
 
     } else if (mnemonic == "je") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Zero Flag (ZF) is set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Zero Flag (ZF) is set.";
         }
     } else if (mnemonic == "jl") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is not equal to the Overflow Flag (OF).";
+            ss << "Jumps to " << get_target_text(target) << " if SF != OF.";
         }
     } else if (mnemonic == "jae") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Carry Flag (CF) is not set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Carry Flag (CF) is not set.";
         }
     } else if (mnemonic == "jb") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Carry Flag (CF) is set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Carry Flag (CF) is set.";
         }
     } else if (mnemonic == "jbe") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Carry Flag (CF) is set or the Zero Flag (ZF) is set.";
+            ss << "Jumps to " << get_target_text(target) << " if CF is set or ZF is set.";
         }
     } else if (mnemonic == "js") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Sign Flag (SF) is set.";
         }
     } else if (mnemonic == "jns") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is not set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Sign Flag (SF) is not set.";
         }
     } else if (mnemonic == "jo") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Overflow Flag (OF) is set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Overflow Flag (OF) is set.";
         }
     } else if (mnemonic == "jno") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Overflow Flag (OF) is not set.";
+            ss << "Jumps to " << get_target_text(target) << " if the Overflow Flag (OF) is not set.";
         }
     } else if (mnemonic == "jge") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Sign Flag (SF) is equal to the Overflow Flag (OF).";
+            ss << "Jumps to " << get_target_text(target) << " if SF == OF.";
         }
     } else if (mnemonic == "jle") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Zero Flag (ZF) is set, or if the Sign Flag (SF) is not equal to the Overflow Flag (OF).";
+            ss << "Jumps to " << get_target_text(target) << " if ZF is set, or if SF != OF.";
         }
     } else if (mnemonic == "jg") {
         if (instr.operands.size() == 1) {
             const auto& target = instr.operands[0];
-            ss << "Jumps to address " << target.text << " if the Zero Flag (ZF) is 0 and the Sign Flag (SF) is equal to the Overflow Flag (OF).";
+            ss << "Jumps to " << get_target_text(target) << " if ZF is 0 and SF == OF.";
         }
     } else if (mnemonic == "nop") {
         ss << "No operation. This instruction does nothing.";
@@ -282,11 +308,18 @@ std::string InstructionDescriber::describe(const DecodedInstruction& instr, cons
                << ". The 64-bit result is stored in EDX:EAX.";
         }
         // Other forms of IMUL can be described here
-    }
-    else if (mnemonic == "idiv") {
+     
+    } else if (mnemonic == "idiv") {
         if (instr.operands.size() == 1) {
             const auto& src = instr.operands[0];
             ss << "Performs a signed division of the 64-bit value in EDX:EAX by " << src.text
+               << ". The quotient is stored in EAX and the remainder in EDX.";
+        }
+    
+    } else if (mnemonic == "div") {
+        if (instr.operands.size() == 1) {
+            const auto& src = instr.operands[0];
+            ss << "Performs an unsigned division of the 64-bit value in EDX:EAX by " << src.text
                << ". The quotient is stored in EAX and the remainder in EDX.";
         }
     }

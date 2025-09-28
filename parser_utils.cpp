@@ -1,6 +1,7 @@
 #include "parser_utils.h" // Include your header
 #include "decoder.h" 
 #include "operand_types.h" 
+#include <sstream>
 
 #include <algorithm> // For std::transform
 #include <charconv> // For std::from_chars (C++17+) for robust string-to-number conversion
@@ -110,3 +111,42 @@ DecodedOperand parse_operand(const std::string& operand_str, const RegisterMap& 
     result.type = OperandType::UNKNOWN_OPERAND_TYPE;
     return result;
 }
+
+std::vector<std::string> parse_line(const std::string& line) {
+    std::vector<std::string> tokens;
+    std::string current_token;
+    bool in_quotes = false;
+
+    for (char c : line) {
+        if (c == '\'' && !in_quotes) {
+            if (!current_token.empty()) {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+            in_quotes = true;
+            current_token += c;
+        } else if (c == '\'' && in_quotes) {
+            current_token += c;
+            in_quotes = false;
+            tokens.push_back(current_token);
+            current_token.clear();
+        } else if ((std::isspace(c) || c == ',') && !in_quotes) {
+            if (!current_token.empty()) {
+                tokens.push_back(current_token);
+                current_token.clear();
+            }
+            if (c == ',') {
+                tokens.push_back(",");
+            }
+        } else {
+            current_token += c;
+        }
+    }
+
+    if (!current_token.empty()) {
+        tokens.push_back(current_token);
+    }
+
+    return tokens;
+}
+
