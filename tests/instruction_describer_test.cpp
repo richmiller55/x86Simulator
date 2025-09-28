@@ -20,7 +20,7 @@ TEST_F(InstructionDescriberTest, DescribeNOP) {
     auto decoded_instr = decoder.decodeInstruction(memory, addr);
     ASSERT_NE(decoded_instr, nullptr);
 
-    std::string description = InstructionDescriber::describe(*decoded_instr, regs);    
+    std::string description = InstructionDescriber::describe(*decoded_instr, regs, nullptr);
     EXPECT_EQ(description, "No operation. This instruction does nothing.");
 }
 
@@ -33,7 +33,7 @@ TEST_F(InstructionDescriberTest, DescribeMOV) {
     ASSERT_NE(decoded_instr, nullptr);
 
     std::string expected_description = "Moves the value from 0x1234 to eax.";
-    std::string description = InstructionDescriber::describe(*decoded_instr, regs);
+    std::string description = InstructionDescriber::describe(*decoded_instr, regs, nullptr);
     EXPECT_EQ(description, expected_description);
 }
 
@@ -47,7 +47,7 @@ TEST_F(InstructionDescriberTest, DescribeVsqrtps) {
     decoded_instr.operands.push_back(src);
 
     std::string expected_description = "Computes the square roots of packed single-precision floating-point values in ymm1 and stores the results in ymm0.";
-    std::string description = InstructionDescriber::describe(decoded_instr, regs);
+    std::string description = InstructionDescriber::describe(decoded_instr, regs, nullptr);
     EXPECT_EQ(description, expected_description);
 }
 
@@ -61,6 +61,6 @@ TEST_F(InstructionDescriberTest, DescribeVrcpps) {
     decoded_instr.operands.push_back(src);
 
     std::string expected_description = "Computes approximate reciprocals of packed single-precision floating-point values in ymm1 and stores the results in ymm0.";
-    std::string description = InstructionDescriber::describe(decoded_instr, regs);
+    std::string description = InstructionDescriber::describe(decoded_instr, regs, nullptr);
     EXPECT_EQ(description, expected_description);
 }

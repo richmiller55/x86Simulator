@@ -397,14 +397,18 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
         auto decoded_instr = std::move(decoded_instr_opt);
 
         // Print Address
-        outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << decoded_instr->address << ": ";
+        outfile << "0x" << std::hex << std::setw(8) << std::right << std::setfill('0') << decoded_instr->address << ": ";
 
         // Print Raw Bytes
         std::stringstream bytes_ss;
         for (size_t i = 0; i < decoded_instr->length_in_bytes; ++i) {
-            bytes_ss << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_text(decoded_instr->address + i) << " ";
+	  bytes_ss << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_text(decoded_instr->address + i) << " ";
         }
-        outfile << std::left << std::setw(18) << bytes_ss.str();
+        std::string bytes_str = bytes_ss.str();
+        outfile << bytes_str;
+        for (size_t i = bytes_str.length(); i < 24; ++i) {
+            outfile << ' ';
+        }
 
         // Print Disassembled Instruction
         outfile << " " << decoded_instr->mnemonic;
@@ -464,4 +468,37 @@ void X86Simulator::dumpBssSegment(const std::string& filename) {
     outfile.close();
 
         return;
+}
+
+void X86Simulator::dumpSymbolTable(const std::string& filename) {
+      std::ofstream outputFile(filename);
+
+    // 2. Check if the file was opened successfully.
+    if (!outputFile) {
+        std::cerr << "Error: Unable to open file " << filename << std::endl;
+        return;
+    }
+
+    // 3. Write a header to the file.
+    outputFile << "--- Symbol Table Dump ---\n";
+    outputFile << std::left << std::setw(24) << "Symbol" << "Address\n";
+    outputFile << "----------------------------------------\n";
+
+    // 4. Iterate through the map and write each key-value pair.
+    //    Use a C++11 range-based for loop for clean iteration.
+    for (const auto& pair : symbolTable_) {
+        // pair.first is the std::string (symbol name).
+        // pair.second is the address_t (address).
+
+        // Write the symbol name with manual padding.
+        std::string symbol = pair.first;
+        outputFile << symbol;
+        for (size_t i = symbol.length(); i < 24; ++i) {
+            outputFile << ' ';
+        }
+        outputFile << "\t";
+
+        outputFile << "0x" << std::hex << std::setw(8) << std::right << std::setfill('0') << pair.second << "\n";
+    }
+    outputFile.close();
 }

@@ -73,6 +73,7 @@ Decoder::Decoder() {
         {0xC1, "GROUP_C1"}, // SHL, SHR, etc.
         {0x7F, "JG"},
         {0x77, "JA"},
+        {0xA1, "MOV"},
         {0xB8, "MOV"},
         {0xA4, "MOVSB"},
         {0xA5, "MOVSD"}, // MOVSW is 66 A5
@@ -323,7 +324,6 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
                 decoded_instr->length_in_bytes = 3; // 0F + BE + ModRM
                 current_address++;
                 uint8_t modrm = memory.read_text(current_address);
-                uint8_t mod = (modrm >> 6) & 0x03;
                 uint8_t reg_field = (modrm >> 3) & 0x07;
                 uint8_t rm = modrm & 0x07;
 
@@ -340,7 +340,6 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
                 decoded_instr->length_in_bytes = 3; // 0F + B6 + ModRM
                 current_address++;
                 uint8_t modrm = memory.read_text(current_address);
-                uint8_t mod = (modrm >> 6) & 0x03;
                 uint8_t reg_field = (modrm >> 3) & 0x07;
                 uint8_t rm = modrm & 0x07;
 
@@ -372,7 +371,23 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             return nullptr;
         }
 
-        if (opcode >= 0xB8 && opcode <= 0xBF) { // MOV r32, imm32
+        if (opcode == 0xA1) { // MOV EAX, [addr32]
+            decoded_instr->length_in_bytes = 5;
+            address_t mem_address = memory.read_text_dword(current_address);
+            
+            DecodedOperand dest, src;
+            dest.type = OperandType::REGISTER;
+            dest.text = "eax";
+            
+            src.type = OperandType::MEMORY;
+            src.value = mem_address;
+            std::stringstream ss;
+            ss << "[0x" << std::hex << mem_address << "]";
+            src.text = ss.str();
+            
+            decoded_instr->operands.push_back(dest);
+            decoded_instr->operands.push_back(src);
+        } else if (opcode >= 0xB8 && opcode <= 0xBF) { // MOV r32, imm32
             decoded_instr->length_in_bytes = 5;
             uint32_t imm_value = memory.read_text_dword(current_address);
             DecodedOperand reg, imm;

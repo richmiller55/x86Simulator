@@ -1,14 +1,15 @@
 #include "CodeGenerator.h"
 #include "decoder.h"
 #include "operand_parser.h"
+#include "parser_utils.h"
 #include <string>
 #include <sstream>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
-CodeGenerator::CodeGenerator(std::map<std::string, address_t>& symbol_table)
-    : symbol_table_(symbol_table), current_address_(0) {}
+CodeGenerator::CodeGenerator(std::map<std::string, address_t>& symbol_table, address_t starting_address)
+    : symbol_table_(symbol_table), current_address_(starting_address) {}
 
 std::vector<uint8_t> CodeGenerator::generate_code(const std::vector<std::string>& program_lines) {
     machine_code_.clear();
@@ -45,38 +46,53 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         std::string dest = operands.get_operand(0);
         std::string src = operands.get_operand(1);
 
-        // Handle mov r32, imm32
-        try {
-            // Use stoul with base 0 to handle "0x" prefixes for hex values
-            uint32_t value = std::stoul(src, nullptr, 0);
-            uint8_t opcode = 0xB8; // Base for MOV r32, imm32
-            if (dest == "eax") opcode = 0xB8;
-            else if (dest == "ecx") opcode = 0xB9;
-            else if (dest == "ebx") opcode = 0xBB;
-            // Note: This doesn't handle all registers, just the ones in testAlpha.asm
+        if (src.front() == '[' && src.back() == ']') { // Memory operand mov reg, [mem]
+            std::string mem_operand = src.substr(1, src.length() - 2);
+            auto it = symbol_table_.find(mem_operand);
+            if (it != symbol_table_.end()) {
+                address_t target_address = it->second;
+                if (dest == "eax") { // mov eax, [addr]
+                    machine_code_.push_back(0xA1);
+                    current_address_ += 1;
+                    machine_code_.insert(machine_code_.end(), { (uint8_t)target_address, (uint8_t)(target_address >> 8), (uint8_t)(target_address >> 16), (uint8_t)(target_address >> 24) });
+                    current_address_ += 4;
+                }
+                // Other mov reg, [mem] would need 8B opcode and ModR/M byte, which is more complex.
+            }
+        } else {
+            // Handle mov r32, imm32 or mov r32, r32
+            try {
+                // Use stoul with base 0 to handle "0x" prefixes for hex values
+                uint32_t value = std::stoul(src, nullptr, 0);
+                uint8_t opcode = 0xB8; // Base for MOV r32, imm32
+                if (dest == "eax") opcode = 0xB8;
+                else if (dest == "ecx") opcode = 0xB9;
+                else if (dest == "ebx") opcode = 0xBB;
+                // Note: This doesn't handle all registers, just the ones in testAlpha.asm
 
-            machine_code_.push_back(opcode);
-            current_address_ += 1;
-            machine_code_.insert(machine_code_.end(), { (uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16), (uint8_t)(value >> 24) });
-            current_address_ += 4;
-        } catch (const std::exception&) {
-            // Not an immediate, so assume it's a register-to-register move
-            if (dest == "eax" && (src == "ebx" || src == "ecx" || src == "edx" || src == "ebp")) {
-                machine_code_.push_back(0x89); // Opcode for MOV r/m32, r32
+                machine_code_.push_back(opcode);
                 current_address_ += 1;
-                if (src == "ebx") machine_code_.push_back(0xD8); // ModR/M for MOV EAX, EBX
-                if (src == "ecx") machine_code_.push_back(0xC8); // ModR/M for MOV EAX, ECX
-                if (src == "edx") machine_code_.push_back(0xD0); // ModR/M for MOV EAX, EDX
-                if (src == "ebp") machine_code_.push_back(0xE8); // ModR/M for MOV EAX, EBP
-                current_address_ += 1;
-            } else if (dest == "ebp" && src == "esp") { // mov ebp, esp
-                machine_code_.push_back(0x89);
-                machine_code_.push_back(0xE5);
-                current_address_ += 2;
-            } else if (dest == "ebx" && src == "eax") { // mov ebx, eax
-                machine_code_.push_back(0x89);
-                machine_code_.push_back(0xC3);
-                current_address_ += 2;
+                machine_code_.insert(machine_code_.end(), { (uint8_t)value, (uint8_t)(value >> 8), (uint8_t)(value >> 16), (uint8_t)(value >> 24) });
+                current_address_ += 4;
+            } catch (const std::exception&) {
+                // Not an immediate, so assume it's a register-to-register move
+                if (dest == "eax" && (src == "ebx" || src == "ecx" || src == "edx" || src == "ebp")) {
+                    machine_code_.push_back(0x89); // Opcode for MOV r/m32, r32
+                    current_address_ += 1;
+                    if (src == "ebx") machine_code_.push_back(0xD8); // ModR/M for MOV EAX, EBX
+                    if (src == "ecx") machine_code_.push_back(0xC8); // ModR/M for MOV EAX, ECX
+                    if (src == "edx") machine_code_.push_back(0xD0); // ModR/M for MOV EAX, EDX
+                    if (src == "ebp") machine_code_.push_back(0xE8); // ModR/M for MOV EAX, EBP
+                    current_address_ += 1;
+                } else if (dest == "ebp" && src == "esp") { // mov ebp, esp
+                    machine_code_.push_back(0x89);
+                    machine_code_.push_back(0xE5);
+                    current_address_ += 2;
+                } else if (dest == "ebx" && src == "eax") { // mov ebx, eax
+                    machine_code_.push_back(0x89);
+                    machine_code_.push_back(0xC3);
+                    current_address_ += 2;
+                }
             }
         }
     } else if (mnemonic == "add") {
@@ -141,10 +157,12 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         if (it != symbol_table_.end()) {
             address_t target_address = it->second;
             int8_t offset = target_address - (current_address_ + 2); // 2 bytes for je rel8
+	    /*
             std::cout << "[CodeGenerator DEBUG] JE to " << label
                       << ": current_addr=0x" << std::hex << current_address_
                       << ", target_addr=0x" << target_address
                       << ", offset=" << static_cast<int>(offset) << std::endl;
+	    */
             machine_code_.push_back(0x74);
             machine_code_.push_back(offset);
             current_address_ += 2;
@@ -339,10 +357,12 @@ void CodeGenerator::process_line(const std::string& line_raw) {
         if (it != symbol_table_.end()) {
             address_t target_address = it->second;
             int32_t offset = target_address - (current_address_ + 5); // 5 bytes for jmp rel32
-            std::cout << "[CodeGenerator DEBUG] JMP to " << label
+            /*
+	      std::cout << "[CodeGenerator DEBUG] JMP to " << label
                       << ": current_addr=0x" << std::hex << current_address_
                       << ", target_addr=0x" << target_address
                       << ", offset=" << offset << std::endl;
+	    */
             machine_code_.push_back(0xE9);
             current_address_ += 1;
             machine_code_.insert(machine_code_.end(), { (uint8_t)offset, (uint8_t)(offset >> 8), (uint8_t)(offset >> 16), (uint8_t)(offset >> 24) });
@@ -960,40 +980,7 @@ void CodeGenerator::process_line(const std::string& line_raw) {
     }
 }
 
-std::vector<std::string> CodeGenerator::parse_line(const std::string& line) {
-    std::vector<std::string> tokens;
-    std::string current_token;
-    bool in_quotes = false;
 
-    for (char c : line) {
-        if (c == '\'' && !in_quotes) {
-            if (!current_token.empty()) {
-                tokens.push_back(current_token);
-                current_token.clear();
-            }
-            in_quotes = true;
-            current_token += c;
-        } else if (c == '\'' && in_quotes) {
-            current_token += c;
-            in_quotes = false;
-            tokens.push_back(current_token);
-            current_token.clear();
-        } else if (std::isspace(c) && !in_quotes) {
-            if (!current_token.empty()) {
-                tokens.push_back(current_token);
-                current_token.clear();
-            }
-        } else {
-            current_token += c;
-        }
-    }
-
-    if (!current_token.empty()) {
-        tokens.push_back(current_token);
-    }
-
-    return tokens;
-}
 
 std::string CodeGenerator::trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\n\r");

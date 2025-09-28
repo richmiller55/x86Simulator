@@ -40,41 +40,6 @@ bool X86Simulator::loadProgram(const std::string& filename) {
   return !programLines_.empty(); // Or a more robust check for successful read.
 }
 
-std::vector<std::string> X86Simulator::parseLine(const std::string& line) {
-    std::vector<std::string> tokens;
-    std::string current_token;
-    bool in_quotes = false;
-
-    for (char c : line) {
-        if (c == '\'' && !in_quotes) {
-            if (!current_token.empty()) {
-                tokens.push_back(current_token);
-                current_token.clear();
-            }
-            in_quotes = true;
-            current_token += c;
-        } else if (c == '\'' && in_quotes) {
-            current_token += c;
-            in_quotes = false;
-            tokens.push_back(current_token);
-            current_token.clear();
-        } else if (std::isspace(c) && !in_quotes) {
-            if (!current_token.empty()) {
-                tokens.push_back(current_token);
-                current_token.clear();
-            }
-        } else {
-            current_token += c;
-        }
-    }
-
-    if (!current_token.empty()) {
-        tokens.push_back(current_token);
-    }
-
-    return tokens;
-}
-
 bool X86Simulator::firstPass() {
     symbolTable_.clear();
     
@@ -96,7 +61,7 @@ bool X86Simulator::firstPass() {
             line = trim(line);
         }
 
-        std::vector<std::string> tokens = parseLine(line);
+        std::vector<std::string> tokens = parse_line(line);
         if (tokens.empty()) {
             continue;
         }
@@ -109,6 +74,7 @@ bool X86Simulator::firstPass() {
         if (first_token.back() == ':') {
             std::string label = first_token.substr(0, first_token.size() - 1);
             symbolTable_[label] = *current_lc;
+
             // Handle labels on the same line as an instruction/directive
             if (tokens.size() > 1) {
                 // Remove the label token and reprocess the rest of the line
@@ -156,16 +122,28 @@ bool X86Simulator::firstPass() {
             if (directive == "db") {
                 for (size_t i = operand_start_idx; i < tokens.size(); ++i) {
                     std::string val_str = tokens[i];
+                    
+                    // Skip comma tokens
+                    if (val_str == ",") continue;
+
+                    // Handle trailing commas attached to tokens
                     if (!val_str.empty() && val_str.back() == ',') {
                         val_str.pop_back();
                     }
                     if (val_str.empty()) continue;
 
                     uint8_t val_to_write = 0;
-                    if (val_str.length() >= 3 && val_str.front() == '\'' && val_str.back() == '\'') {
+                    // Check for character literal e.g. 'a'
+                    if (val_str.length() == 3 && val_str.front() == '\'' && val_str.back() == '\'') {
                         val_to_write = val_str[1];
                     } else {
-                        val_to_write = static_cast<uint8_t>(std::stoul(val_str));
+                        try {
+                            // Handle numeric value (decimal or hex)
+                            val_to_write = static_cast<uint8_t>(std::stoul(val_str, nullptr, 0));
+                        } catch (const std::exception& e) {
+                            log(session_id_, "Invalid value for 'db' directive: " + val_str, "ERROR", 0, __FILE__, __LINE__);
+                            continue; // Skip invalid values
+                        }
                     }
 
                     if (*current_lc < memory_.main_memory->size()) {
@@ -176,17 +154,26 @@ bool X86Simulator::firstPass() {
             } else if (directive == "dd") {
                 for (size_t i = operand_start_idx; i < tokens.size(); ++i) {
                     std::string val_str = tokens[i];
+
+                    // Skip comma tokens
+                    if (val_str == ",") continue;
+
                     if (!val_str.empty() && val_str.back() == ',') {
                         val_str.pop_back();
                     }
                     if (val_str.empty()) continue;
 
                     uint32_t val_to_write = 0;
-                    if (val_str.find('.') != std::string::npos) {
-                        float f = std::stof(val_str);
-                        val_to_write = *reinterpret_cast<uint32_t*>(&f);
-                    } else {
-                        val_to_write = static_cast<uint32_t>(std::stoll(val_str));
+                    try {
+                        if (val_str.find('.') != std::string::npos) {
+                            float f = std::stof(val_str);
+                            val_to_write = *reinterpret_cast<uint32_t*>(&f);
+                        } else {
+                            val_to_write = static_cast<uint32_t>(std::stoll(val_str, nullptr, 0));
+                        }
+                    } catch (const std::exception& e) {
+                        log(session_id_, "Invalid value for 'dd' directive: " + val_str, "ERROR", 0, __FILE__, __LINE__);
+                        continue;
                     }
 
                     for (int j = 0; j < 4; ++j) {
@@ -231,7 +218,7 @@ bool X86Simulator::firstPass() {
         }
         // Handle instructions in the text segment
         else {
-            CodeGenerator temp_gen(symbolTable_); // Will now have data labels
+            CodeGenerator temp_gen(symbolTable_, *current_lc); // Will now have data labels
             std::vector<uint8_t> code = temp_gen.generate_code({line_raw});
             *current_lc += code.size();
         }
@@ -244,7 +231,7 @@ bool X86Simulator::firstPass() {
 }
 
 bool X86Simulator::secondPass() {
-    CodeGenerator code_generator(symbolTable_);
+    CodeGenerator code_generator(symbolTable_, memory_.get_text_segment_start());
     std::vector<uint8_t> machine_code = code_generator.generate_code(programLines_);
     program_size_in_bytes_ = machine_code.size();
 
@@ -268,6 +255,7 @@ bool X86Simulator::secondPass() {
     program_decoder->decode();
     if (ui_) {
         ui_->setProgramDecoder(std::move(program_decoder));
+        ui_->setSymbolTable(&symbolTable_);
     }
     return true;
 }
@@ -286,4 +274,3 @@ void X86Simulator::waitForInput() {
     ui_->waitForInput();
   }
 }
-

@@ -39,7 +39,7 @@ void X86Simulator::updateDisplay() {
     ui_->drawMainRegisters(register_map_);
     ui_->drawYmmRegisters(register_map_);
     ui_->drawTextWindow(current_rip);
-    ui_->drawInstructionDescription(current_rip, register_map_);
+    ui_->drawInstructionDescription(current_rip, register_map_); // This already calls the correct function in UIManager
     ui_->drawLegend();
     ui_->refreshAll();
   }
