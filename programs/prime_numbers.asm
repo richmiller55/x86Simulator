@@ -18,7 +18,7 @@ _start:
     mov ecx, 2                  ; Outer loop counter, starts at 2. Numbers 0 and 1 are not prime.
     
 prime_loop:
-    cmp ecx, 100                ; Check if we have tested all numbers up to 100.
+    cmp ecx, 20                ; Check if we have tested all numbers up to 20.
     jg end_program              ; If ecx > 100, we are done.
     
     mov ebx, 2                  ; Inner loop counter (divisor), starts at 2.

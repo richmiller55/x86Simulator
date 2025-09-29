@@ -87,6 +87,10 @@ public:
   void set_OF(bool value);
   bool get_DF() const;
   void set_DF(bool value);
+  bool get_AF() const;
+  void set_AF(bool value);
+  bool get_PF() const;
+  void set_PF(bool value);
   int get_session_id() const;
   uint64_t getRegister(const std::string& register_name);
   void log(int session_id, const std::string& message,

@@ -23,7 +23,8 @@ UIManager::UIManager(const Memory& memory_instance)
   ymm_view_mode_(YmmViewMode::HEX_256),
   display_base_(DisplayBase::HEX),
   current_regs_(nullptr),
-  symbol_table_(nullptr)
+  symbol_table_(nullptr),
+  show_labels_in_text_segment_(false)
 {
     initscr();
     clear();
@@ -301,8 +302,26 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t
         }
 
         std::string line = decoded_instr.mnemonic;
+
+        // Create a reverse map for address-to-label lookup
+        std::map<address_t, std::string> address_to_label;
+        if (symbol_table_) {
+            for (const auto& pair : *symbol_table_) {
+                address_to_label[pair.second] = pair.first;
+            }
+        }
+
         for (const auto& operand : decoded_instr.operands) {
-            line += " " + operand.text;
+            std::string operand_text = operand.text;
+            if (show_labels_in_text_segment_) {
+                if (operand.type == OperandType::IMMEDIATE || operand.type == OperandType::LABEL) {
+                    auto it = address_to_label.find(operand.value);
+                    if (it != address_to_label.end()) {
+                        operand_text = it->second; // Use label
+                    }
+                }
+            }
+            line += " " + operand_text;
         }
 
         // Truncate line to fit in the window to prevent overflow
@@ -340,7 +359,7 @@ void UIManager::drawLegend() {
     box(win_legend_, 0, 0);
     mvwprintw(win_legend_, 1, 2, "n: step | q: quit | m: toggle view");
     mvwprintw(win_legend_, 2, 2, "up/down: scroll text | +/-: scroll YMM");
-    mvwprintw(win_legend_, 3, 2, "v: YMM view | d/x/o: base | f: flags");
+    mvwprintw(win_legend_, 3, 2, "v: YMM view | d/x/o: base | f: flags | l: labels");
 }
 
 bool UIManager::waitForInput() {
@@ -415,6 +434,13 @@ bool UIManager::waitForInput() {
                 display_base_ = DisplayBase::OCT;
                 if (current_regs_) {
                     drawYmmRegisters(*current_regs_);
+                    refreshAll();
+                }
+                break;
+            case 'l': // Toggle labels in text segment
+                show_labels_in_text_segment_ = !show_labels_in_text_segment_;
+                if (current_regs_) {
+                    drawTextWindow(current_regs_->get64("rip"));
                     refreshAll();
                 }
                 break;

@@ -2,7 +2,12 @@
 #include "ui_manager.h"
 #include "decoder.h"
 #include "i_database_manager.h"
-
+/*
+#include <stdexcept>
+#include <vector>
+#include <string>
+#include <sstream>
+*/
 // Constructor with DatabaseManager injection
 X86Simulator::X86Simulator(IDatabaseManager& dbManager, int session_id, bool headless)
     : dbManager_(dbManager),
@@ -85,10 +90,6 @@ bool X86Simulator::is_headless() const {
     return headless_;
 }
 
-#include <stdexcept>
-#include <vector>
-#include <string>
-#include <sstream>
 
 // Helper to check if a string is a numeric literal
 bool is_number(const std::string& s) {
