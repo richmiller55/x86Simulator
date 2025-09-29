@@ -58,7 +58,9 @@ private:
 
   UIView current_view_ = UIView::kNormal;
   bool show_flags_as_text_ = true;
+  bool show_labels_in_text_segment_;
   YmmViewMode ymm_view_mode_;
+
   DisplayBase display_base_;
   const RegisterMap* current_regs_; // Pointer to the current RegisterMap for input handling
   const std::map<std::string, address_t>* symbol_table_;

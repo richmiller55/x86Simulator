@@ -29,6 +29,18 @@ void X86Simulator::set_DF(bool value) {
   else rflags_ &= ~(1ULL << RFLAGS_DF_BIT);
 }
 
+bool X86Simulator::get_AF() const { return (rflags_ >> RFLAGS_AF_BIT) & 1; }
+void X86Simulator::set_AF(bool value) {
+  if (value) rflags_ |= (1ULL << RFLAGS_AF_BIT);
+  else rflags_ &= ~(1ULL << RFLAGS_AF_BIT);
+}
+
+bool X86Simulator::get_PF() const { return (rflags_ >> RFLAGS_PF_BIT) & 1; }
+void X86Simulator::set_PF(bool value) {
+  if (value) rflags_ |= (1ULL << RFLAGS_PF_BIT);
+  else rflags_ &= ~(1ULL << RFLAGS_PF_BIT);
+}
+
 void X86Simulator::update_rflags_in_register_map() {
     register_map_.set64("rflags", rflags_);
 }

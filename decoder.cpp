@@ -91,7 +91,19 @@ Decoder::Decoder() {
     };
 
     two_byte_opcode_to_mnemonic = {
+        {0x80, "JO"},
+        {0x81, "JNO"},
+        {0x82, "JB"},
+        {0x83, "JAE"},
+        {0x84, "JE"},
+        {0x85, "JNE"},
+        {0x86, "JBE"},
+        {0x88, "JS"},
+        {0x89, "JNS"},
+        {0x8C, "JL"},
+        {0x8D, "JGE"},
         {0x8E, "JLE"},
+        {0x8F, "JG"},
         {0xBE, "MOVSX"},
         {0xB6, "MOVZX"}
     };
@@ -308,7 +320,11 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
             decoded_instr->mnemonic = it->second;
             std::transform(decoded_instr->mnemonic.begin(), decoded_instr->mnemonic.end(), decoded_instr->mnemonic.begin(), ::tolower);
 
-            if (decoded_instr->mnemonic == "jle") {
+            const auto& mnemonic = decoded_instr->mnemonic;
+            if (mnemonic == "jo" || mnemonic == "jno" || mnemonic == "jb" || mnemonic == "jae" ||
+                mnemonic == "je" || mnemonic == "jne" || mnemonic == "jbe" || mnemonic == "js" ||
+                mnemonic == "jns" || mnemonic == "jl" || mnemonic == "jge" || mnemonic == "jle" ||
+                mnemonic == "jg") {
                 decoded_instr->length_in_bytes = 6;
                 current_address++;
                 int32_t offset = memory.read_text_dword(current_address);

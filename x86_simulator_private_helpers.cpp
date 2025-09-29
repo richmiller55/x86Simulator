@@ -74,6 +74,19 @@ void X86Simulator::handleAdd(const DecodedInstruction& decoded_instr) {
         bool result_sign = (result & 0x80000000);
         set_OF((dest_sign == src_sign) && (dest_sign != result_sign));
 
+        // Set Adjust Flag (AF): Set if there is a carry from bit 3
+        set_AF(((destValue & 0xF) + (sourceValue & 0xF)) > 0xF);
+
+        // Set Parity Flag (PF): Set if the number of set bits in the least significant byte is even
+        uint8_t lsb = result & 0xFF;
+        int set_bits = 0;
+        for (int i = 0; i < 8; ++i) {
+            if ((lsb >> i) & 1) {
+                set_bits++;
+            }
+        }
+        set_PF((set_bits % 2) == 0);
+
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in ADD: " + std::string(e.what());
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -116,6 +129,19 @@ void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
     bool src_sign = (sourceValue & 0x80000000);
     bool result_sign = (result & 0x80000000);
     set_OF((dest_sign != src_sign) && (dest_sign != result_sign));
+
+    // Set Adjust Flag (AF): Set if there is a borrow from bit 4
+    set_AF((destValue & 0xF) < (sourceValue & 0xF));
+
+    // Set Parity Flag (PF): Set if the number of set bits in the least significant byte is even
+    uint8_t lsb = result & 0xFF;
+    int set_bits = 0;
+    for (int i = 0; i < 8; ++i) {
+        if ((lsb >> i) & 1) {
+            set_bits++;
+        }
+    }
+    set_PF((set_bits % 2) == 0);
 
     // Perform subtraction and update destination using register_map_
     try {
