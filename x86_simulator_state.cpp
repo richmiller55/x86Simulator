@@ -392,7 +392,7 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
     Decoder& decoder = Decoder::getInstance();
     address_t current_address = memory_.get_text_segment_start();
 
-    while (current_address < memory_.get_data_segment_start() && current_address < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
+    while (current_address < memory_.get_text_segment_start() + program_size_in_bytes_) {
         auto decoded_instr_opt = decoder.decodeInstruction(memory_, current_address);
         if (!decoded_instr_opt) {
             // If decoding fails, just print the byte and move on
