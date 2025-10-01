@@ -146,8 +146,8 @@ bool X86Simulator::firstPass() {
                         }
                     }
 
-                    if (*current_lc < memory_.main_memory->size()) {
-                        memory_.main_memory->at(*current_lc) = val_to_write;
+                    if (*current_lc < memory_.get_total_memory_size()) {
+                        memory_.write_data(*current_lc, val_to_write);
                     }
                     *current_lc += 1;
                 }
@@ -177,8 +177,8 @@ bool X86Simulator::firstPass() {
                     }
 
                     for (int j = 0; j < 4; ++j) {
-                        if (*current_lc + j < memory_.main_memory->size()) {
-                            memory_.main_memory->at(*current_lc + j) = (val_to_write >> (j * 8)) & 0xFF;
+                        if (*current_lc + j < memory_.get_total_memory_size()) {
+                            memory_.write_data(*current_lc + j, (val_to_write >> (j * 8)) & 0xFF);
                         }
                     }
                     *current_lc += 4;
@@ -225,7 +225,7 @@ bool X86Simulator::firstPass() {
     }
     
     // Update the memory object with the final text segment size
-    memory_.set_text_segment_size(text_lc - memory_.get_text_segment_start());
+    // memory_.set_text_segment_size(text_lc - memory_.get_text_segment_start()); // FIXME: Design changed, size is set at construction.
 
     return true;
 }
@@ -240,7 +240,7 @@ bool X86Simulator::secondPass() {
         memory_.write_text(memory_.get_text_segment_start() + i, machine_code[i]);
     }
 
-    memory_.set_text_segment_size(program_size_in_bytes_);
+    // memory_.set_text_segment_size(program_size_in_bytes_); // FIXME: Design changed, size is set at construction.
 
     // Set the initial instruction pointer (RIP) to the address of the entry point label.
     auto it = symbolTable_.find(entryPointLabel_);
@@ -249,7 +249,7 @@ bool X86Simulator::secondPass() {
     } else {
         log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
         // Fallback to the start of the text segment if the label is not found
-        register_map_.set64("rip", memory_.text_segment_start);
+        register_map_.set64("rip", memory_.get_text_segment_start());
     }
     auto program_decoder = std::make_unique<ProgramDecoder>(memory_);
     program_decoder->decode();

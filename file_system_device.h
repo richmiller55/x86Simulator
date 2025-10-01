@@ -49,25 +49,35 @@ public:
 class FileSystemDevice {
 public:
     std::unique_ptr<Directory> root_directory;
-    const std::string persistence_file = "simulated_hdd.json";
+    std::string persistence_file;
 
-    FileSystemDevice() {
+    explicit FileSystemDevice(std::string persistence_path = "simulated_hdd.json") 
+        : persistence_file(std::move(persistence_path)) {
         root_directory = std::make_unique<Directory>("root");
-        load();
+        // if (!persistence_file.empty()) {
+        //     load();
+        // }
     }
 
     ~FileSystemDevice() {
-        save();
+        if (!persistence_file.empty()) {
+            save();
+        }
     }
 
     void createFile(const std::string& parent_path, const std::string& file_name, const std::vector<std::string>& file_content);
 
     void listContents(const std::string& path);
 
+    void appendToFile(const std::string& file_path, char data);
+    const std::vector<std::string>* getFileContent(const std::string& path) const;
+
 private:
     void save();
 
     void load();
+
+    FileEntry* findFile(const std::string& path);
 
     // Simplified directory finding (recursive search needed for full path resolution)
     Directory* findDirectory(const std::string& path);

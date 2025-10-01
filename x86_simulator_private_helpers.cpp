@@ -22,11 +22,7 @@ void X86Simulator::handleMov(const DecodedInstruction& decoded_instr) {
         // If the source is a memory location, read the value from memory.
         // Assuming a 32-bit read for now.
         address_t address = src_operand.value;
-        uint32_t value_from_mem = 0;
-        // Little-endian read
-        for (int i = 0; i < 4; ++i) {
-            value_from_mem |= static_cast<uint32_t>(memory_.main_memory->at(address + i)) << (i * 8);
-        }
+        uint32_t value_from_mem = memory_.read_dword(address);
         sourceValue = value_from_mem;
     } else {
         // Otherwise, it's an immediate value
@@ -186,15 +182,13 @@ void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
     rsp -= operand_size;
     register_map_.set64("rsp", rsp);
 
-    if (rsp < memory_.stack_segment_start) {
+    if (rsp < memory_.get_stack_segment_start()) {
         log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
-    // Write value to the stack (little-endian)
-    for (size_t i = 0; i < operand_size; ++i) {
-        memory_.main_memory->at(rsp + i) = (src_value >> (i * 8)) & 0xFF;
-    }
+    // Write value to the stack
+    memory_.write_stack(rsp, src_value);
 }
 
 void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
@@ -223,15 +217,12 @@ void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
 
     uint64_t rsp = register_map_.get64("rsp");
 
-    if (rsp + operand_size > memory_.stack_bottom) {
+    if (rsp + operand_size > memory_.get_stack_bottom()) {
         log(session_id_, "Stack underflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
-    uint64_t value = 0;
-    for (size_t i = 0; i < operand_size; ++i) {
-        value |= static_cast<uint64_t>(memory_.main_memory->at(rsp + i)) << (i * 8);
-    }
+    uint64_t value = memory_.read_stack(rsp);
 
     if (operand_size == 8) {
         register_map_.set64(reg_name, value);
@@ -283,7 +274,7 @@ void X86Simulator::handleCall(const DecodedInstruction& decoded_instr) {
     rsp -= 8; // Pushing a 64-bit address
     register_map_.set64("rsp", rsp);
 
-    if (rsp < memory_.stack_segment_start) {
+    if (rsp < memory_.get_stack_segment_start()) {
         log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
         register_map_.set64("rsp", rsp + 8); // Attempt to recover stack pointer
         return;
@@ -1340,11 +1331,10 @@ void X86Simulator::handleMovsb(const DecodedInstruction& decoded_instr) {
         address_t dest_addr = register_map_.get64("rdi");
 
         // Read the byte from the source address.
-        // We assume it can be in any segment, so we read from main_memory directly.
-        uint8_t byte_to_move = memory_.main_memory->at(src_addr);
+        uint8_t byte_to_move = memory_.read_byte(src_addr);
 
         // Write the byte to the destination address.
-        memory_.main_memory->at(dest_addr) = byte_to_move;
+        memory_.write_byte(dest_addr, byte_to_move);
 
         // Adjust RSI and RDI based on the Direction Flag (DF).
         int8_t increment = get_DF() ? -1 : 1;
@@ -1372,12 +1362,12 @@ void X86Simulator::handleMovsw(const DecodedInstruction& decoded_instr) {
         }
 
         // Read the word (2 bytes) from the source address.
-        uint8_t byte1 = memory_.main_memory->at(src_addr);
-        uint8_t byte2 = memory_.main_memory->at(src_addr + 1);
+        uint8_t byte1 = memory_.read_byte(src_addr);
+        uint8_t byte2 = memory_.read_byte(src_addr + 1);
 
         // Write the word to the destination address.
-        memory_.main_memory->at(dest_addr) = byte1;
-        memory_.main_memory->at(dest_addr + 1) = byte2;
+        memory_.write_byte(dest_addr, byte1);
+        memory_.write_byte(dest_addr + 1, byte2);
 
         // Adjust RSI and RDI by 2 based on the Direction Flag (DF).
         int8_t increment = get_DF() ? -2 : 2;
@@ -1405,16 +1395,13 @@ void X86Simulator::handleMovsd(const DecodedInstruction& decoded_instr) {
         }
 
         // Read the doubleword (4 bytes) from the source address.
-        uint8_t byte1 = memory_.main_memory->at(src_addr);
-        uint8_t byte2 = memory_.main_memory->at(src_addr + 1);
-        uint8_t byte3 = memory_.main_memory->at(src_addr + 2);
-        uint8_t byte4 = memory_.main_memory->at(src_addr + 3);
+        uint32_t dword_to_move = memory_.read_dword(src_addr);
 
         // Write the doubleword to the destination address.
-        memory_.main_memory->at(dest_addr) = byte1;
-        memory_.main_memory->at(dest_addr + 1) = byte2;
-        memory_.main_memory->at(dest_addr + 2) = byte3;
-        memory_.main_memory->at(dest_addr + 3) = byte4;
+        memory_.write_byte(dest_addr, dword_to_move & 0xFF);
+        memory_.write_byte(dest_addr + 1, (dword_to_move >> 8) & 0xFF);
+        memory_.write_byte(dest_addr + 2, (dword_to_move >> 16) & 0xFF);
+        memory_.write_byte(dest_addr + 3, (dword_to_move >> 24) & 0xFF);
 
         // Adjust RSI and RDI by 4 based on the Direction Flag (DF).
         int8_t increment = get_DF() ? -4 : 4;

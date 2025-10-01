@@ -22,6 +22,7 @@ RegisterMap::RegisterMap()
   };
 
   registers64_.resize(NUM_REG64, 0);
+  // Initialize YMM registers to zero
   registers_ymm_.resize(NUM_REG_YMM, _mm256_setzero_si256());
   RegSeg_.resize(NUM_REG_SEG, 0);
 }

@@ -250,25 +250,25 @@ TEST(ProgramDecoderTest, AssembleAndDecodeJumps) {
     EXPECT_EQ(decoded_program[1]->mnemonic, "cmp");
     EXPECT_EQ(decoded_program[1]->address, 5);
 
-    // 3. je end (address 8, size 2)
+    // 3. je end (address 8, size 6)
     const auto& je_instr = decoded_program[2];
     EXPECT_EQ(je_instr->mnemonic, "je");
     EXPECT_EQ(je_instr->address, 8);
     ASSERT_EQ(je_instr->operands.size(), 1);
     EXPECT_EQ(je_instr->operands[0].value, symbol_table["end"]);
 
-    // 4. dec ecx (address 10, size 2)
+    // 4. dec ecx (address 14, size 2)
     EXPECT_EQ(decoded_program[3]->mnemonic, "dec");
-    EXPECT_EQ(decoded_program[3]->address, 10);
+    EXPECT_EQ(decoded_program[3]->address, 14);
 
-    // 5. jmp loop (address 12, size 5)
+    // 5. jmp loop (address 16, size 5)
     const auto& jmp_instr = decoded_program[4];
     EXPECT_EQ(jmp_instr->mnemonic, "jmp");
-    EXPECT_EQ(jmp_instr->address, 12);
+    EXPECT_EQ(jmp_instr->address, 16);
     ASSERT_EQ(jmp_instr->operands.size(), 1);
     EXPECT_EQ(jmp_instr->operands[0].value, symbol_table["loop"]);
 
-    // 6. nop (address 17)
+    // 6. nop (address 21)
     EXPECT_EQ(decoded_program[5]->mnemonic, "nop");
-    EXPECT_EQ(decoded_program[5]->address, 17);
+    EXPECT_EQ(decoded_program[5]->address, 21);
 }

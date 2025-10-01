@@ -1,81 +1,105 @@
-// Memory.cpp
 #include "memory.h"
 #include <iostream>
+#include <algorithm> // For std::fill and std::copy
 
+// Constructor for the default memory layout
 Memory::Memory()
   : text_segment_start(0),
     data_segment_start(0x200000),
-    bss_segment_start(0x400000),
-    initial_heap_size(0x1000000),
-    max_stack_size(0x100000)
+    bss_segment_start(0x400000)
 {
-  text_segment_size = data_segment_start - text_segment_start;
-  heap_segment_start = bss_segment_start + 0x100000;
-  total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
-  main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size);
+    // These member variables are initialized in the constructor's body for clarity.
+    text_segment_size = data_segment_start - text_segment_start;
+    heap_segment_start = bss_segment_start + initial_heap_size;
+    total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
+    
+    // Allocate main memory using std::vector and smart pointer.
+    main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
 
-  for (size_t i = bss_segment_start; i < heap_segment_start; ++i) {
-    main_memory->at(i) = 0;
-  }
+    // Explicitly zero the BSS segment.
+    std::fill(main_memory->begin() + bss_segment_start,
+              main_memory->begin() + heap_segment_start, 0);
 
-  next_available_heap_address = heap_segment_start;
-  stack_bottom = total_memory_size;
-  stack_pointer = stack_bottom;
-  stack_segment_end = stack_bottom;
-  stack_segment_start = stack_bottom - max_stack_size;
+    // Set up stack boundaries and pointer.
+    stack_bottom = total_memory_size;
+    stack_pointer = stack_bottom;
+    stack_segment_end = stack_bottom;
+    stack_segment_start = stack_bottom - max_stack_size;
 }
 
+// Constructor for a custom memory layout
 Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
   : text_segment_start(0),
     text_segment_size(text_size),
-    initial_heap_size(0x1000000),
-    max_stack_size(0x100000)
+    data_segment_start(text_size),
+    bss_segment_start(text_size + data_size)
 {
-  data_segment_start = text_segment_start + text_size;
-  bss_segment_start = data_segment_start + data_size;
-  heap_segment_start = bss_segment_start + bss_size;
+    // Calculate memory layout based on provided sizes.
+    heap_segment_start = bss_segment_start + bss_size;
+    total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
 
-  total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
-  main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size);
+    // Allocate main memory using std::vector and smart pointer.
+    main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
+    
+    // Explicitly zero the BSS segment.
+    std::fill(main_memory->begin() + bss_segment_start,
+              main_memory->begin() + heap_segment_start, 0);
 
-  for (size_t i = bss_segment_start; i < heap_segment_start; ++i) {
-    main_memory->at(i) = 0;
-  }
-
-  next_available_heap_address = heap_segment_start;
-  stack_bottom = total_memory_size;
-  stack_pointer = stack_bottom;
-  stack_segment_end = stack_bottom;
-  stack_segment_start = stack_bottom - max_stack_size;
+    // Set up stack boundaries and pointer.
+    stack_bottom = total_memory_size;
+    stack_pointer = stack_bottom;
+    stack_segment_end = stack_bottom;
+    stack_segment_start = stack_bottom - max_stack_size;
 }
 
+// Generic bounds checking helper function
+void Memory::check_bounds(address_t address, size_t size) const {
+    if (address + size > main_memory->size() || address < 0) {
+        throw std::out_of_range("Memory access out of bounds!");
+    }
+}
+
+// Accessors with updated implementation for text segment
 uint8_t Memory::read_text(address_t address) const {
-  if (address < text_segment_start || address >= (text_segment_start + text_segment_size)) {
-    throw std::out_of_range("Text segment out of bounds!");
-  }
-  return main_memory->at(address);
+    if (address < text_segment_start || address >= (text_segment_start + text_segment_size)) {
+        throw std::out_of_range("Text segment read out of bounds!");
+    }
+    return main_memory->at(address);
 }
+
 void Memory::write_text(address_t address, uint8_t value) {
-  if (address < text_segment_start || address >= (text_segment_start + text_segment_size)) {
-    throw std::out_of_range("Text segment write out of bounds!");
-  }
-  main_memory->at(address) = value;
+    if (address < text_segment_start || address >= (text_segment_start + text_segment_size)) {
+        throw std::out_of_range("Text segment write out of bounds!");
+    }
+    main_memory->at(address) = value;
 }
 
 uint32_t Memory::read_text_dword(address_t address) const {
-    uint32_t value = 0;
-    for (int i = 0; i < 4; ++i) {
-        value |= static_cast<uint32_t>(read_text(address + i)) << (i * 8);
+    if (address < text_segment_start || address + 4 > (text_segment_start + text_segment_size)) {
+        throw std::out_of_range("Text segment read out of bounds!");
     }
-    return value;
+    return *reinterpret_cast<uint32_t*>(main_memory->data() + address);
 }
 
 void Memory::write_text_dword(address_t address, uint32_t value) {
-    for (int i = 0; i < 4; ++i) {
-        write_text(address + i, (value >> (i * 8)) & 0xFF);
+    if (address < text_segment_start || address + 4 > (text_segment_start + text_segment_size)) {
+        throw std::out_of_range("Text segment write out of bounds!");
     }
+    *reinterpret_cast<uint32_t*>(main_memory->data() + address) = value;
 }
 
+// Generic byte access
+uint8_t Memory::read_byte(address_t address) const {
+    check_bounds(address, 1);
+    return main_memory->at(address);
+}
+
+void Memory::write_byte(address_t address, uint8_t value) {
+    check_bounds(address, 1);
+    main_memory->at(address) = value;
+}
+
+// Accessors for data segment
 uint8_t Memory::read_data(address_t address) const {
     if (address < data_segment_start || address >= bss_segment_start) {
         throw std::out_of_range("Data segment read out of bounds!");
@@ -91,50 +115,42 @@ void Memory::write_data(address_t address, uint8_t value) {
 }
 
 uint32_t Memory::read_data_dword(address_t address) const {
-    uint32_t value = 0;
-    for (int i = 0; i < 4; ++i) {
-        value |= static_cast<uint32_t>(read_data(address + i)) << (i * 8);
+    if (address < data_segment_start || address + 4 > bss_segment_start) {
+        throw std::out_of_range("Data segment read out of bounds!");
     }
-    return value;
+    return *reinterpret_cast<uint32_t*>(main_memory->data() + address);
 }
 
 void Memory::write_data_dword(address_t address, uint32_t value) {
-    for (int i = 0; i < 4; ++i) {
-        write_data(address + i, (value >> (i * 8)) & 0xFF);
+    if (address < data_segment_start || address + 4 > bss_segment_start) {
+        throw std::out_of_range("Data segment write out of bounds!");
     }
+    *reinterpret_cast<uint32_t*>(main_memory->data() + address) = value;
 }
 
+// AVX2 read/write
 __m256i Memory::read_ymm(address_t address) const {
-    if (address < data_segment_start || address + 32 > heap_segment_start) {
-        throw std::out_of_range("YMM read out of data segment bounds!");
-    }
+    check_bounds(address, 32); // 32 bytes for AVX2 YMM register
     return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(main_memory->data() + address));
 }
 
 void Memory::write_ymm(address_t address, __m256i value) {
-    if (address < data_segment_start || address + 32 > heap_segment_start) {
-        throw std::out_of_range("YMM write out of data segment bounds!");
-    }
+    check_bounds(address, 32); // 32 bytes for AVX2 YMM register
     _mm256_storeu_si256(reinterpret_cast<__m256i*>(main_memory->data() + address), value);
 }
 
-
+// Generic 64-bit read/write using reinterpret_cast
 uint64_t Memory::read64(address_t address) const {
-    uint64_t value = 0;
-    for (int i = 0; i < 8; ++i) {
-        // Assuming little-endian byte order
-        value |= static_cast<uint64_t>(main_memory->at(address + i)) << (i * 8);
-    }
-    return value;
+    check_bounds(address, 8);
+    return *reinterpret_cast<const uint64_t*>(main_memory->data() + address);
 }
 
 void Memory::write64(address_t address, uint64_t value) {
-    for (int i = 0; i < 8; ++i) {
-        // Assuming little-endian byte order
-        main_memory->at(address + i) = (value >> (i * 8)) & 0xFF;
-    }
+    check_bounds(address, 8);
+    *reinterpret_cast<uint64_t*>(main_memory->data() + address) = value;
 }
 
+// 64-bit accessor aliases
 uint64_t Memory::read_qword(address_t address) const {
     return read64(address);
 }
@@ -143,55 +159,50 @@ void Memory::write_qword(address_t address, uint64_t value) {
     write64(address, value);
 }
 
+// Generic 32-bit read using reinterpret_cast
 uint32_t Memory::read_dword(address_t address) const {
-    uint32_t value = 0;
-    for (int i = 0; i < 4; ++i) {
-        value |= static_cast<uint32_t>(main_memory->at(address + i)) << (i * 8);
-    }
-    return value;
+    check_bounds(address, 4);
+    return *reinterpret_cast<const uint32_t*>(main_memory->data() + address);
 }
 
-void Memory::reset() {
-    // Bulletproof reset: Recalculate the entire memory layout from constructor constants
-    // to defend against memory corruption that was invalidating size-related members.
-    const size_t const_bss_segment_start = 0x400000;
-    const size_t const_initial_heap_size = 0x1000000;
-    const size_t const_max_stack_size = 0x100000;
-    const size_t const_data_segment_start = 0x200000;
-    const size_t const_text_segment_start = 0;
-
-    // Re-calculate and re-assign member variables to restore a valid state
-    heap_segment_start = const_bss_segment_start + 0x100000;
-    total_memory_size = heap_segment_start + const_initial_heap_size + const_max_stack_size;
-
-    // Re-allocate the main memory vector with the corrected size
-    main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
-
-    // Reset all pointers and sizes to their initial state
-    text_segment_size = const_data_segment_start - const_text_segment_start;
-    next_available_heap_address = heap_segment_start;
-    
-    // Reset stack pointers and boundaries
-    stack_bottom = total_memory_size;
-    stack_pointer = stack_bottom;
-    stack_segment_end = stack_bottom;
-    stack_segment_start = stack_bottom - const_max_stack_size;
-}
-
+// Stack accessors
 uint64_t Memory::read_stack(address_t address) const {
-  if (address < stack_segment_start || address >= stack_segment_end) {
-    throw std::out_of_range("Stack segment read out of bounds!");
-  }
-  return read64(address);
+    if (address < stack_segment_start || address >= stack_segment_end) {
+        throw std::out_of_range("Stack segment read out of bounds!");
+    }
+    return read64(address);
 }
 
 void Memory::write_stack(address_t address, uint64_t value) {
-  if (address < stack_segment_start || address >= stack_segment_end) {
-    throw std::out_of_range("Stack segment write out of bounds!");
-  }
-  write64(address, value);
+    if (address < stack_segment_start || address >= stack_segment_end) {
+        throw std::out_of_range("Stack segment write out of bounds!");
+    }
+    write64(address, value);
 }
 
+// Reset function that returns to a default state
+void Memory::reset() {
+    // Re-initialize members to default-constructed state, avoiding assignment.
+    text_segment_start = 0;
+    data_segment_start = 0x200000;
+    bss_segment_start = 0x400000;
+
+    text_segment_size = data_segment_start - text_segment_start;
+    heap_segment_start = bss_segment_start + initial_heap_size;
+    total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
+    
+    main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
+
+    std::fill(main_memory->begin() + bss_segment_start,
+              main_memory->begin() + heap_segment_start, 0);
+
+    stack_bottom = total_memory_size;
+    stack_pointer = stack_bottom;
+    stack_segment_end = stack_bottom;
+    stack_segment_start = stack_bottom - max_stack_size;
+}
+
+// Getter for total memory size
 size_t Memory::get_total_memory_size() const {
     return total_memory_size;
 }
