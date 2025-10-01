@@ -111,8 +111,8 @@ public:
 
 private:
   IDatabaseManager& dbManager_;
-  RegisterMap register_map_;
   Memory memory_;
+  RegisterMap register_map_;
   address_t instructionPointer_ = 0;
   std::unique_ptr<UIManager> ui_;
   uint64_t rflags_;

@@ -63,3 +63,65 @@ Directory* FileSystemDevice::findDirectory(const std::string& path) {
     }
     return nullptr;
 }
+
+FileEntry* FileSystemDevice::findFile(const std::string& path) {
+    // Simple implementation for "/root/filename.txt"
+    size_t last_slash = path.find_last_of('/');
+    if (last_slash == std::string::npos) return nullptr;
+
+    std::string parent_path = path.substr(0, last_slash);
+    if (parent_path.empty()) parent_path = "/";
+    std::string file_name = path.substr(last_slash + 1);
+
+    Directory* parent = findDirectory(parent_path);
+    if (parent) {
+        for (const auto& file : parent->files) {
+            if (file->name == file_name) {
+                return file.get();
+            }
+        }
+    }
+    return nullptr;
+}
+
+void FileSystemDevice::appendToFile(const std::string& file_path, char data) {
+    FileEntry* file = findFile(file_path);
+    
+    if (!file) {
+        size_t last_slash = file_path.find_last_of('/');
+        std::string parent_path = (last_slash != std::string::npos) ? file_path.substr(0, last_slash) : "/";
+        if (parent_path.empty()) parent_path = "/";
+        std::string file_name = (last_slash != std::string::npos) ? file_path.substr(last_slash + 1) : file_path;
+        
+        Directory* parent = findDirectory(parent_path);
+        if (parent) {
+            parent->files.push_back(std::make_unique<FileEntry>(file_name));
+            file = parent->files.back().get();
+        } else {
+            return; // Cannot find parent directory
+        }
+    }
+
+    if (file->content.empty()) {
+        file->content.push_back("");
+    }
+
+    if (data == '\n') {
+        file->content.push_back("");
+    } else {
+        file->content.back() += data;
+    }
+
+    file->size = 0;
+    for (const auto& line : file->content) {
+        file->size += line.length() + 1; // +1 for newline
+    }
+}
+
+const std::vector<std::string>* FileSystemDevice::getFileContent(const std::string& path) const {
+    FileEntry* file = const_cast<FileSystemDevice*>(this)->findFile(path);
+    if (file) {
+        return &file->content;
+    }
+    return nullptr;
+}

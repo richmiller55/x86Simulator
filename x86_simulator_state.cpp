@@ -328,6 +328,14 @@ void X86Simulator::runSingleInstruction() {
     }
 
     auto decoded_instr = std::move(decoded_instr_opt);
+
+    // Defensive check for zero-length instruction to prevent infinite loop
+    if (decoded_instr->length_in_bytes == 0) {
+        log(session_id_, "Decoder returned 0-length instruction at address " + std::to_string(instruction_pointer), "ERROR", instruction_pointer, __FILE__, __LINE__);
+        register_map_.set64("rip", instruction_pointer + 1); // Prevent infinite loop
+        return;
+    }
+
     // Log before execution
     // log(session_id_, "Executing: " + decoded_instr.mnemonic, "INFO", instruction_pointer, __FILE__, __LINE__);
 
@@ -365,7 +373,7 @@ void X86Simulator::runProgram() {
         address_t instruction_pointer = register_map_.get64("rip");
         
         // Check for end of program or explicit halt.
-        if (instruction_pointer >= memory_.text_segment_start + memory_.text_segment_size) {
+        if (instruction_pointer >= memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
             isRunning = false; // Program finished
             log(session_id_, "End of program", "INFO", instruction_pointer, __FILE__, __LINE__);
         } else {
@@ -382,9 +390,9 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
     }
 
     Decoder& decoder = Decoder::getInstance();
-    address_t current_address = memory_.text_segment_start;
+    address_t current_address = memory_.get_text_segment_start();
 
-    while (current_address < memory_.data_segment_start && current_address < memory_.text_segment_start + memory_.text_segment_size) {
+    while (current_address < memory_.get_data_segment_start() && current_address < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
         auto decoded_instr_opt = decoder.decodeInstruction(memory_, current_address);
         if (!decoded_instr_opt) {
             // If decoding fails, just print the byte and move on
@@ -417,7 +425,12 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
         }
         outfile << std::endl;
 
-        current_address += decoded_instr->length_in_bytes;
+        if (decoded_instr->length_in_bytes == 0) {
+            log(session_id_, "Decoder returned 0-length instruction at address " + std::to_string(current_address), "ERROR", current_address, __FILE__, __LINE__);
+            current_address++;
+        } else {
+            current_address += decoded_instr->length_in_bytes;
+        }
     }
     outfile.close();
 }
@@ -442,8 +455,8 @@ void X86Simulator::dumpMemoryRange(const std::string& filename, address_t start_
             outfile << "0x" << std::hex << std::setw(8) << std::setfill('0') << current_address << ": ";
         }
 
-        if (current_address < memory_.main_memory->size()) {
-            outfile << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.main_memory->at(current_address) << " ";
+        if (current_address < memory_.get_total_memory_size()) {
+            outfile << std::hex << std::setw(2) << std::setfill('0') << (int)memory_.read_byte(current_address) << " ";
         } else {
             outfile << "?? ";
         }

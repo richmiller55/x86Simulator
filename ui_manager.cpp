@@ -5,7 +5,7 @@
 #include <iomanip>
 #include "decoder.h"
 #include "instruction_describer.h" // Will be created later
-
+#include <ncursesw/curses.h> // Include the wide-character header
 
 
 UIManager::UIManager(const Memory& memory_instance)
@@ -15,6 +15,7 @@ UIManager::UIManager(const Memory& memory_instance)
   win_ymm_(nullptr),
   win_instruction_description_(nullptr),
   win_legend_(nullptr),
+  win_file_tail_(nullptr),
   memory_(memory_instance),
   text_scroll_offset_(0),
   ymm_scroll_offset_(0),
@@ -24,6 +25,7 @@ UIManager::UIManager(const Memory& memory_instance)
   display_base_(DisplayBase::HEX),
   current_regs_(nullptr),
   symbol_table_(nullptr),
+  address_to_label_(),
   show_labels_in_text_segment_(false)
 {
     initscr();
@@ -37,6 +39,7 @@ UIManager::UIManager(const Memory& memory_instance)
         start_color();
         init_pair(1, COLOR_YELLOW, COLOR_BLACK);
         init_pair(2, COLOR_GREEN, COLOR_BLACK);
+        init_pair(3, COLOR_BLUE, COLOR_BLACK);
     }
 
     win32_ = newwin(1, 1, 1, 1);
@@ -45,17 +48,18 @@ UIManager::UIManager(const Memory& memory_instance)
     win_ymm_ = newwin(1, 1, 1, 1);
     win_instruction_description_ = newwin(1, 1, 1, 1);
     win_legend_ = newwin(1, 1, 1, 1);
-
+    win_file_tail_ = newwin(1, 1, 1, 1);
     arrangeWindows();
 }
 
 namespace { // Anonymous namespace for layout constants
     const WindowLayout kNormalWin32Layout = { .y = 1, .x = 1, .height = 13, .width = 30 };
     const WindowLayout kNormalWin64Layout = { .y = 1, .x = 32, .height = 22, .width = 30 };
-    const WindowLayout kNormalTextSegmentLayout = { .y = 14, .x = 1, .height = 25, .width = 30 };
+    const WindowLayout kNormalTextSegmentLayout = { .y = 14, .x = 1, .height = 23, .width = 30 };
     const WindowLayout kNormalYmmLayout = { .y = 23, .x = 32, .height = 12, .width = 80 };
     const WindowLayout kNormalInstructionDescLayout = { .y = 1, .x = 63, .height = 12, .width = 50 };
-    const WindowLayout kNormalLegendLayout = { .y = 14, .x = 63, .height = 6, .width = 50 };
+    const WindowLayout kNormalLegendLayout = { .y = 37, .x = 1, .height = 3, .width = 90 };
+    const WindowLayout kNormalFileTailLayout = { .y = 14, .x = 63, .height = 8, .width = 50 };
 
     const WindowLayout kExpandedYmmLayout = { .y = 23, .x = 32, .height = 19, .width = 80 };
 } // namespace
@@ -82,6 +86,7 @@ void UIManager::arrangeWindows() {
     const auto& text_segment_layout = kNormalTextSegmentLayout;
     const auto& instruction_desc_layout = kNormalInstructionDescLayout;
     const auto& legend_layout = kNormalLegendLayout;
+    const auto& file_tail_layout = kNormalFileTailLayout;
     const auto& ymm_layout = (current_view_ == UIView::kNormal) ? kNormalYmmLayout : kExpandedYmmLayout;
 
     mvwin(win32_, win32_layout.y, win32_layout.x);
@@ -102,6 +107,9 @@ void UIManager::arrangeWindows() {
     mvwin(win_legend_, legend_layout.y, legend_layout.x);
     wresize(win_legend_, legend_layout.height, legend_layout.width);
 
+    mvwin(win_file_tail_, file_tail_layout.y, file_tail_layout.x);
+    wresize(win_file_tail_, file_tail_layout.height, file_tail_layout.width);
+
     clear();
     refresh();
 }
@@ -112,6 +120,12 @@ void UIManager::setRegisterMap(const RegisterMap* regs) {
 
 void UIManager::setSymbolTable(const std::map<std::string, address_t>* symbol_table) {
     symbol_table_ = symbol_table;
+    if (symbol_table_) {
+        address_to_label_.clear();
+        for (const auto& pair : *symbol_table_) {
+            address_to_label_[pair.second] = pair.first;
+        }
+    }
 }
 
 UIManager::~UIManager() {
@@ -129,6 +143,7 @@ void UIManager::tearDown() {
     delwin(win_ymm_);
     delwin(win_instruction_description_);
     delwin(win_legend_);
+    delwin(win_file_tail_);
     endwin();
 }
 
@@ -297,26 +312,50 @@ void UIManager::drawTextSegment(WINDOW* win, const std::string& title, address_t
 
         const auto& decoded_instr = *decoded_program[i];
 
+        // Check for and draw label before the instruction
+        auto label_it = address_to_label_.find(decoded_instr.address);
+        if (label_it != address_to_label_.end()) {
+            if (y_offset >= max_y) {
+                mvwprintw(win, max_y, getmaxx(win) - 10, "[More...]");
+                break;
+            }
+            wattron(win, COLOR_PAIR(3)); // Blue
+            std::string label_text;
+            if (show_labels_in_text_segment_) {
+                label_text = label_it->second + ":";
+            } else {
+                std::stringstream ss;
+                ss << " (" << "0x" << std::hex << label_it->first << ")";
+                label_text = label_it->second + ":" + ss.str();
+            }
+            
+            int max_width_label = getmaxx(win) - 3;
+            if (max_width_label < 0) max_width_label = 0;
+            if (label_text.length() > static_cast<size_t>(max_width_label)) {
+                label_text = label_text.substr(0, max_width_label);
+            }
+            mvwaddstr(win, y_offset, 2, label_text.c_str());
+            wattroff(win, COLOR_PAIR(3));
+            y_offset++;
+        }
+
+        if (y_offset >= max_y) { // Check again after maybe printing a label
+            mvwprintw(win, max_y, getmaxx(win) - 10, "[More...]");
+            break;
+        }
+
         if (decoded_instr.address == current_rip) {
             wattron(win, COLOR_PAIR(2));
         }
 
         std::string line = decoded_instr.mnemonic;
 
-        // Create a reverse map for address-to-label lookup
-        std::map<address_t, std::string> address_to_label;
-        if (symbol_table_) {
-            for (const auto& pair : *symbol_table_) {
-                address_to_label[pair.second] = pair.first;
-            }
-        }
-
         for (const auto& operand : decoded_instr.operands) {
             std::string operand_text = operand.text;
             if (show_labels_in_text_segment_) {
                 if (operand.type == OperandType::IMMEDIATE || operand.type == OperandType::LABEL) {
-                    auto it = address_to_label.find(operand.value);
-                    if (it != address_to_label.end()) {
+                    auto it = address_to_label_.find(operand.value);
+                    if (it != address_to_label_.end()) {
                         operand_text = it->second; // Use label
                     }
                 }
@@ -351,16 +390,40 @@ void UIManager::refreshAll() {
     wnoutrefresh(win_text_segment_);
     wnoutrefresh(win_instruction_description_);
     wnoutrefresh(win_legend_);
+    wnoutrefresh(win_file_tail_);
     doupdate();
 }
+#include <iostream>
+#include <string>
+#include <locale>
+
 
 void UIManager::drawLegend() {
     werase(win_legend_);
     box(win_legend_, 0, 0);
-    mvwprintw(win_legend_, 1, 2, "n: step | q: quit | m: toggle view");
-    mvwprintw(win_legend_, 2, 2, "up/down: scroll text | +/-: scroll YMM");
-    mvwprintw(win_legend_, 3, 2, "v: YMM view | d/x/o: base | f: flags | l: labels");
+
+    // Set the locale for Unicode support
+    setlocale(LC_ALL, "");
+
+    // Create the UTF-8 strings
+    std::string up_arrow_str = u8"Up: \u2191";
+    std::string down_arrow_str = u8"Down: \u2193";
+    std::string out_s = "n:step | q:quit | m: ";
+    out_s += " " + up_arrow_str + "/" + down_arrow_str;
+    out_s += " | +/-:  ";
+    out_s += " v:YMM | d/x/o:base | l:labels";
+
+    // Use a wide-character string for printing with ncursesw
+    // (A more modern approach is available in newer C++ standards but this is portable)
+    std::wstring out_ws(out_s.begin(), out_s.end());
+
+    // Convert to const wchar_t* and print
+    const wchar_t* c_wstr = out_ws.c_str();
+    mvwaddwstr(win_legend_, 1, 2, c_wstr);
+
+    // The rest of your draw function...
 }
+
 
 bool UIManager::waitForInput() {
     while (true) {
@@ -463,3 +526,37 @@ bool UIManager::waitForInput() {
         }
     }
 }
+/*
+void UIManager::drawFileTail() {
+    werase(win_file_tail_);
+    box(win_file_tail_, 0, 0);
+    mvwprintw(win_file_tail_, 1, 2, "--- /root/stdout.txt ---");
+
+    if (file_system_) {
+        const std::vector<std::string>* content = file_system_->getFileContent("/root/stdout.txt");
+        if (content) {
+            int max_lines = getmaxy(win_file_tail_) - 2; // 1 for box top, 1 for box bottom
+            if (max_lines < 1) return;
+
+            size_t start_line = 0;
+            if (content->size() > static_cast<size_t>(max_lines)) {
+                start_line = content->size() - max_lines;
+            }
+
+            int row = 2;
+            for (size_t i = start_line; i < content->size(); ++i) {
+                if (row >= getmaxy(win_file_tail_) - 1) break;
+                const std::string& line = (*content)[i];
+
+                int max_width = getmaxx(win_file_tail_) - 3;
+                if (max_width < 0) max_width = 0;
+                std::string truncated_line = line;
+                if (truncated_line.length() > static_cast<size_t>(max_width)) {
+                    truncated_line = truncated_line.substr(0, max_width);
+                }
+                mvwprintw(win_file_tail_, row++, 2, "%s", truncated_line.c_str());
+            }
+        }
+    }
+}
+*/

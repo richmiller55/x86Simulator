@@ -10,6 +10,7 @@
 #include "register_map.h"
 #include "memory.h"
 #include "program_decoder.h"
+#include "file_system_device.h"
 
 struct DecodedInstruction; // Forward declaration
 
@@ -28,6 +29,7 @@ public:
   void drawTextWindow(address_t current_rip);
   void drawInstructionDescription(address_t current_rip, const RegisterMap& regs);
   void drawLegend();
+  void drawFileTail();
   void refreshAll();
   bool waitForInput();
   void setProgramDecoder(std::unique_ptr<ProgramDecoder> decoder);
@@ -52,18 +54,20 @@ private:
   WINDOW *win_ymm_;
   WINDOW *win_instruction_description_;
   WINDOW *win_legend_;
+  WINDOW *win_file_tail_;
   const Memory& memory_;
   size_t text_scroll_offset_;
   size_t ymm_scroll_offset_ = 0;
 
   UIView current_view_ = UIView::kNormal;
   bool show_flags_as_text_ = true;
-  bool show_labels_in_text_segment_;
   YmmViewMode ymm_view_mode_;
 
   DisplayBase display_base_;
   const RegisterMap* current_regs_; // Pointer to the current RegisterMap for input handling
   const std::map<std::string, address_t>* symbol_table_;
+  std::map<address_t, std::string> address_to_label_;
+  bool show_labels_in_text_segment_;
   const std::vector<std::string> RegisterDisplayOrderYMM_ = {
     "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
     "ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15"

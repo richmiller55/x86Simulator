@@ -11,11 +11,13 @@
 // Constructor with DatabaseManager injection
 X86Simulator::X86Simulator(IDatabaseManager& dbManager, int session_id, bool headless)
     : dbManager_(dbManager),
-      register_map_(),
       memory_(),
+      register_map_(),
+      instructionPointer_(0),
       rflags_(0),
       session_id_(session_id),
-      headless_(headless) {
+      headless_(headless),
+      program_size_in_bytes_(0) {
   if (!headless_) {
     ui_ = std::make_unique<UIManager>(memory_);
     ui_->setRegisterMap(&register_map_);
