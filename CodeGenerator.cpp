@@ -124,6 +124,10 @@ void CodeGenerator::process_line(const std::string& line_raw) {
       machine_code_.push_back(0x39); // CMP r/m32, r32
       machine_code_.push_back(0xC8); // ModR/M for CMP EAX, ECX
       current_address_ += 2;
+    } else if (dest == "ebx" && src == "eax") {
+      machine_code_.push_back(0x39); // CMP r/m32, r32
+      machine_code_.push_back(0xC3); // ModR/M for CMP EBX, EAX
+      current_address_ += 2;
     } else if (dest == "ecx") { // Assuming immediate
       machine_code_.push_back(0x83);
       machine_code_.push_back(0xF9);
@@ -492,6 +496,11 @@ void CodeGenerator::process_line(const std::string& line_raw) {
 	// XOR EAX, EAX. Opcode: 31 /r
 	machine_code_.push_back(0x31);
 	machine_code_.push_back(0xC0); // ModR/M for EAX, EAX
+	current_address_ += 2;
+      } else if (dest == "edx" && src == "edx") {
+	// XOR EDX, EDX. Opcode: 31 /r
+	machine_code_.push_back(0x31);
+	machine_code_.push_back(0xD2); // ModR/M for EDX, EDX
 	current_address_ += 2;
       } else if (dest == "ebx") { // Handle xor r32, imm8
 	try {

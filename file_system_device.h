@@ -54,9 +54,9 @@ public:
     explicit FileSystemDevice(std::string persistence_path = "simulated_hdd.json") 
         : persistence_file(std::move(persistence_path)) {
         root_directory = std::make_unique<Directory>("root");
-        // if (!persistence_file.empty()) {
-        //     load();
-        // }
+        if (!persistence_file.empty()) {
+            load();
+        }
     }
 
     ~FileSystemDevice() {
