@@ -6,9 +6,9 @@ TEST(MemoryTest, DefaultConstructor) {
     EXPECT_EQ(mem.get_text_segment_start(), 0);
     EXPECT_EQ(mem.get_data_segment_start(), 0x200000);
     EXPECT_EQ(mem.get_bss_segment_start(), 0x400000);
-    EXPECT_EQ(mem.get_heap_segment_start(), 0x500000);
-    EXPECT_EQ(mem.get_total_memory_size(), 0x1600000);
-    EXPECT_EQ(mem.get_stack_bottom(), 0x1600000);
+    EXPECT_EQ(mem.get_heap_segment_start(), 0x1400000);
+    EXPECT_EQ(mem.get_total_memory_size(), 0x2500000);
+    EXPECT_EQ(mem.get_stack_bottom(), 0x2500000);
     EXPECT_EQ(mem.get_text_segment_size(), 0x200000);
 }
 

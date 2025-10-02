@@ -7,7 +7,7 @@
 // 2: 0x0000000000000100 (256 in decimal)
 // 1: 0x000000000000000A (10 in decimal)
 // 0: 0x0000000000000001
-const __m256i test_ymm_val = _mm256_set_epi64x(
+const m256i_t test_ymm_val = _mm256_set_epi64x_sim(
     0x8000000000000000, // High qword
     0x0000000000000100,
     0x000000000000000A,

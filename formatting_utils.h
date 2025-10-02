@@ -2,7 +2,7 @@
 #define FORMATTING_UTILS_H
 
 #include <string>
-#include <immintrin.h>
+#include "avx_core.h"
 
 // Defines the different ways we can view a YMM register's data.
 enum class YmmViewMode {
@@ -22,7 +22,7 @@ enum class DisplayBase {
 
 // Formats the content of a YMM register into a string based on the desired view and base.
 std::string format_ymm_register(
-    __m256i value,
+    m256i_t value,
     YmmViewMode view_mode,
     DisplayBase display_base
 );

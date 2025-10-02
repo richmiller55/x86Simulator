@@ -6,7 +6,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <memory>
-#include <immintrin.h>
+#include "avx_core.h"
 
 // Use a fixed-size integer type for addresses for clarity and portability.
 // A 64-bit unsigned integer is appropriate for a 64-bit simulator.
@@ -34,10 +34,12 @@ public:
 
   uint64_t read_stack(address_t address) const;
   void write_stack(address_t address, uint64_t value);
+  uint32_t read_stack_dword(address_t address) const;
+  void write_stack_dword(address_t address, uint32_t value);
 
-  // AVX2 read/write (requires #include <immintrin.h>)
-  __m256i read_ymm(address_t address) const;
-  void write_ymm(address_t address, __m256i value);
+  // AVX2 read/write
+  m256i_t read_ymm(address_t address) const;
+  void write_ymm(address_t address, m256i_t value);
 
   // Helper functions for various data sizes
   uint64_t read_qword(address_t address) const;
@@ -47,6 +49,7 @@ public:
   // Management functions
   void reset();
   size_t get_total_memory_size() const;
+  void set_text_segment_size(size_t size);
 
   // Getters for memory layout
   size_t get_text_segment_start() const { return text_segment_start; }

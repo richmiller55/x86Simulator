@@ -1,6 +1,6 @@
 #include "x86_simulator.h"
 #include "decoder.h"
-#include <immintrin.h>
+#include "avx_core.h"
 
 // In x86_simulator_private_helpers.cpp or x86_simulator.cpp (depending on where they are defined)
 
@@ -188,7 +188,11 @@ void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
     }
 
     // Write value to the stack
-    memory_.write_stack(rsp, src_value);
+    if (operand_size == 8) {
+        memory_.write_stack(rsp, src_value);
+    } else { // operand_size is 4
+        memory_.write_stack_dword(rsp, static_cast<uint32_t>(src_value));
+    }
 }
 
 void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
@@ -222,12 +226,12 @@ void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
         return;
     }
 
-    uint64_t value = memory_.read_stack(rsp);
-
     if (operand_size == 8) {
+        uint64_t value = memory_.read_stack(rsp);
         register_map_.set64(reg_name, value);
     } else { // operand_size is 4
-        register_map_.set32(reg_name, static_cast<uint32_t>(value));
+        uint32_t value = memory_.read_stack_dword(rsp);
+        register_map_.set32(reg_name, value);
     }
 
     register_map_.set64("rsp", rsp + operand_size);
@@ -1433,15 +1437,12 @@ void X86Simulator::handleVaddps(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val_i = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val_i = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        __m256 src1_val_ps = _mm256_castsi256_ps(src1_val_i);
-        __m256 src2_val_ps = _mm256_castsi256_ps(src2_val_i);
+        m256i_t result = _mm256_add_ps_sim(src1_val, src2_val);
 
-        __m256 result_ps = _mm256_add_ps(src1_val_ps, src2_val_ps);
-
-        register_map_.setYmm(dest_operand.text, _mm256_castps_si256(result_ps));
+        register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VADDPS: " + std::string(e.what());
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -1466,15 +1467,12 @@ void X86Simulator::handleVdivps(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val_i = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val_i = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        __m256 src1_val_ps = _mm256_castsi256_ps(src1_val_i);
-        __m256 src2_val_ps = _mm256_castsi256_ps(src2_val_i);
+        m256i_t result = _mm256_div_ps_sim(src1_val, src2_val);
 
-        __m256 result_ps = _mm256_div_ps(src1_val_ps, src2_val_ps);
-
-        register_map_.setYmm(dest_operand.text, _mm256_castps_si256(result_ps));
+        register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VDIVPS: " + std::string(e.what());
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -1499,15 +1497,12 @@ void X86Simulator::handleVmaxps(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val_i = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val_i = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        __m256 src1_val_ps = _mm256_castsi256_ps(src1_val_i);
-        __m256 src2_val_ps = _mm256_castsi256_ps(src2_val_i);
+        m256i_t result = _mm256_max_ps_sim(src1_val, src2_val);
 
-        __m256 result_ps = _mm256_max_ps(src1_val_ps, src2_val_ps);
-
-        register_map_.setYmm(dest_operand.text, _mm256_castps_si256(result_ps));
+        register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VMAXPS: " + std::string(e.what());
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -1532,25 +1527,18 @@ void X86Simulator::handleVpandn(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
         
-        // Emulate VPANDN using AVX1/SSE instructions as the target CPU does not support AVX2.
-        // The operation is (NOT src1) AND src2.
-        // We do this in two 128-bit chunks.
+        m128i_t src1_low  = _mm256_extractf128_si256_sim(src1_val, 0);
+        m128i_t src1_high = _mm256_extractf128_si256_sim(src1_val, 1);
+        m128i_t src2_low  = _mm256_extractf128_si256_sim(src2_val, 0);
+        m128i_t src2_high = _mm256_extractf128_si256_sim(src2_val, 1);
 
-        // 1. Extract the lower and upper 128-bit lanes from the 256-bit registers.
-        __m128i src1_low  = _mm256_extractf128_si256(src1_val, 0);
-        __m128i src1_high = _mm256_extractf128_si256(src1_val, 1);
-        __m128i src2_low  = _mm256_extractf128_si256(src2_val, 0);
-        __m128i src2_high = _mm256_extractf128_si256(src2_val, 1);
+        m128i_t result_low  = _mm_andnot_si128_sim(src1_low, src2_low);
+        m128i_t result_high = _mm_andnot_si128_sim(src1_high, src2_high);
 
-        // 2. Perform the bitwise AND-NOT operation on each 128-bit lane.
-        __m128i result_low  = _mm_andnot_si128(src1_low, src2_low);
-        __m128i result_high = _mm_andnot_si128(src1_high, src2_high);
-
-        // 3. Combine the 128-bit results back into a 256-bit register.
-        __m256i result = _mm256_set_m128i(result_high, result_low);
+        m256i_t result = _mm256_set_m128i_sim(result_high, result_low);
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPANDN: " + std::string(e.what());
@@ -1576,20 +1564,18 @@ void X86Simulator::handleVpand(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        // Emulate VPAND using AVX1/SSE instructions as the target CPU does not support AVX2.
-        // The operation is src1 AND src2.
-        __m128i src1_low  = _mm256_extractf128_si256(src1_val, 0);
-        __m128i src1_high = _mm256_extractf128_si256(src1_val, 1);
-        __m128i src2_low  = _mm256_extractf128_si256(src2_val, 0);
-        __m128i src2_high = _mm256_extractf128_si256(src2_val, 1);
+        m128i_t src1_low  = _mm256_extractf128_si256_sim(src1_val, 0);
+        m128i_t src1_high = _mm256_extractf128_si256_sim(src1_val, 1);
+        m128i_t src2_low  = _mm256_extractf128_si256_sim(src2_val, 0);
+        m128i_t src2_high = _mm256_extractf128_si256_sim(src2_val, 1);
 
-        __m128i result_low  = _mm_and_si128(src1_low, src2_low);
-        __m128i result_high = _mm_and_si128(src1_high, src2_high);
+        m128i_t result_low  = _mm_and_si128_sim(src1_low, src2_low);
+        m128i_t result_high = _mm_and_si128_sim(src1_high, src2_high);
 
-        __m256i result = _mm256_set_m128i(result_high, result_low);
+        m256i_t result = _mm256_set_m128i_sim(result_high, result_low);
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPAND: " + std::string(e.what());
@@ -1615,20 +1601,18 @@ void X86Simulator::handleVpmullw(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        // Emulate VPMULLW using AVX1/SSE instructions as the target CPU does not support AVX2.
-        // The operation is a packed 16-bit multiply, keeping the low 16 bits of the result.
-        __m128i src1_low  = _mm256_extractf128_si256(src1_val, 0);
-        __m128i src1_high = _mm256_extractf128_si256(src1_val, 1);
-        __m128i src2_low  = _mm256_extractf128_si256(src2_val, 0);
-        __m128i src2_high = _mm256_extractf128_si256(src2_val, 1);
+        m128i_t src1_low  = _mm256_extractf128_si256_sim(src1_val, 0);
+        m128i_t src1_high = _mm256_extractf128_si256_sim(src1_val, 1);
+        m128i_t src2_low  = _mm256_extractf128_si256_sim(src2_val, 0);
+        m128i_t src2_high = _mm256_extractf128_si256_sim(src2_val, 1);
 
-        __m128i result_low  = _mm_mullo_epi16(src1_low, src2_low);
-        __m128i result_high = _mm_mullo_epi16(src1_high, src2_high);
+        m128i_t result_low  = _mm_mullo_epi16_sim(src1_low, src2_low);
+        m128i_t result_high = _mm_mullo_epi16_sim(src1_high, src2_high);
 
-        __m256i result = _mm256_set_m128i(result_high, result_low);
+        m256i_t result = _mm256_set_m128i_sim(result_high, result_low);
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPMULLW: " + std::string(e.what());
@@ -1654,15 +1638,12 @@ void X86Simulator::handleVminps(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val_i = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val_i = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        __m256 src1_val_ps = _mm256_castsi256_ps(src1_val_i);
-        __m256 src2_val_ps = _mm256_castsi256_ps(src2_val_i);
+        m256i_t result = _mm256_min_ps_sim(src1_val, src2_val);
 
-        __m256 result_ps = _mm256_min_ps(src1_val_ps, src2_val_ps);
-
-        register_map_.setYmm(dest_operand.text, _mm256_castps_si256(result_ps));
+        register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VMINPS: " + std::string(e.what());
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -1677,18 +1658,17 @@ void X86Simulator::handleVmovups(const DecodedInstruction& decoded_instr) {
 
     const DecodedOperand& dest_operand = decoded_instr.operands[0];
     const DecodedOperand& src_operand = decoded_instr.operands[1];
-    address_t data_segment_start = memory_.get_data_segment_start();
 
     if (dest_operand.type == OperandType::YMM_REGISTER && src_operand.type == OperandType::MEMORY) {
         // Load from memory
-        __m256i value = memory_.read_ymm(src_operand.value);
+        m256i_t value = memory_.read_ymm(src_operand.value);
         register_map_.setYmm(dest_operand.text, value);
     } else if (dest_operand.type == OperandType::MEMORY && src_operand.type == OperandType::YMM_REGISTER) {
         // Store to memory
-        __m256i value = register_map_.getYmm(src_operand.text);
+        m256i_t value = register_map_.getYmm(src_operand.text);
         memory_.write_ymm(dest_operand.value, value);
     } else if (dest_operand.type == OperandType::YMM_REGISTER && src_operand.type == OperandType::YMM_REGISTER) {
-        __m256i value = register_map_.getYmm(src_operand.text);
+        m256i_t value = register_map_.getYmm(src_operand.text);
         register_map_.setYmm(dest_operand.text, value);
     } else {
         log(session_id_, "Unsupported operand combination for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -1713,20 +1693,18 @@ void X86Simulator::handleVpxor(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        // Emulate VPXOR using AVX1/SSE instructions as the target CPU does not support AVX2.
-        // The operation is src1 XOR src2.
-        __m128i src1_low  = _mm256_extractf128_si256(src1_val, 0);
-        __m128i src1_high = _mm256_extractf128_si256(src1_val, 1);
-        __m128i src2_low  = _mm256_extractf128_si256(src2_val, 0);
-        __m128i src2_high = _mm256_extractf128_si256(src2_val, 1);
+        m128i_t src1_low  = _mm256_extractf128_si256_sim(src1_val, 0);
+        m128i_t src1_high = _mm256_extractf128_si256_sim(src1_val, 1);
+        m128i_t src2_low  = _mm256_extractf128_si256_sim(src2_val, 0);
+        m128i_t src2_high = _mm256_extractf128_si256_sim(src2_val, 1);
 
-        __m128i result_low  = _mm_xor_si128(src1_low, src2_low);
-        __m128i result_high = _mm_xor_si128(src1_high, src2_high);
+        m128i_t result_low  = _mm_xor_si128_sim(src1_low, src2_low);
+        m128i_t result_high = _mm_xor_si128_sim(src1_high, src2_high);
 
-        __m256i result = _mm256_set_m128i(result_high, result_low);
+        m256i_t result = _mm256_set_m128i_sim(result_high, result_low);
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPXOR: " + std::string(e.what());
@@ -1748,23 +1726,20 @@ void X86Simulator::handleVrcpps(const DecodedInstruction& decoded_instr) {
         return;
     }
 
-    __m256 src_ps;
+    m256i_t src_val;
 
     if (src_op.type == OperandType::YMM_REGISTER) {
-        __m256i src_val_i = register_map_.getYmm(src_op.text);
-        src_ps = _mm256_castsi256_ps(src_val_i);
+        src_val = register_map_.getYmm(src_op.text);
     } else if (src_op.type == OperandType::MEMORY) {
-        __m256i src_val_i = memory_.read_ymm(src_op.value);
-        src_ps = _mm256_castsi256_ps(src_val_i);
+        src_val = memory_.read_ymm(src_op.value);
     } else {
         log(session_id_, "Invalid source operand for VRCPPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
-    // Computes approximate reciprocals
-    __m256 result_ps = _mm256_rcp_ps(src_ps);
+    m256i_t result = _mm256_rcp_ps_sim(src_val);
 
-    register_map_.setYmm(dest_op.text, _mm256_castps_si256(result_ps));
+    register_map_.setYmm(dest_op.text, result);
 }
 
 void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
@@ -1781,28 +1756,20 @@ void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
         return;
     }
 
-    __m256 src_ps;
+    m256i_t src_val;
 
     if (src_op.type == OperandType::YMM_REGISTER) {
-        __m256i src_val_i = register_map_.getYmm(src_op.text);
-        src_ps = _mm256_castsi256_ps(src_val_i);
+        src_val = register_map_.getYmm(src_op.text);
     } else if (src_op.type == OperandType::MEMORY) {
-        __m256i src_val_i = memory_.read_ymm(src_op.value);
-        src_ps = _mm256_castsi256_ps(src_val_i);
+        src_val = memory_.read_ymm(src_op.value);
     } else {
         log(session_id_, "Invalid source operand for VSQRTPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
-    // Perform element-wise square root on the packed single-precision floats.
-    // This intrinsic handles special cases like sqrt(-ve) -> NaN, sqrt(-0) -> -0, etc.
-    // It uses the rounding mode specified in the MXCSR register.
-    __m256 result_ps = _mm256_sqrt_ps(src_ps);
+    m256i_t result = _mm256_sqrt_ps_sim(src_val);
 
-    // TODO: The simulator needs to manage the MXCSR register for rounding modes
-    // and handle floating-point exceptions (invalid operation, denormal, etc.).
-
-    register_map_.setYmm(dest_op.text, _mm256_castps_si256(result_ps));
+    register_map_.setYmm(dest_op.text, result);
 }
 
 void X86Simulator::handleVsubps(const DecodedInstruction& decoded_instr) {
@@ -1823,15 +1790,12 @@ void X86Simulator::handleVsubps(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val_i = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val_i = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        __m256 src1_val_ps = _mm256_castsi256_ps(src1_val_i);
-        __m256 src2_val_ps = _mm256_castsi256_ps(src2_val_i);
+        m256i_t result = _mm256_sub_ps_sim(src1_val, src2_val);
 
-        __m256 result_ps = _mm256_sub_ps(src1_val_ps, src2_val_ps);
-
-        register_map_.setYmm(dest_operand.text, _mm256_castps_si256(result_ps));
+        register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VSUBPS: " + std::string(e.what());
         log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
@@ -1856,20 +1820,18 @@ void X86Simulator::handleVpor(const DecodedInstruction& decoded_instr) {
     }
 
     try {
-        __m256i src1_val = register_map_.getYmm(src1_operand.text);
-        __m256i src2_val = register_map_.getYmm(src2_operand.text);
+        m256i_t src1_val = register_map_.getYmm(src1_operand.text);
+        m256i_t src2_val = register_map_.getYmm(src2_operand.text);
 
-        // Emulate VPOR using AVX1/SSE instructions as the target CPU does not support AVX2.
-        // The operation is src1 OR src2.
-        __m128i src1_low  = _mm256_extractf128_si256(src1_val, 0);
-        __m128i src1_high = _mm256_extractf128_si256(src1_val, 1);
-        __m128i src2_low  = _mm256_extractf128_si256(src2_val, 0);
-        __m128i src2_high = _mm256_extractf128_si256(src2_val, 1);
+        m128i_t src1_low  = _mm256_extractf128_si256_sim(src1_val, 0);
+        m128i_t src1_high = _mm256_extractf128_si256_sim(src1_val, 1);
+        m128i_t src2_low  = _mm256_extractf128_si256_sim(src2_val, 0);
+        m128i_t src2_high = _mm256_extractf128_si256_sim(src2_val, 1);
 
-        __m128i result_low  = _mm_or_si128(src1_low, src2_low);
-        __m128i result_high = _mm_or_si128(src1_high, src2_high);
+        m128i_t result_low  = _mm_or_si128_sim(src1_low, src2_low);
+        m128i_t result_high = _mm_or_si128_sim(src1_high, src2_high);
 
-        __m256i result = _mm256_set_m128i(result_high, result_low);
+        m256i_t result = _mm256_set_m128i_sim(result_high, result_low);
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPOR: " + std::string(e.what());

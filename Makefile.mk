@@ -11,6 +11,7 @@ INCLUDES = -I../libpqxx/include
 
 # Define library source files (all sources except main.cpp)
 LIB_SRCS = \
+	avx_core.cpp \
 	string_utils.cpp \
 	parser_utils.cpp \
 	memory.cpp \
@@ -45,7 +46,7 @@ all: $(TARGET)
 
 # Rule to link the executable
 $(TARGET): $(MAIN_OBJ) $(LIB_OBJS)
-	$(CXX) $(CXXFLAGS) -mavx -o $(TARGET) $(MAIN_OBJ) $(LIB_OBJS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(MAIN_OBJ) $(LIB_OBJS) $(LIBS)
 
 # --- Compilation Rules ---
 
@@ -53,30 +54,6 @@ $(TARGET): $(MAIN_OBJ) $(LIB_OBJS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
 
-# Special rules for files that need AVX2 extensions
-ui_manager.o: ui_manager.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-register_map.o: register_map.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-formatting_utils.o: formatting_utils.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-x86_simulator_private_helpers.o: x86_simulator_private_helpers.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-file_system_device.o: file_system_device.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-memory.o: memory.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-tests/formatting_utils_test.o: tests/formatting_utils_test.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
-
-tests/simulator_core_test.o: tests/simulator_core_test.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -mavx -c $< -o $@
 
 # --- Test Targets ---
 TEST_SRCS = \
@@ -105,7 +82,7 @@ test: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
 $(TEST_TARGET): $(LIB_OBJS) $(TEST_OBJS) $(TEST_MAIN_OBJ)
-	$(CXX) $(CXXFLAGS) -mavx -o $(TEST_TARGET) $(LIB_OBJS) $(TEST_OBJS) $(TEST_MAIN_OBJ) $(LIBS) $(GTEST_LIBS)
+	$(CXX) $(CXXFLAGS) -o $(TEST_TARGET) $(LIB_OBJS) $(TEST_OBJS) $(TEST_MAIN_OBJ) $(LIBS) $(GTEST_LIBS)
 
 # Target for cleaning up generated files
 .PHONY: clean
