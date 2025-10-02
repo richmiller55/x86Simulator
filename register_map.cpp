@@ -23,7 +23,7 @@ RegisterMap::RegisterMap()
 
   registers64_.resize(NUM_REG64, 0);
   // Initialize YMM registers to zero
-  registers_ymm_.resize(NUM_REG_YMM, _mm256_setzero_si256());
+  registers_ymm_.resize(NUM_REG_YMM, _mm256_setzero_si256_sim());
   RegSeg_.resize(NUM_REG_SEG, 0);
 }
 
@@ -67,14 +67,14 @@ const std::map<std::string, Reg32>& RegisterMap::getRegisterNameMap32() const {
   return register_name_map_32_;
 }
 
-__m256i RegisterMap::getYmm(const std::string& reg_name) const {
+m256i_t RegisterMap::getYmm(const std::string& reg_name) const {
   if (auto it = register_name_map_ymm_.find(reg_name); it != register_name_map_ymm_.end()) {
     return registers_ymm_[static_cast<size_t>(it->second)];
   }
   throw std::out_of_range("Invalid YMM register name: " + reg_name);
 }
 
-void RegisterMap::setYmm(const std::string& reg_name, __m256i value) {
+void RegisterMap::setYmm(const std::string& reg_name, m256i_t value) {
   if (auto it = register_name_map_ymm_.find(reg_name); it != register_name_map_ymm_.end()) {
     registers_ymm_[static_cast<size_t>(it->second)] = value;
     return;

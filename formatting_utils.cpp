@@ -5,7 +5,7 @@
 
 // Helper to format an array of integers into a string.
 template<typename T>
-std::string format_integer_array(const __m256i& value, DisplayBase display_base) {
+std::string format_integer_array(const m256i_t& value, DisplayBase display_base) {
     std::stringstream ss;
     const T* ptr = reinterpret_cast<const T*>(&value);
     size_t count = 256 / (sizeof(T) * 8);
@@ -45,7 +45,7 @@ std::string format_integer_array(const __m256i& value, DisplayBase display_base)
 
 
 std::string format_ymm_register(
-    __m256i value,
+    m256i_t value,
     YmmViewMode view_mode,
     DisplayBase display_base
 ) {

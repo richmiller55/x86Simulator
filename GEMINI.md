@@ -62,7 +62,7 @@ Variable Naming: Use snake_case for all variable names.
 Member Variables: Member variables will have a trailing underscore (e.g., decoder_).
 Filenames: Use snake_case.cpp for all source files.
 General Style: The code uses header guards and separates concerns into different classes for clarity. 
-Database Integration
+Database Integration:
 Connection String: The connection to the PostgreSQL database is configured via the DB_CONN_STR environment variable.
 Testing:
 Test Framework: The project uses gtest

@@ -240,7 +240,7 @@ bool X86Simulator::secondPass() {
         memory_.write_text(memory_.get_text_segment_start() + i, machine_code[i]);
     }
 
-    // memory_.set_text_segment_size(program_size_in_bytes_); // FIXME: Design changed, size is set at construction.
+    memory_.set_text_segment_size(program_size_in_bytes_);
 
     // Set the initial instruction pointer (RIP) to the address of the entry point label.
     auto it = symbolTable_.find(entryPointLabel_);

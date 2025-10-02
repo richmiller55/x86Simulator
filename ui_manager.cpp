@@ -196,7 +196,7 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
       }
       found = true;
     } else if (auto it_ymm = regs.getRegisterNameMapYmm().find(regName); it_ymm != regs.getRegisterNameMapYmm().end()) {
-        __m256i ymmValue = regs.getYmm(regName);
+        m256i_t ymmValue = regs.getYmm(regName);
         ss << format_ymm_register(ymmValue, current_ymm_view_mode, current_display_base);
         found = true;
     }  else if (auto it = map32.find(regName); it != map32.end()){

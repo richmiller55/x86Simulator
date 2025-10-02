@@ -129,14 +129,14 @@ void Memory::write_data_dword(address_t address, uint32_t value) {
 }
 
 // AVX2 read/write
-__m256i Memory::read_ymm(address_t address) const {
+m256i_t Memory::read_ymm(address_t address) const {
     check_bounds(address, 32); // 32 bytes for AVX2 YMM register
-    return _mm256_loadu_si256(reinterpret_cast<const __m256i*>(main_memory->data() + address));
+    return _mm256_loadu_si256_sim(main_memory->data() + address);
 }
 
-void Memory::write_ymm(address_t address, __m256i value) {
+void Memory::write_ymm(address_t address, m256i_t value) {
     check_bounds(address, 32); // 32 bytes for AVX2 YMM register
-    _mm256_storeu_si256(reinterpret_cast<__m256i*>(main_memory->data() + address), value);
+    _mm256_storeu_si256_sim(main_memory->data() + address, value);
 }
 
 // Generic 64-bit read/write using reinterpret_cast
@@ -174,10 +174,24 @@ uint64_t Memory::read_stack(address_t address) const {
 }
 
 void Memory::write_stack(address_t address, uint64_t value) {
-    if (address < stack_segment_start || address >= stack_segment_end) {
+    if (address < stack_segment_start || address + 8 > stack_segment_end) {
         throw std::out_of_range("Stack segment write out of bounds!");
     }
-    write64(address, value);
+    *reinterpret_cast<uint64_t*>(main_memory->data() + address) = value;
+}
+
+uint32_t Memory::read_stack_dword(address_t address) const {
+    if (address < stack_segment_start || address + 4 > stack_segment_end) {
+        throw std::out_of_range("Stack segment dword read out of bounds!");
+    }
+    return *reinterpret_cast<const uint32_t*>(main_memory->data() + address);
+}
+
+void Memory::write_stack_dword(address_t address, uint32_t value) {
+    if (address < stack_segment_start || address + 4 > stack_segment_end) {
+        throw std::out_of_range("Stack segment dword write out of bounds!");
+    }
+    *reinterpret_cast<uint32_t*>(main_memory->data() + address) = value;
 }
 
 // Reset function that returns to a default state
@@ -205,4 +219,8 @@ void Memory::reset() {
 // Getter for total memory size
 size_t Memory::get_total_memory_size() const {
     return total_memory_size;
+}
+
+void Memory::set_text_segment_size(size_t size) {
+    text_segment_size = size;
 }
