@@ -79,5 +79,31 @@ tests/simulator_core_test.cpp
 tests/system_bus_test.cpp
 tests/test_main.cpp
 Errors:
-/home/rmiller/src/cpp/simulators/x86/error.log
+Target directory: `/home/rmiller/src/cpp/simulators/x86/`
 
+## Future Work: Multi-ISA Support
+
+This section outlines a design for a multi-ISA (Instruction Set Architecture) simulator. The core idea is to create a generalized simulation engine by abstracting away the specifics of any single architecture like x86, ARM, or RISC-V. This is achieved through a powerful Intermediate Representation (IR) and a modular design.
+
+### Summary of Design Goals
+
+The simulator should be refactored to support multiple architectures by creating a generic core that operates on an abstract instruction set. This involves creating "front-end" parsers for each specific ISA (like x86, ARM) that translate assembly code into a universal, architecture-agnostic format (the IR). The main simulator engine will then execute these abstract instructions, managing a generalized model of registers and memory.
+
+### Specific TODO List
+
+1.  **Intermediate Representation (IR) Development:**
+    *   Design a canonical set of operations for the IR (e.g., `Move`, `Add`, `Load`, `Store`) that can represent instructions from various ISAs.
+    *   Define a flexible structure within the IR to represent diverse operand types and complex addressing modes (e.g., x86's `base + index*scale + displacement`).
+    *   Abstract control flow instructions in the IR, creating a generic `Branch` operation with properties for the target address and condition codes.
+    *   Create a generic representation for system calls (e.g., `Syscall`) that can be mapped to specific ISA implementations like `syscall` (x86) or `ecall` (RISC-V).
+
+2.  **Abstraction Layer Implementation:**
+    *   Abstract the register file. Instead of using specific names like `RAX` or `R0`, use generalized identifiers (e.g., `GPR[0]`, `StackPointer`).
+    *   Implement a configurable memory model that can handle different endianness (big vs. little) based on the target architecture.
+    *   Develop a mapping system to translate ISA-specific registers and system call mechanisms to and from the abstract IR.
+
+3.  **Modular Architecture Refactoring:**
+    *   Create distinct "front-end" parsers for each target ISA (e.g., one for x86, another for ARM) responsible for translating assembly into the IR.
+    *   Refactor the core simulator engine to operate exclusively on the abstract IR, removing any direct dependencies on x86-specific logic.
+    *   Implement "back-end" modules that can translate the simulator's state (from the IR) back into an architecture-specific view for debugging and output.
+    *   Add a configuration system that allows the user to specify the target architecture (ISA, endianness, etc.) at startup.
