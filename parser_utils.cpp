@@ -150,3 +150,65 @@ std::vector<std::string> parse_line(const std::string& line) {
     return tokens;
 }
 
+// Helper to check if a string is a numeric literal
+bool is_number(const std::string& s) {
+    std::string::const_iterator it = s.begin();
+    while (it != s.end() && std::isdigit(*it)) ++it;
+    return !s.empty() && it == s.end();
+}
+
+// Calculates the size of a data directive in bytes
+size_t calculate_data_size(const std::vector<std::string>& tokens) {
+    if (tokens.empty()) {
+        return 0;
+    }
+
+    std::string directive = tokens[0];
+    size_t size = 0;
+
+    if (directive == "db" || directive == ".byte") {
+        size = 1;
+    } else if (directive == "dw" || directive == ".word") {
+        size = 2;
+    } else if (directive == "dd" || directive == ".long") {
+        size = 4;
+    } else if (directive == "dq" || directive == ".quad") {
+        size = 8;
+    } else {
+        return 0; // Unknown directive
+    }
+
+    // A single directive can have multiple comma-separated values
+    // e.g., dq 1, 2, 3
+    size_t num_operands = tokens.size() - 1;
+    return size * num_operands;
+}
+
+// Calculates the size of a BSS directive
+size_t calculate_bss_size(const std::vector<std::string>& tokens) {
+    if (tokens.empty()) {
+        return 0;
+    }
+    
+    std::string directive = tokens[0];
+
+    if (directive == "resb") {
+        if (tokens.size() > 1 && is_number(tokens[1])) {
+            return std::stoul(tokens[1]);
+        }
+    } else if (directive == "resw") {
+        if (tokens.size() > 1 && is_number(tokens[1])) {
+            return 2 * std::stoul(tokens[1]);
+        }
+    } else if (directive == "resd") {
+        if (tokens.size() > 1 && is_number(tokens[1])) {
+            return 4 * std::stoul(tokens[1]);
+        }
+    } else if (directive == "resq") {
+        if (tokens.size() > 1 && is_number(tokens[1])) {
+            return 8 * std::stoul(tokens[1]);
+        }
+    }
+
+    return 0; // Unknown directive or invalid operand
+}

@@ -165,6 +165,21 @@ uint32_t Memory::read_dword(address_t address) const {
     return *reinterpret_cast<const uint32_t*>(main_memory->data() + address);
 }
 
+void Memory::write_dword(address_t address, uint32_t value) {
+    check_bounds(address, 4);
+    *reinterpret_cast<uint32_t*>(main_memory->data() + address) = value;
+}
+
+uint16_t Memory::read_word(address_t address) const {
+    check_bounds(address, 2);
+    return *reinterpret_cast<const uint16_t*>(main_memory->data() + address);
+}
+
+void Memory::write_word(address_t address, uint16_t value) {
+    check_bounds(address, 2);
+    *reinterpret_cast<uint16_t*>(main_memory->data() + address) = value;
+}
+
 // Stack accessors
 uint64_t Memory::read_stack(address_t address) const {
     if (address < stack_segment_start || address >= stack_segment_end) {

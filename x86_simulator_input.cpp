@@ -1,12 +1,12 @@
 #include "x86_simulator.h"
 #include "ui_manager.h"
-#include "ui_manager.h"
 #include "decoder.h" // For DecodedOperand and helper types if any
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
 #include <algorithm> // For std::remove_if, std::isspace
 #include "CodeGenerator.h"
+#include "parser_utils.h"
 
 #include <stdexcept>
 #include <string>
@@ -98,7 +98,7 @@ bool X86Simulator::firstPass() {
                 } else if (section_name == ".bss") {
                     current_lc = &bss_lc;
                 } else {
-                    log(session_id_, "Unknown section directive: " + section_name, "ERROR", 0, __FILE__, __LINE__);
+                    db_manager_.log(session_id_, "Unknown section directive: " + section_name, "ERROR", 0, __FILE__, __LINE__);
                     return false;
                 }
             }
@@ -141,7 +141,7 @@ bool X86Simulator::firstPass() {
                             // Handle numeric value (decimal or hex)
                             val_to_write = static_cast<uint8_t>(std::stoul(val_str, nullptr, 0));
                         } catch (const std::exception& e) {
-                            log(session_id_, "Invalid value for 'db' directive: " + val_str, "ERROR", 0, __FILE__, __LINE__);
+                            db_manager_.log(session_id_, "Invalid value for 'db' directive: " + val_str, "ERROR", 0, __FILE__, __LINE__);
                             continue; // Skip invalid values
                         }
                     }
@@ -172,7 +172,7 @@ bool X86Simulator::firstPass() {
                             val_to_write = static_cast<uint32_t>(std::stoll(val_str, nullptr, 0));
                         }
                     } catch (const std::exception& e) {
-                        log(session_id_, "Invalid value for 'dd' directive: " + val_str, "ERROR", 0, __FILE__, __LINE__);
+                        db_manager_.log(session_id_, "Invalid value for 'dd' directive: " + val_str, "ERROR", 0, __FILE__, __LINE__);
                         continue;
                     }
 
@@ -247,7 +247,7 @@ bool X86Simulator::secondPass() {
     if (it != symbolTable_.end()) {
         register_map_.set64("rip", it->second);
     } else {
-        log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
         // Fallback to the start of the text segment if the label is not found
         register_map_.set64("rip", memory_.get_text_segment_start());
     }
@@ -268,9 +268,4 @@ std::string X86Simulator::trim(const std::string& str) {
   }
   size_t last = str.find_last_not_of(" \t\n\r");
   return str.substr(first, (last - first + 1));
-}
-void X86Simulator::waitForInput() {
-  if (ui_) {
-    ui_->waitForInput();
-  }
 }

@@ -2,29 +2,36 @@
 #include <stdexcept> // For std::out_of_range
 
 RegisterMap::RegisterMap()
-  : register_name_map_64_({{"rax", RAX}, {"rbx", RBX}, {"rcx", RCX}, {"rdx", RDX},
-                           {"rsi", RSI}, {"rdi", RDI}, {"rbp", RBP}, {"rsp", RSP},
-                           {"r8", R8}, {"r9", R9}, {"r10", R10}, {"r11", R11},
-                           {"r12", R12}, {"r13", R13}, {"r14", R14}, {"r15", R15},
-                           {"rip", RIP}, {"rflags", RFLAGS}}),
-    register_name_map_32_({{"eax", EAX}, {"ebx", EBX}, {"ecx", ECX}, {"edx", EDX},
-                           {"esi", ESI}, {"edi", EDI}, {"ebp", EBP}, {"esp", ESP},
-                           {"eflags", EFLAGS}}),
-    registers64_(),
-    registers_ymm_(),
-    RegSeg_()
+  : register_name_map_64_({
+        {"rax", RAX}, {"rbx", RBX}, {"rcx", RCX}, {"rdx", RDX},
+        {"rsi", RSI}, {"rdi", RDI}, {"rbp", RBP}, {"rsp", RSP},
+        {"r8", R8}, {"r9", R9}, {"r10", R10}, {"r11", R11},
+        {"r12", R12}, {"r13", R13}, {"r14", R14}, {"r15", R15},
+        {"rip", RIP}, {"rflags", RFLAGS}
+    }),
+    register_name_map_32_({
+        {"eax", EAX}, {"ebx", EBX}, {"ecx", ECX}, {"edx", EDX},
+        {"esi", ESI}, {"edi", EDI}, {"ebp", EBP}, {"esp", ESP},
+        {"eflags", EFLAGS}
+    }),
+    register_name_map_16_({
+        {"ax", RAX}, {"bx", RBX}, {"cx", RCX}, {"dx", RDX},
+        {"si", RSI}, {"di", RDI}, {"bp", RBP}, {"sp", RSP}
+    }),
+    register_name_map_8_({
+        {"al", RAX}, {"bl", RBX}, {"cl", RCX}, {"dl", RDX}
+    }),
+    register_name_map_ymm_({
+        {"ymm0", YMM0}, {"ymm1", YMM1}, {"ymm2", YMM2}, {"ymm3", YMM3},
+        {"ymm4", YMM4}, {"ymm5", YMM5}, {"ymm6", YMM6}, {"ymm7", YMM7},
+        {"ymm8", YMM8}, {"ymm9", YMM9}, {"ymm10", YMM10}, {"ymm11", YMM11},
+        {"ymm12", YMM12}, {"ymm13", YMM13}, {"ymm14", YMM14}, {"ymm15", YMM15}
+    }),
+    registers64_(NUM_REG64, 0),
+    registers_ymm_(NUM_REG_YMM, _mm256_setzero_si256_sim()),
+    RegSeg_(NUM_REG_SEG, 0)
 {
-  register_name_map_ymm_ = {
-    {"ymm0", YMM0}, {"ymm1", YMM1}, {"ymm2", YMM2}, {"ymm3", YMM3},
-    {"ymm4", YMM4}, {"ymm5", YMM5}, {"ymm6", YMM6}, {"ymm7", YMM7},
-    {"ymm8", YMM8}, {"ymm9", YMM9}, {"ymm10", YMM10}, {"ymm11", YMM11},
-    {"ymm12", YMM12}, {"ymm13", YMM13}, {"ymm14", YMM14}, {"ymm15", YMM15}
-  };
-
-  registers64_.resize(NUM_REG64, 0);
-  // Initialize YMM registers to zero
-  registers_ymm_.resize(NUM_REG_YMM, _mm256_setzero_si256_sim());
-  RegSeg_.resize(NUM_REG_SEG, 0);
+  // All initialization is now done in the member initializer list.
 }
 
 uint64_t RegisterMap::get64(const std::string& reg_name) const {
@@ -44,7 +51,6 @@ void RegisterMap::set64(const std::string& reg_name, uint64_t value) {
 
 uint64_t RegisterMap::get32(const std::string& reg_name) const {
   if (auto it = register_name_map_32_.find(reg_name); it != register_name_map_32_.end()) {
-    // EAX, EBX, etc. correspond to RAX, RBX in the enum values.
     return static_cast<uint32_t>(registers64_[static_cast<size_t>(it->second)]);
   }
   throw std::out_of_range("Invalid 32-bit register name: " + reg_name);
@@ -52,11 +58,40 @@ uint64_t RegisterMap::get32(const std::string& reg_name) const {
 
 void RegisterMap::set32(const std::string& reg_name, uint64_t value) {
   if (auto it = register_name_map_32_.find(reg_name); it != register_name_map_32_.end()) {
-    // Writing to a 32-bit register zeros the upper 32 bits of the corresponding 64-bit register.
     registers64_[static_cast<size_t>(it->second)] = static_cast<uint32_t>(value);
     return;
   }
   throw std::out_of_range("Invalid 32-bit register name: " + reg_name);
+}
+
+uint16_t RegisterMap::get16(const std::string& reg_name) const {
+    if (auto it = register_name_map_16_.find(reg_name); it != register_name_map_16_.end()) {
+        return static_cast<uint16_t>(registers64_[static_cast<size_t>(it->second)]);
+    }
+    throw std::out_of_range("Invalid 16-bit register name: " + reg_name);
+}
+
+void RegisterMap::set16(const std::string& reg_name, uint16_t value) {
+    if (auto it = register_name_map_16_.find(reg_name); it != register_name_map_16_.end()) {
+        registers64_[static_cast<size_t>(it->second)] = (registers64_[static_cast<size_t>(it->second)] & 0xFFFFFFFFFFFF0000) | value;
+        return;
+    }
+    throw std::out_of_range("Invalid 16-bit register name: " + reg_name);
+}
+
+uint8_t RegisterMap::get8(const std::string& reg_name) const {
+    if (auto it = register_name_map_8_.find(reg_name); it != register_name_map_8_.end()) {
+        return static_cast<uint8_t>(registers64_[static_cast<size_t>(it->second)]);
+    }
+    throw std::out_of_range("Invalid 8-bit register name: " + reg_name);
+}
+
+void RegisterMap::set8(const std::string& reg_name, uint8_t value) {
+    if (auto it = register_name_map_8_.find(reg_name); it != register_name_map_8_.end()) {
+        registers64_[static_cast<size_t>(it->second)] = (registers64_[static_cast<size_t>(it->second)] & 0xFFFFFFFFFFFFFF00) | value;
+        return;
+    }
+    throw std::out_of_range("Invalid 8-bit register name: " + reg_name);
 }
 
 const std::map<std::string, Reg64>& RegisterMap::getRegisterNameMap64() const {
@@ -84,19 +119,4 @@ void RegisterMap::setYmm(const std::string& reg_name, m256i_t value) {
 
 const std::map<std::string, RegYMM>& RegisterMap::getRegisterNameMapYmm() const {
     return register_name_map_ymm_;
-}
-
-uint8_t RegisterMap::get8(const std::string& reg_name) const {
-    if (reg_name == "al") {
-        return static_cast<uint8_t>(registers64_[RAX]);
-    }
-    throw std::out_of_range("Invalid 8-bit register name: " + reg_name);
-}
-
-void RegisterMap::set8(const std::string& reg_name, uint8_t value) {
-    if (reg_name == "al") {
-        registers64_[RAX] = (registers64_[RAX] & 0xFFFFFFFFFFFFFF00) | value;
-        return;
-    }
-    throw std::out_of_range("Invalid 8-bit register name: " + reg_name);
 }

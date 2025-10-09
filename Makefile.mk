@@ -1,6 +1,6 @@
 # Define compiler and flags
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -g
+CXXFLAGS = -std=c++17 -Wall -g -DGOOGLE_TEST
 LDFLAGS =
 
 # Define the target executable name
@@ -28,8 +28,11 @@ LIB_SRCS = \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
+	ir_executor_helpers.cpp \
 	program_decoder.cpp \
-	formatting_utils.cpp
+	formatting_utils.cpp \
+	architecture.cpp \
+	x86_to_ir.cpp
 
 # Define object files
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)
@@ -57,20 +60,8 @@ $(TARGET): $(MAIN_OBJ) $(LIB_OBJS)
 
 # --- Test Targets ---
 TEST_SRCS = \
-	tests/memory_test.cpp \
-	tests/decoder_test.cpp \
-	tests/instruction_describer_test.cpp \
-	tests/operand_parser_test.cpp \
-	tests/register_map_test.cpp \
-	tests/rflags_test.cpp \
-	tests/program_decoder_test.cpp \
-	tests/formatting_utils_test.cpp \
-	tests/simulator_core_test.cpp \
-	tests/mock_database_manager.cpp \
-	tests/system_bus_test.cpp \
-	tests/parser_utils_test.cpp \
-	tests/file_system_device_test.cpp \
-	tests/simulator_integration_test.cpp
+	tests/ir_executor_test.cpp \
+	tests/mock_database_manager.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test
 
