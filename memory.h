@@ -45,6 +45,9 @@ public:
   uint64_t read_qword(address_t address) const;
   void write_qword(address_t address, uint64_t value);
   uint32_t read_dword(address_t address) const;
+  void write_dword(address_t address, uint32_t value);
+  uint16_t read_word(address_t address) const;
+  void write_word(address_t address, uint16_t value);
 
   // Management functions
   void reset();

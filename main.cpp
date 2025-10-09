@@ -11,6 +11,7 @@ int main() {
         return 1;
     }
     DatabaseManager dbManager(conn_str_env);
+    std::cout << "dbManager address in main: " << &dbManager << std::endl;
     SystemBus system_bus(dbManager);
     system_bus.load_configuration("system_bus.json");
     system_bus.run();

@@ -7,7 +7,7 @@
 void X86Simulator::handleMov(const DecodedInstruction& decoded_instr) {
     // We expect exactly two operands for a MOV instruction
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for MOV", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for MOV", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -16,8 +16,15 @@ void X86Simulator::handleMov(const DecodedInstruction& decoded_instr) {
 
     uint64_t sourceValue = 0;
     if (src_operand.type == OperandType::REGISTER) {
-        // If the source is a register, get its value
-        sourceValue = getRegister(src_operand.text);
+        const auto& reg_name = src_operand.text;
+        if (register_map_.getRegisterNameMap64().count(reg_name)) {
+            sourceValue = register_map_.get64(reg_name);
+        } else if (register_map_.getRegisterNameMap32().count(reg_name)) {
+            sourceValue = register_map_.get32(reg_name);
+        } else {
+            db_manager_.log(session_id_, "Unknown register in MOV: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            return;
+        }
     } else if (src_operand.type == OperandType::MEMORY) {
         // If the source is a memory location, read the value from memory.
         // Assuming a 32-bit read for now.
@@ -35,7 +42,7 @@ void X86Simulator::handleMov(const DecodedInstruction& decoded_instr) {
         register_map_.set32(dest_operand.text, sourceValue);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid destination operand in MOV: " + dest_operand.text;
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
@@ -43,7 +50,7 @@ void X86Simulator::handleMov(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleAdd(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for ADD", "ERROR",
+        db_manager_.log(session_id_, "Invalid number of operands for ADD", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -52,7 +59,7 @@ void X86Simulator::handleAdd(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || src_operand.type != OperandType::REGISTER) {
-        log(session_id_, "ADD instruction requires register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "ADD instruction requires register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -85,13 +92,13 @@ void X86Simulator::handleAdd(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in ADD: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for SUB", "ERROR",
+        db_manager_.log(session_id_, "Invalid number of operands for SUB", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -105,7 +112,7 @@ void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
         destValue = register_map_.get32(dest_operand.text);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid destination operand in SUB: " + dest_operand.text;
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -144,13 +151,13 @@ void X86Simulator::handleSub(const DecodedInstruction& decoded_instr) {
         register_map_.set32(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid destination operand in SUB: " + dest_operand.text;
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "PUSH instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "PUSH instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -167,14 +174,14 @@ void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
             operand_size = 4;
             src_value = register_map_.get32(reg_name);
         } else {
-            log(session_id_, "Unsupported register size for PUSH: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Unsupported register size for PUSH: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
             return;
         }
     } else if (src_operand.type == OperandType::IMMEDIATE) {
         operand_size = 8; // Assume 64-bit push for immediates
         src_value = src_operand.value;
     } else {
-        log(session_id_, "PUSH only supports register or immediate operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "PUSH only supports register or immediate operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -183,7 +190,7 @@ void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
     register_map_.set64("rsp", rsp);
 
     if (rsp < memory_.get_stack_segment_start()) {
-        log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -197,13 +204,13 @@ void X86Simulator::handlePush(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "POP instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "POP instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     const DecodedOperand& dest_operand = decoded_instr.operands[0];
     if (dest_operand.type != OperandType::REGISTER) {
-        log(session_id_, "POP only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "POP only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -215,14 +222,14 @@ void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
     } else if (register_map_.getRegisterNameMap32().count(reg_name)) {
         operand_size = 4;
     } else {
-        log(session_id_, "Unsupported register size for POP: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Unsupported register size for POP: " + reg_name, "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     uint64_t rsp = register_map_.get64("rsp");
 
     if (rsp + operand_size > memory_.get_stack_bottom()) {
-        log(session_id_, "Stack underflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Stack underflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -239,7 +246,7 @@ void X86Simulator::handlePop(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJmp(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JMP instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JMP instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -254,19 +261,19 @@ void X86Simulator::handleJmp(const DecodedInstruction& decoded_instr) {
         register_map_.set64("rip", targetAddress);
     } else {
         std::string logMessage = "JMP target must be a valid label or address. Label '" + targetLabel + "' not found.";
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleCall(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "CALL instruction requires a target.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "CALL instruction requires a target.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     const DecodedOperand& target_operand = decoded_instr.operands[0];
     if (target_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "CALL target must be a valid label or address.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "CALL target must be a valid label or address.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -279,7 +286,7 @@ void X86Simulator::handleCall(const DecodedInstruction& decoded_instr) {
     register_map_.set64("rsp", rsp);
 
     if (rsp < memory_.get_stack_segment_start()) {
-        log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Stack overflow!", "ERROR", instructionPointer_, __FILE__, __LINE__);
         register_map_.set64("rsp", rsp + 8); // Attempt to recover stack pointer
         return;
     }
@@ -294,7 +301,7 @@ void X86Simulator::handleCall(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJne(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JNE instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JNE instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -311,7 +318,7 @@ void X86Simulator::handleJne(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJe(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JE instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JE instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -328,7 +335,7 @@ void X86Simulator::handleJe(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJl(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JL instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JL instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -345,7 +352,7 @@ void X86Simulator::handleJl(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJb(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JB instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JB instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -362,7 +369,7 @@ void X86Simulator::handleJb(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJae(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JAE instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JAE instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -379,7 +386,7 @@ void X86Simulator::handleJae(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJbe(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JBE instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JBE instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -396,7 +403,7 @@ void X86Simulator::handleJbe(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJs(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JS instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JS instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -413,7 +420,7 @@ void X86Simulator::handleJs(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJns(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JNS instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JNS instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -430,7 +437,7 @@ void X86Simulator::handleJns(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJo(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JO instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JO instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -447,7 +454,7 @@ void X86Simulator::handleJo(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJno(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JNO instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JNO instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -464,7 +471,7 @@ void X86Simulator::handleJno(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJge(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JGE instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JGE instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -481,7 +488,7 @@ void X86Simulator::handleJge(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJle(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JLE instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JLE instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -498,7 +505,7 @@ void X86Simulator::handleJle(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJg(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JG instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JG instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -515,7 +522,7 @@ void X86Simulator::handleJg(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleJa(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "JA instruction requires a target.", "ERROR",
+        db_manager_.log(session_id_, "JA instruction requires a target.", "ERROR",
 	    instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -532,7 +539,7 @@ void X86Simulator::handleJa(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleInc(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "INC instruction requires an operand.", "ERROR",
+        db_manager_.log(session_id_, "INC instruction requires an operand.", "ERROR",
             instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -553,16 +560,16 @@ void X86Simulator::handleInc(const DecodedInstruction& decoded_instr) {
             // AF and PF are not implemented yet.
         } catch (const std::out_of_range& e) {
             std::string logMessage = "Invalid register in INC: " + operand.text;
-            log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
         }
     } else {
-        log(session_id_, "INC only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "INC only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for CMP.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for CMP.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
     
@@ -574,7 +581,7 @@ void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
         val1 = register_map_.get32(operand1.text);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid destination operand in CMP: " + operand1.text;
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -584,7 +591,7 @@ void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
             val2 = register_map_.get32(operand2.text);
         } catch (const std::out_of_range& e) {
             std::string logMessage = "Invalid source operand in CMP: " + operand2.text;
-            log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
             return;
         }
     } else { // Assuming immediate
@@ -610,7 +617,7 @@ void X86Simulator::handleCmp(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleInt(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty() || decoded_instr.operands[0].type != OperandType::IMMEDIATE) {
-        log(session_id_, "INT instruction requires an immediate operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "INT instruction requires an immediate operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -621,20 +628,20 @@ void X86Simulator::handleInt(const DecodedInstruction& decoded_instr) {
         if (syscall_num == 1) { // sys_exit
             uint32_t exit_code = register_map_.get32("ebx");
             std::string logMessage = "Program exited with code: " + std::to_string(exit_code);
-            log(session_id_, logMessage, "INFO", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, logMessage, "INFO", instructionPointer_, __FILE__, __LINE__);
             
             // Here you would set a flag to stop the main simulation loop.
             // For now, we'll just log it. The loop will stop on the next iteration
             // because we will advance RIP past the end of the program.
         } else {
-            log(session_id_, "Unsupported syscall: " + std::to_string(syscall_num), "WARNING", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Unsupported syscall: " + std::to_string(syscall_num), "WARNING", instructionPointer_, __FILE__, __LINE__);
         }
     }
 }
 
 void X86Simulator::handleMul(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "MUL instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "MUL instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -645,11 +652,11 @@ void X86Simulator::handleMul(const DecodedInstruction& decoded_instr) {
         try {
             src_val = register_map_.get32(src_operand.text);
         } catch (const std::out_of_range& e) {
-            log(session_id_, "Invalid register in MUL: " + src_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Invalid register in MUL: " + src_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
             return;
         }
     } else {
-        log(session_id_, "MUL only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "MUL only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -666,7 +673,7 @@ void X86Simulator::handleMul(const DecodedInstruction& decoded_instr) {
 void X86Simulator::handleImul(const DecodedInstruction& decoded_instr) {
     // This handles the one-operand form: IMUL r/m32
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "IMUL (one-operand) requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IMUL (one-operand) requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -677,11 +684,11 @@ void X86Simulator::handleImul(const DecodedInstruction& decoded_instr) {
         try {
             src_val = register_map_.get32(src_operand.text);
         } catch (const std::out_of_range& e) {
-            log(session_id_, "Invalid register in IMUL: " + src_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Invalid register in IMUL: " + src_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
             return;
         }
     } else {
-        log(session_id_, "IMUL only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IMUL only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -711,7 +718,7 @@ void X86Simulator::handleImul(const DecodedInstruction& decoded_instr) {
 void X86Simulator::handleIdiv(const DecodedInstruction& decoded_instr) {
     // This handles the one-operand form: IDIV r/m32
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "IDIV (one-operand) requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IDIV (one-operand) requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -722,16 +729,16 @@ void X86Simulator::handleIdiv(const DecodedInstruction& decoded_instr) {
         try {
             divisor = register_map_.get32(divisor_operand.text);
         } catch (const std::out_of_range& e) {
-            log(session_id_, "Invalid register in IDIV: " + divisor_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Invalid register in IDIV: " + divisor_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
             return;
         }
     } else {
-        log(session_id_, "IDIV only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IDIV only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     if (divisor == 0) {
-        log(session_id_, "Divide error: Division by zero.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Divide error: Division by zero.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         // In a real CPU, this would trigger a #DE exception.
         return;
     }
@@ -743,7 +750,7 @@ void X86Simulator::handleIdiv(const DecodedInstruction& decoded_instr) {
 
     // Check for overflow. The quotient must fit within a 32-bit signed integer.
     if (quotient_64 > std::numeric_limits<int32_t>::max() || quotient_64 < std::numeric_limits<int32_t>::min()) {
-        log(session_id_, "Divide error: Quotient overflows EAX.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Divide error: Quotient overflows EAX.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         // This also triggers a #DE exception.
         return;
     }
@@ -757,7 +764,7 @@ void X86Simulator::handleIdiv(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleDec(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.empty()) {
-        log(session_id_, "DEC instruction requires an operand.", "ERROR",
+        db_manager_.log(session_id_, "DEC instruction requires an operand.", "ERROR",
             instructionPointer_, __FILE__, __LINE__);
         return;
     }
@@ -776,16 +783,16 @@ void X86Simulator::handleDec(const DecodedInstruction& decoded_instr) {
             // Overflow for dec occurs when decrementing the min negative signed value (0x80000000)
             set_OF(value == 0x80000000);
         } catch (const std::out_of_range& e) {
-            log(session_id_, "Invalid register in DEC: " + operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Invalid register in DEC: " + operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
         }
     } else {
-        log(session_id_, "DEC only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "DEC only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleDiv(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "DIV instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "DIV instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -796,16 +803,16 @@ void X86Simulator::handleDiv(const DecodedInstruction& decoded_instr) {
         try {
             divisor = register_map_.get32(divisor_operand.text);
         } catch (const std::out_of_range& e) {
-            log(session_id_, "Invalid register in DIV: " + divisor_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, "Invalid register in DIV: " + divisor_operand.text, "ERROR", instructionPointer_, __FILE__, __LINE__);
             return;
         }
     } else {
-        log(session_id_, "DIV only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "DIV only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     if (divisor == 0) {
-        log(session_id_, "Divide error: Division by zero.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Divide error: Division by zero.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         // In a real CPU, this would trigger a #DE exception. We'll halt execution.
         // You could set a halt flag here, e.g., isRunning_ = false;
         return;
@@ -814,7 +821,7 @@ void X86Simulator::handleDiv(const DecodedInstruction& decoded_instr) {
     uint64_t dividend = (static_cast<uint64_t>(register_map_.get32("edx")) << 32) | register_map_.get32("eax");
 
     if (dividend / divisor > 0xFFFFFFFF) {
-        log(session_id_, "Divide error: Quotient overflows EAX.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Divide error: Quotient overflows EAX.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         // This also triggers a #DE exception.
         return;
     }
@@ -825,7 +832,7 @@ void X86Simulator::handleDiv(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleAnd(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for AND", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for AND", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -833,7 +840,7 @@ void X86Simulator::handleAnd(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER) {
-        log(session_id_, "AND destination must be a register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "AND destination must be a register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -857,13 +864,13 @@ void X86Simulator::handleAnd(const DecodedInstruction& decoded_instr) {
         set_SF((result & 0x80000000) != 0);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in AND: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleOr(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for OR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for OR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -871,7 +878,7 @@ void X86Simulator::handleOr(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER) {
-        log(session_id_, "OR destination must be a register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "OR destination must be a register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -895,13 +902,13 @@ void X86Simulator::handleOr(const DecodedInstruction& decoded_instr) {
         set_SF((result & 0x80000000) != 0);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in OR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleXor(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for XOR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for XOR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -909,7 +916,7 @@ void X86Simulator::handleXor(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER) {
-        log(session_id_, "XOR destination must be a register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "XOR destination must be a register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -933,20 +940,20 @@ void X86Simulator::handleXor(const DecodedInstruction& decoded_instr) {
         set_SF((result & 0x80000000) != 0);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in XOR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleNot(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 1) {
-        log(session_id_, "NOT instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "NOT instruction requires one operand.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     const DecodedOperand& operand = decoded_instr.operands[0];
 
     if (operand.type != OperandType::REGISTER) {
-        log(session_id_, "NOT only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "NOT only supports register operands currently.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -959,13 +966,13 @@ void X86Simulator::handleNot(const DecodedInstruction& decoded_instr) {
         // The NOT instruction does not affect any flags.
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in NOT: " + operand.text;
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleShl(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for SHL", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for SHL", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -973,7 +980,7 @@ void X86Simulator::handleShl(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& count_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "SHL currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "SHL currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1003,13 +1010,13 @@ void X86Simulator::handleShl(const DecodedInstruction& decoded_instr) {
         set_SF((result & 0x80000000) != 0);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in SHL: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleShr(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for SHR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for SHR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1017,7 +1024,7 @@ void X86Simulator::handleShr(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& count_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "SHR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "SHR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1047,13 +1054,13 @@ void X86Simulator::handleShr(const DecodedInstruction& decoded_instr) {
         set_SF((result & 0x80000000) != 0); // SHR clears the MSB, so SF will be 0.
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in SHR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleSar(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for SAR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for SAR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1061,7 +1068,7 @@ void X86Simulator::handleSar(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& count_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "SAR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "SAR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1091,13 +1098,13 @@ void X86Simulator::handleSar(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in SAR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleRol(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for ROL", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for ROL", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1105,7 +1112,7 @@ void X86Simulator::handleRol(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& count_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "ROL currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "ROL currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1135,13 +1142,13 @@ void X86Simulator::handleRol(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in ROL: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleRor(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for ROR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for ROR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1149,7 +1156,7 @@ void X86Simulator::handleRor(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& count_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || count_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "ROR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "ROR currently supports register, immediate operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1180,13 +1187,13 @@ void X86Simulator::handleRor(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in ROR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleLea(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for LEA", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for LEA", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1194,7 +1201,7 @@ void X86Simulator::handleLea(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || src_operand.type != OperandType::MEMORY) {
-        log(session_id_, "LEA requires a register destination and memory source.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "LEA requires a register destination and memory source.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1213,16 +1220,16 @@ void X86Simulator::handleLea(const DecodedInstruction& decoded_instr) {
 
         } catch (const std::out_of_range& e) {
             std::string logMessage = "Invalid register in LEA memory operand: " + reg_name;
-            log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+            db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
         }
     } else {
-        log(session_id_, "Unsupported memory addressing mode in LEA: " + mem_text, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Unsupported memory addressing mode in LEA: " + mem_text, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleXchg(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for XCHG", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for XCHG", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1230,7 +1237,7 @@ void X86Simulator::handleXchg(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& op2 = decoded_instr.operands[1];
 
     if (op1.type != OperandType::REGISTER || op2.type != OperandType::REGISTER) {
-        log(session_id_, "XCHG currently supports register-to-register exchange.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "XCHG currently supports register-to-register exchange.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1252,13 +1259,13 @@ void X86Simulator::handleXchg(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in XCHG: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleMovsx(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for MOVSX", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for MOVSX", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1267,7 +1274,7 @@ void X86Simulator::handleMovsx(const DecodedInstruction& decoded_instr) {
 
     // We are implementing MOVSX r32, r/m8
     if (dest_op.type != OperandType::REGISTER || src_op.type != OperandType::REGISTER) {
-        log(session_id_, "MOVSX currently supports register-to-register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "MOVSX currently supports register-to-register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1288,13 +1295,13 @@ void X86Simulator::handleMovsx(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in MOVSX: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleMovzx(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for MOVZX", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for MOVZX", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1303,7 +1310,7 @@ void X86Simulator::handleMovzx(const DecodedInstruction& decoded_instr) {
 
     // We are implementing MOVZX r32, r/m8
     if (dest_op.type != OperandType::REGISTER || src_op.type != OperandType::REGISTER) {
-        log(session_id_, "MOVZX currently supports register-to-register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "MOVZX currently supports register-to-register.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1322,7 +1329,7 @@ void X86Simulator::handleMovzx(const DecodedInstruction& decoded_instr) {
 
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in MOVZX: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
@@ -1348,7 +1355,7 @@ void X86Simulator::handleMovsb(const DecodedInstruction& decoded_instr) {
         // MOVSB does not affect any flags other than the implicit update of RSI/RDI.
 
     } catch (const std::out_of_range& e) {
-        log(session_id_, "Memory access out of bounds during MOVSB.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Memory access out of bounds during MOVSB.", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
@@ -1381,7 +1388,7 @@ void X86Simulator::handleMovsw(const DecodedInstruction& decoded_instr) {
         // MOVSW does not affect any flags other than the implicit update of RSI/RDI.
 
     } catch (const std::out_of_range& e) {
-        log(session_id_, "Memory access out of bounds during MOVSW.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Memory access out of bounds during MOVSW.", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
@@ -1415,13 +1422,13 @@ void X86Simulator::handleMovsd(const DecodedInstruction& decoded_instr) {
         // MOVSD does not affect any flags other than the implicit update of RSI/RDI.
 
     } catch (const std::out_of_range& e) {
-        log(session_id_, "Memory access out of bounds during MOVSD.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Memory access out of bounds during MOVSD.", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVaddps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VADDPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VADDPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1432,7 +1439,7 @@ void X86Simulator::handleVaddps(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER || 
         src1_operand.type != OperandType::YMM_REGISTER || 
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VADDPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VADDPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1445,13 +1452,13 @@ void X86Simulator::handleVaddps(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VADDPS: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVdivps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VDIVPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VDIVPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1462,7 +1469,7 @@ void X86Simulator::handleVdivps(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VDIVPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VDIVPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1475,13 +1482,13 @@ void X86Simulator::handleVdivps(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VDIVPS: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVmaxps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VMAXPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VMAXPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1492,7 +1499,7 @@ void X86Simulator::handleVmaxps(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VMAXPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VMAXPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1505,13 +1512,13 @@ void X86Simulator::handleVmaxps(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VMAXPS: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVpandn(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VPANDN", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VPANDN", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1522,7 +1529,7 @@ void X86Simulator::handleVpandn(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VPANDN instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VPANDN instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1542,13 +1549,13 @@ void X86Simulator::handleVpandn(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPANDN: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVpand(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VPAND", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VPAND", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1559,7 +1566,7 @@ void X86Simulator::handleVpand(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VPAND instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VPAND instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1579,13 +1586,13 @@ void X86Simulator::handleVpand(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPAND: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVpmullw(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VPMULLW", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VPMULLW", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1596,7 +1603,7 @@ void X86Simulator::handleVpmullw(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VPMULLW instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VPMULLW instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1616,13 +1623,13 @@ void X86Simulator::handleVpmullw(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPMULLW: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVminps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VMINPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VMINPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1633,7 +1640,7 @@ void X86Simulator::handleVminps(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VMINPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VMINPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1646,13 +1653,13 @@ void X86Simulator::handleVminps(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VMINPS: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVmovups(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1671,13 +1678,13 @@ void X86Simulator::handleVmovups(const DecodedInstruction& decoded_instr) {
         m256i_t value = register_map_.getYmm(src_operand.text);
         register_map_.setYmm(dest_operand.text, value);
     } else {
-        log(session_id_, "Unsupported operand combination for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Unsupported operand combination for VMOVUPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVpxor(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VPXOR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VPXOR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1688,7 +1695,7 @@ void X86Simulator::handleVpxor(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VPXOR instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VPXOR instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1708,13 +1715,13 @@ void X86Simulator::handleVpxor(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPXOR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVrcpps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for VRCPPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VRCPPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1722,7 +1729,7 @@ void X86Simulator::handleVrcpps(const DecodedInstruction& decoded_instr) {
     const auto& src_op = decoded_instr.operands[1];
 
     if (dest_op.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "Destination operand for VRCPPS must be a YMM register", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Destination operand for VRCPPS must be a YMM register", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1733,7 +1740,7 @@ void X86Simulator::handleVrcpps(const DecodedInstruction& decoded_instr) {
     } else if (src_op.type == OperandType::MEMORY) {
         src_val = memory_.read_ymm(src_op.value);
     } else {
-        log(session_id_, "Invalid source operand for VRCPPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid source operand for VRCPPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1744,7 +1751,7 @@ void X86Simulator::handleVrcpps(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "Invalid number of operands for VSQRTPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VSQRTPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1752,7 +1759,7 @@ void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
     const auto& src_op = decoded_instr.operands[1];
 
     if (dest_op.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "Destination operand for VSQRTPS must be a YMM register", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Destination operand for VSQRTPS must be a YMM register", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1763,7 +1770,7 @@ void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
     } else if (src_op.type == OperandType::MEMORY) {
         src_val = memory_.read_ymm(src_op.value);
     } else {
-        log(session_id_, "Invalid source operand for VSQRTPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid source operand for VSQRTPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1774,7 +1781,7 @@ void X86Simulator::handleVsqrtps(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleVsubps(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VSUBPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VSUBPS", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1785,7 +1792,7 @@ void X86Simulator::handleVsubps(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VSUBPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VSUBPS instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1798,13 +1805,13 @@ void X86Simulator::handleVsubps(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VSUBPS: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleVpor(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 3) {
-        log(session_id_, "Invalid number of operands for VPOR", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "Invalid number of operands for VPOR", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1815,7 +1822,7 @@ void X86Simulator::handleVpor(const DecodedInstruction& decoded_instr) {
     if (dest_operand.type != OperandType::YMM_REGISTER ||
         src1_operand.type != OperandType::YMM_REGISTER ||
         src2_operand.type != OperandType::YMM_REGISTER) {
-        log(session_id_, "VPOR instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "VPOR instruction requires YMM register operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1835,13 +1842,13 @@ void X86Simulator::handleVpor(const DecodedInstruction& decoded_instr) {
         register_map_.setYmm(dest_operand.text, result);
     } catch (const std::out_of_range& e) {
         std::string logMessage = "Invalid register in VPOR: " + std::string(e.what());
-        log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, logMessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
     }
 }
 
 void X86Simulator::handleIn(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "IN instruction requires two operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IN instruction requires two operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1849,12 +1856,12 @@ void X86Simulator::handleIn(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::REGISTER || dest_operand.text != "al") {
-        log(session_id_, "IN instruction currently only supports AL as destination.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IN instruction currently only supports AL as destination.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     if (src_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "IN instruction currently only supports immediate for port.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "IN instruction currently only supports immediate for port.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1867,7 +1874,7 @@ void X86Simulator::handleIn(const DecodedInstruction& decoded_instr) {
 
 void X86Simulator::handleOut(const DecodedInstruction& decoded_instr) {
     if (decoded_instr.operands.size() != 2) {
-        log(session_id_, "OUT instruction requires two operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "OUT instruction requires two operands.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
@@ -1875,12 +1882,12 @@ void X86Simulator::handleOut(const DecodedInstruction& decoded_instr) {
     const DecodedOperand& src_operand = decoded_instr.operands[1];
 
     if (dest_operand.type != OperandType::IMMEDIATE) {
-        log(session_id_, "OUT instruction currently only supports immediate for port.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "OUT instruction currently only supports immediate for port.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 
     if (src_operand.type != OperandType::REGISTER || src_operand.text != "al") {
-        log(session_id_, "OUT instruction currently only supports AL as source.", "ERROR", instructionPointer_, __FILE__, __LINE__);
+        db_manager_.log(session_id_, "OUT instruction currently only supports AL as source.", "ERROR", instructionPointer_, __FILE__, __LINE__);
         return;
     }
 

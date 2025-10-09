@@ -11,9 +11,10 @@
 class SimulatorCoreTest : public ::testing::Test {
 protected:
     MockDatabaseManager dbManager;
+    Memory memory;
     X86Simulator simulator;
 
-    SimulatorCoreTest() : simulator(dbManager, 1) {}
+    SimulatorCoreTest() : memory(), simulator(dbManager, memory, 1) {}
 
     void SetUp() override {
         // Set up any necessary objects or state

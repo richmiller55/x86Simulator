@@ -68,6 +68,7 @@ enum class IROpcode {
     VectorZero, // For instructions like VZEROUPPER or XORing a register with itself
 
     // System
+    Out,
     Syscall,
     Nop,
 
@@ -136,6 +137,7 @@ struct IRMemoryOperand {
     std::optional<IRRegister> index_reg;
     uint32_t scale = 1;
     int64_t displacement = 0;
+    uint32_t size = 32; // Size of memory access in bits (e.g., 8, 16, 32, 64)
 };
 
 /**
@@ -145,35 +147,6 @@ using IROperand = std::variant<
     IRRegister,
     IRMemoryOperand,
     uint64_t,       // Immediate value
-    std::string,    // Label
-    IRConditionCode // For branch conditions
->;
-
-/**
- * @brief Represents a single, architecture-agnostic instruction in the Intermediate Representation.
- */
-class IRInstruction {
-public:
-    IRInstruction(IROpcode op, std::vector<IROperand> ops = {})
-        : opcode(op), operands(std::move(ops)) {}
-
-    IROpcode opcode;
-    std::vector<IROperand> operands;
-
-    // Optional: Metadata about the original instruction
-    uint64_t original_address = 0;
-    uint32_t original_size = 0;
-};
-
-// A program is a sequence of IR instructions.
-using IRProgram = std::vector<std::unique_ptr<IRInstruction>>;
-
-#endif // IR_H
-using IROperand = std::variant<
-    IRRegister,
-    IRMemoryOperand,
-    uint64_t,       // Immediate value
-    std::string     // Label
     std::string,    // Label
     IRConditionCode // For branch conditions
 >;

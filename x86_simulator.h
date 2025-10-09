@@ -30,6 +30,8 @@
 #include "operand_types.h"
 #include "i_database_manager.h"
 #include "decoder.h" // Include for DecodedInstruction and DecodedOperand
+#include "architecture.h"
+#include "ir.h"
 
 class UIManager;
 
@@ -59,9 +61,13 @@ const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
 bool is_number(const std::string& s);
 
 class X86Simulator {
+#ifdef GOOGLE_TEST
+friend class SimulatorCoreTest;
+friend class IRExecutorTest;
+#endif
 public:
     // Constructor, other public methods
-  X86Simulator(IDatabaseManager& dbManager, int session_id, bool headless = false);
+  X86Simulator(IDatabaseManager& db_manager, Memory& memory, int session_id, bool headless = false);
   ~X86Simulator();
   
   void init(const std::string& program_name);
@@ -73,10 +79,23 @@ public:
   bool secondPass();
   void runProgram();
   void dumpTextSegment(const std::string& filename);
+  void dumpDataSegment(const std::string& filename);
+  void dumpBssSegment(const std::string& filename);
   void dumpSymbolTable(const std::string& filename);
   void displayRegistersWithDiff();
   void displayRegistersControlled();
   std::string trim(const std::string& str) ;
+
+  // --- Getters for helpers ---
+  const Architecture& get_architecture() const { return architecture_; }
+  RegisterMap& getRegisterMap() { return register_map_; }
+  const RegisterMap& getRegisterMap() const { return register_map_; }
+  Memory& getMemory() { return memory_; }
+  const Memory& getMemory() const { return memory_; }
+  int get_session_id() const { return session_id_; }
+  IDatabaseManager& getDatabaseManager() { return db_manager_; }
+  bool is_headless() const { return headless_; }
+
   bool get_CF() const;
   void set_CF(bool value);
   bool get_ZF() const;
@@ -90,99 +109,43 @@ public:
   bool get_AF() const;
   void set_AF(bool value);
   bool get_PF() const;
-  void set_PF(bool value);
-  int get_session_id() const;
-  uint64_t getRegister(const std::string& register_name);
-  void log(int session_id, const std::string& message,
-	   const std::string& level,
-	   uint64_t instruction_pointer,
-	   const std::string& source_file,
-	   int source_line);
-  void updateDisplay(); // This function now implicitly uses the current RIP
-  void waitForInput();
-  void update_rflags_in_register_map();
-  RegisterMap& getRegisterMapForTesting() { return register_map_; }
-  Memory& getMemoryForTesting() { return memory_; }
-  bool is_headless() const;
-  size_t calculate_data_size(const std::vector<std::string>& tokens);
-  size_t calculate_bss_size(const std::vector<std::string>& tokens);  
-  void dumpDataSegment(const std::string& filename);
-  void dumpBssSegment(const std::string& filename);
+    void set_PF(bool val);
+
+    void execute_ir_instruction(const IRInstruction& ir_instr);
+    void update_rflags_in_register_map();
+
+    // --- I/O Handling ---
+    void log_out(uint16_t port, uint64_t value);
+    const std::vector<std::pair<uint16_t, uint64_t>>& get_out_log() const;
+
+#if defined(GOOGLE_TEST)
+    RegisterMap& getRegisterMapForTesting() { return register_map_; }
+    Memory& getMemoryForTesting() { return memory_; }
+#endif
 
 private:
-  IDatabaseManager& dbManager_;
-  Memory memory_;
-  RegisterMap register_map_;
-  address_t instructionPointer_ = 0;
-  std::unique_ptr<UIManager> ui_;
-  uint64_t rflags_;
-  int session_id_;
-  bool headless_;
-  address_t program_size_in_bytes_; 
-  void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
-  std::vector<std::string> programLines_; // raw
-  std::map<std::string, address_t> symbolTable_;
-  std::string entryPointLabel_ = "_start"; // Default entry point
-  void handleMov(const DecodedInstruction& decoded_instr);
-  void handleAdd(const DecodedInstruction& decoded_instr);
-  void handleJmp(const DecodedInstruction& decoded_instr);
-  void handleCall(const DecodedInstruction& decoded_instr);
-  void handleJne(const DecodedInstruction& decoded_instr);
-  void handleJe(const DecodedInstruction& decoded_instr);
-  void handleJl(const DecodedInstruction& decoded_instr);
-  void handleJb(const DecodedInstruction& decoded_instr);
-  void handleJae(const DecodedInstruction& decoded_instr);
-  void handleJbe(const DecodedInstruction& decoded_instr);
-  void handleJs(const DecodedInstruction& decoded_instr);
-  void handleJo(const DecodedInstruction& decoded_instr);
-  void handleJno(const DecodedInstruction& decoded_instr);
-  void handleJns(const DecodedInstruction& decoded_instr);
-  void handleJge(const DecodedInstruction& decoded_instr);
-  void handleJle(const DecodedInstruction& decoded_instr);
-  void handleJg(const DecodedInstruction& decoded_instr);
-  void handleJa(const DecodedInstruction& decoded_instr);
-  void handleInc(const DecodedInstruction& decoded_instr);
-  void handleCmp(const DecodedInstruction& decoded_instr);
-  void handleInt(const DecodedInstruction& decoded_instr);
-  void handleMul(const DecodedInstruction& decoded_instr);
-  void handleImul(const DecodedInstruction& decoded_instr);
-  void handleDec(const DecodedInstruction& decoded_instr);
-  void handleIdiv(const DecodedInstruction& decoded_instr);
-  void handleDiv(const DecodedInstruction& decoded_instr);
-  void handleAnd(const DecodedInstruction& decoded_instr);
-  void handleOr(const DecodedInstruction& decoded_instr);
-  void handleXor(const DecodedInstruction& decoded_instr);
-  void handleNot(const DecodedInstruction& decoded_instr);
-  void handleShl(const DecodedInstruction& decoded_instr);
-  void handleShr(const DecodedInstruction& decoded_instr);
-  void handleSar(const DecodedInstruction& decoded_instr);
-  void handleRol(const DecodedInstruction& decoded_instr);
-  void handleRor(const DecodedInstruction& decoded_instr);
-  void handleLea(const DecodedInstruction& decoded_instr);
-  void handleXchg(const DecodedInstruction& decoded_instr);
-  void handleMovsx(const DecodedInstruction& decoded_instr);
-  void handleMovzx(const DecodedInstruction& decoded_instr);
-  void handleMovsb(const DecodedInstruction& decoded_instr);
-  void handleMovsd(const DecodedInstruction& decoded_instr);
-  void handleMovsw(const DecodedInstruction& decoded_instr);
-  void handleSub(const DecodedInstruction& decoded_instr);
-  void handlePush(const DecodedInstruction& decoded_instr);
-  void handlePop(const DecodedInstruction& decoded_instr);
-  void handleIn(const DecodedInstruction& decoded_instr);
-  void handleOut(const DecodedInstruction& decoded_instr);
-  void handleVaddps(const DecodedInstruction& decoded_instr);
-  void handleVdivps(const DecodedInstruction& decoded_instr);
-  void handleVmaxps(const DecodedInstruction& decoded_instr);
-  void handleVpandn(const DecodedInstruction& decoded_instr);
-  void handleVpand(const DecodedInstruction& decoded_instr);
-  void handleVpmullw(const DecodedInstruction& decoded_instr);
-  void handleVminps(const DecodedInstruction& decoded_instr);
-  void handleVmovups(const DecodedInstruction& decoded_instr);
-  void handleVpxor(const DecodedInstruction& decoded_instr);
-  void handleVrcpps(const DecodedInstruction& decoded_instr);
-  void handleVsqrtps(const DecodedInstruction& decoded_instr);
-  void handleVsubps(const DecodedInstruction& decoded_instr);
-  void handleVpor(const DecodedInstruction& decoded_instr);
+    // Private helper methods
+    void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
+
+    // --- Member Variables ---
+    IDatabaseManager& db_manager_;
+    Memory& memory_;
+    RegisterMap register_map_;
+    Architecture architecture_;
+
+    int session_id_;
+    bool headless_;
+    
+    address_t instructionPointer_ = 0;
+    address_t program_size_in_bytes_ = 0;
+    uint64_t rflags_;
+
+    std::unique_ptr<UIManager> ui_;
+    std::map<std::string, address_t> symbolTable_;
+    std::vector<std::pair<uint16_t, uint64_t>> out_log_;
+    std::vector<std::string> programLines_; // raw
+    std::string entryPointLabel_ = "_start"; // Default entry point
+
   
 };
 

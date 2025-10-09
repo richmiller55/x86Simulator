@@ -13,6 +13,8 @@ class RegisterMap {
 private:
   std::map<std::string, Reg64> register_name_map_64_;
   std::map<std::string, Reg32> register_name_map_32_;
+  std::map<std::string, Reg64> register_name_map_16_;
+  std::map<std::string, Reg64> register_name_map_8_;
   std::map<std::string, RegYMM> register_name_map_ymm_;
   std::vector<uint64_t> registers64_; 
   std::vector<m256i_t> registers_ymm_; // YMM registers
@@ -24,6 +26,8 @@ public:
   void set64(const std::string& reg_name, uint64_t value);
   uint64_t get32(const std::string& reg_name) const;
   void set32(const std::string& reg_name, uint64_t value);
+  uint16_t get16(const std::string& reg_name) const;
+  void set16(const std::string& reg_name, uint16_t value);
   uint8_t get8(const std::string& reg_name) const;
   void set8(const std::string& reg_name, uint8_t value);
   m256i_t getYmm(const std::string& reg_name) const;

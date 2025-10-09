@@ -26,4 +26,13 @@ DecodedOperand parse_operand(const std::string& operand_str, const RegisterMap& 
 
 std::vector<std::string> parse_line(const std::string& line);
 
+// Helper to check if a string is a numeric literal
+bool is_number(const std::string& s);
+
+// Calculates the size of a data directive in bytes
+size_t calculate_data_size(const std::vector<std::string>& tokens);
+
+// Calculates the size of a BSS directive
+size_t calculate_bss_size(const std::vector<std::string>& tokens);
+
 #endif // PARSER_UTILS_H
