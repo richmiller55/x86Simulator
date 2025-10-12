@@ -4,7 +4,7 @@ CXXFLAGS = -std=c++17 -Wall -g -DGOOGLE_TEST
 LDFLAGS =
 
 # Define the target executable name
-TARGET = x86simulator
+TARGET = simulator
 
 # Define include directories
 INCLUDES = -I../libpqxx/include
@@ -16,7 +16,6 @@ LIB_SRCS = \
 	parser_utils.cpp \
 	memory.cpp \
 	x86_simulator_input.cpp \
-	x86_simulator_private_helpers.cpp \
 	x86_simulator_state.cpp \
 	x86_simulator_core.cpp \
 	system_bus.cpp \
@@ -28,11 +27,14 @@ LIB_SRCS = \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
+	INTEL_helpers.cpp \
 	ir_executor_helpers.cpp \
 	program_decoder.cpp \
 	formatting_utils.cpp \
 	architecture.cpp \
-	x86_to_ir.cpp
+	x86_to_ir.cpp \
+	arm_to_ir.cpp \
+	arm_simulator.cpp
 
 # Define object files
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)

@@ -40,7 +40,11 @@ enum class IROpcode {
     // Control Flow
     Jump,   // target
     Branch, // target, condition
-    Call,   // target
+    Call,
+    Push,
+    Pop,
+    Dec,
+    Inc,   // target
     Ret,
 
     // === SIMD/Vector Operations ===
@@ -54,6 +58,7 @@ enum class IROpcode {
     PackedMinPS,
     PackedSqrtPS,
     PackedReciprocalPS, // For instructions like RCPPS
+    PackedReciprocalSqrtPS, // For VRsqrtPS
 
     // Packed Logical (Integer)
     PackedAnd,
@@ -62,10 +67,22 @@ enum class IROpcode {
     PackedXor,
 
     // Packed Integer Arithmetic
+    PackedAddI8,
+    PackedAddI16,
+    PackedAddI32,
+    PackedAddI64,
+    PackedSubI8,
+    PackedSubI16,
+    PackedSubI32,
+    PackedSubI64,
     PackedMulLowI16, // For VPMULLW
+    PackedMulLowI32, // For VPMULLD
+    PackedMulU32,    // For VPMULUDQ
 
     // Other SIMD
-    VectorZero, // For instructions like VZEROUPPER or XORing a register with itself
+    VectorMove,
+    VectorZero, // For VZEROALL
+    VectorZeroUpper, // For VZEROUPPER
 
     // System
     Out,
@@ -87,8 +104,10 @@ enum class IRConditionCode {
     NotEqual,       // JNE, JNZ
 
     // Based on Carry Flag (CF) - for unsigned comparisons
-    Below,          // JB, JNAE
-    AboveOrEqual,   // JAE, JNB
+    Below,          // JB, JNAE, JC
+    BelowOrEqual,   // JBE, JNA
+    Above,          // JA, JNBE
+    AboveOrEqual,   // JAE, JNB, JNC
 
     // Based on Sign (SF) and Overflow (OF) - for signed comparisons
     Less,           // JL, JNGE
@@ -101,6 +120,8 @@ enum class IRConditionCode {
     NotOverflow,    // JNO
     Sign,           // JS
     NotSign,        // JNS
+    ParityEven,     // JP, JPE
+    ParityOdd,      // JNP, JPO
 };
 
 /**

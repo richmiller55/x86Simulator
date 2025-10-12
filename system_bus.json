@@ -2,8 +2,9 @@
   "ui_enabled": true,
   "processes": [
     {
-      "name": "my_program",
-      "path": "./programs/prime_numbers.asm"
+      "name": "prime_number",
+      "path": "./programs/prime_numbers.asm",
+      "isa": "x86"
     }
   ],
   "devices": [

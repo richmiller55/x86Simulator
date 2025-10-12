@@ -1,8 +1,10 @@
+
 #include "x86_simulator.h"
 #include "ui_manager.h"
 #include "decoder.h"
 #include "i_database_manager.h"
 #include "architecture.h"
+#include "ir_visitor.h"
 
 // Constructor with DatabaseManager injection
 X86Simulator::X86Simulator(IDatabaseManager& db_manager, Memory& memory, int session_id, bool headless)
@@ -24,11 +26,12 @@ X86Simulator::X86Simulator(IDatabaseManager& db_manager, Memory& memory, int ses
 }
 
 X86Simulator::~X86Simulator() {
-    if (ui_) {
-        ui_->tearDown();
-    }
 }
 
 void X86Simulator::init(const std::string& program_name) {
   session_id_ = db_manager_.createSession(program_name);
+}
+
+void X86Simulator::accept(IRVisitor& visitor, const IRInstruction& instr) {
+    visitor.visit(instr, *this);
 }

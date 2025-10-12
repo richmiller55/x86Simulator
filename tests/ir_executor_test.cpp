@@ -31,7 +31,7 @@ TEST_F(IRExecutorTest, HandleIrAnd) {
         IRRegister{IRRegisterType::GPR, 3, 32}  // ebx
     });
 
-    // simulator.execute_ir_instruction(and_instr);
+    simulator.execute_ir_instruction(and_instr);
 
     EXPECT_EQ(regs.get32("eax"), 0b1000);
     EXPECT_FALSE(simulator.get_ZF());

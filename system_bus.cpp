@@ -1,4 +1,6 @@
 #include "system_bus.h"
+#include "x86_simulator.h"
+#include "arm_simulator.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
@@ -55,7 +57,7 @@ size_t SystemBus::get_process_count() const {
     return processes_.size();
 }
 
-const X86Simulator* SystemBus::get_process(size_t index) const {
+const ISimulator* SystemBus::get_process(size_t index) const {
     if (index < processes_.size()) {
         return processes_[index].simulator.get();
     }
@@ -65,17 +67,30 @@ const X86Simulator* SystemBus::get_process(size_t index) const {
 // Private helper implementations
 
 void SystemBus::create_and_configure_simulator(const json& process_info, bool ui_enabled) {
-    std::string program_path = process_info["path"];
-    std::cout << "db_manager_ address in load_configuration: " << &db_manager_ << std::endl;
+    std::string program_path = process_info.value("path", "");
+    std::string isa_str = process_info.value("isa", "x86");
+
     int session_id = db_manager_.createSession(program_path);
     auto memory = std::make_unique<Memory>();
-    auto simulator = std::make_unique<X86Simulator>(db_manager_, *memory, session_id, !ui_enabled);
-    simulator->loadProgram(program_path);
-    simulator->firstPass();
-    simulator->secondPass();
-	simulator->dumpTextSegment("text_segment.dump");
-	simulator->dumpDataSegment("data_segment.dump");
-	simulator->dumpSymbolTable("symbol_table.dump");
+    std::unique_ptr<ISimulator> simulator;
+
+    if (isa_str == "x86") {
+        auto x86_sim = std::make_unique<X86Simulator>(db_manager_, *memory, session_id, !ui_enabled);
+        x86_sim->loadProgram(program_path);
+        x86_sim->firstPass();
+        x86_sim->secondPass();
+        x86_sim->dumpTextSegment("text_segment.dump");
+        x86_sim->dumpDataSegment("data_segment.dump");
+        x86_sim->dumpSymbolTable("symbol_table.dump");
+        simulator = std::move(x86_sim);
+    } else if (isa_str == "arm") {
+        auto arm_sim = std::make_unique<ArmSimulator>(db_manager_, *memory, session_id, !ui_enabled);
+
+        simulator = std::move(arm_sim);
+    } else {
+        std::cerr << "Error: Unknown ISA '" << isa_str << "' in configuration." << std::endl;
+        return;
+    }
 
     Process process;
     process.memory = std::move(memory);

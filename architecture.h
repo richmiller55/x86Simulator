@@ -6,6 +6,12 @@
 #include <map>
 #include <stdexcept>
 
+// Enum to identify the Instruction Set Architecture
+enum class ISA {
+    X86,
+    ARM
+};
+
 // A helper struct to allow IRRegister to be used as a key in std::map.
 struct IRRegisterKey {
     IRRegisterType type;
@@ -24,6 +30,8 @@ struct IRRegisterKey {
  */
 class Architecture {
 public:
+    ISA isa;
+
     // Maps an abstract IRRegister to its concrete ISA-specific name (e.g., "eax").
     std::map<IRRegisterKey, std::string> register_map;
 
@@ -48,5 +56,10 @@ public:
  * @brief Factory function to create a description for the x86 architecture.
  */
 Architecture create_x86_architecture();
+
+/**
+ * @brief Factory function to create a description for the ARM Cortex-R8 architecture.
+ */
+Architecture create_arm_cortex_r8_architecture();
 
 #endif // ARCHITECTURE_H

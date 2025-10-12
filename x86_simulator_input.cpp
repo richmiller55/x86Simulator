@@ -36,6 +36,7 @@ std::vector<std::string> readLinesFromFile(const std::string& filePath) {
 
 bool X86Simulator::loadProgram(const std::string& filename) {
   memory_.reset();
+  register_map_.set64("rsp", memory_.get_stack_bottom());
   programLines_ = readLinesFromFile(filename);
   return !programLines_.empty(); // Or a more robust check for successful read.
 }
@@ -231,33 +232,39 @@ bool X86Simulator::firstPass() {
 }
 
 bool X86Simulator::secondPass() {
-    CodeGenerator code_generator(symbolTable_, memory_.get_text_segment_start());
-    std::vector<uint8_t> machine_code = code_generator.generate_code(programLines_);
-    program_size_in_bytes_ = machine_code.size();
+    try {
+        CodeGenerator code_generator(symbolTable_, memory_.get_text_segment_start());
+        std::vector<uint8_t> machine_code = code_generator.generate_code(programLines_);
+        program_size_in_bytes_ = machine_code.size();
 
-    // Write the generated code to the simulator's memory
-    for (size_t i = 0; i < program_size_in_bytes_; ++i) {
-        memory_.write_text(memory_.get_text_segment_start() + i, machine_code[i]);
-    }
+        // Write the generated code to the simulator's memory
+        for (size_t i = 0; i < program_size_in_bytes_; ++i) {
+            memory_.write_text(memory_.get_text_segment_start() + i, machine_code[i]);
+        }
 
-    memory_.set_text_segment_size(program_size_in_bytes_);
+        memory_.set_text_segment_size(program_size_in_bytes_);
 
-    // Set the initial instruction pointer (RIP) to the address of the entry point label.
-    auto it = symbolTable_.find(entryPointLabel_);
-    if (it != symbolTable_.end()) {
-        register_map_.set64("rip", it->second);
-    } else {
-        db_manager_.log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
-        // Fallback to the start of the text segment if the label is not found
-        register_map_.set64("rip", memory_.get_text_segment_start());
+        // Set the initial instruction pointer (RIP) to the address of the entry point label.
+        auto it = symbolTable_.find(entryPointLabel_);
+        if (it != symbolTable_.end()) {
+            register_map_.set64("rip", it->second);
+        } else {
+            db_manager_.log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
+            // Fallback to the start of the text segment if the label is not found
+            register_map_.set64("rip", memory_.get_text_segment_start());
+        }
+        auto program_decoder = std::make_unique<ProgramDecoder>(memory_);
+        program_decoder->decode();
+        if (ui_) {
+            ui_->setProgramDecoder(std::move(program_decoder));
+            ui_->setSymbolTable(&symbolTable_);
+        }
+        return true;
+    } catch (const std::runtime_error& e) {
+        // Log the error from the CodeGenerator
+        db_manager_.log(session_id_, e.what(), "FATAL", 0, __FILE__, __LINE__);
+        return false; // Signal that the second pass failed
     }
-    auto program_decoder = std::make_unique<ProgramDecoder>(memory_);
-    program_decoder->decode();
-    if (ui_) {
-        ui_->setProgramDecoder(std::move(program_decoder));
-        ui_->setSymbolTable(&symbolTable_);
-    }
-    return true;
 }
 
 // Helper to remove leading/trailing whitespace

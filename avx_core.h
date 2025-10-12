@@ -69,4 +69,17 @@ m256i_t _mm256_set_ps_sim(float e7, float e6, float e5, float e4, float e3, floa
 m256i_t _mm256_set_epi16_sim(short e15, short e14, short e13, short e12, short e11, short e10, short e9, short e8, short e7, short e6, short e5, short e4, short e3, short e2, short e1, short e0);
 void _mm256_storeu_ps_sim(float* mem_addr, m256i_t a);
 
+// New simulated intrinsics
+m256i_t _mm256_rsqrt_ps_sim(m256i_t a);
+m256i_t _mm256_add_epi8_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_add_epi16_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_add_epi64_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_sub_epi8_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_sub_epi16_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_sub_epi32_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_sub_epi64_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_mullo_epi32_sim(m256i_t a, m256i_t b);
+m256i_t _mm256_mul_epu32_sim(m256i_t a, m256i_t b);
+m128i_t _mm_setzero_si128_sim();
+
 #endif // AVX_CORE_H
