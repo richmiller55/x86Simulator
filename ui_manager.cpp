@@ -7,6 +7,8 @@
 #include "instruction_describer.h" // Will be created later
 #include <ncursesw/curses.h> // Include the wide-character header
 
+static bool ncurses_initialized = false;
+
 
 UIManager::UIManager(const Memory& memory_instance)
 : win32_(nullptr),
@@ -28,18 +30,21 @@ UIManager::UIManager(const Memory& memory_instance)
   address_to_label_(),
   show_labels_in_text_segment_(false)
 {
-    initscr();
-    clear();
-    refresh();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
+    if (!ncurses_initialized) {
+        initscr();
+        clear();
+        refresh();
+        cbreak();
+        noecho();
+        keypad(stdscr, TRUE);
 
-    if (has_colors()) {
-        start_color();
-        init_pair(1, COLOR_YELLOW, COLOR_BLACK);
-        init_pair(2, COLOR_GREEN, COLOR_BLACK);
-        init_pair(3, COLOR_BLUE, COLOR_BLACK);
+        if (has_colors()) {
+            start_color();
+            init_pair(1, COLOR_YELLOW, COLOR_BLACK);
+            init_pair(2, COLOR_GREEN, COLOR_BLACK);
+            init_pair(3, COLOR_BLUE, COLOR_BLACK);
+        }
+        ncurses_initialized = true;
     }
 
     win32_ = newwin(1, 1, 1, 1);
@@ -129,23 +134,24 @@ void UIManager::setSymbolTable(const std::map<std::string, address_t>* symbol_ta
 }
 
 UIManager::~UIManager() {
-  tearDown();
+  delwin(win32_);
+  delwin(win64_);
+  delwin(win_text_segment_);
+  delwin(win_ymm_);
+  delwin(win_instruction_description_);
+  delwin(win_legend_);
+  delwin(win_file_tail_);
+  if (ncurses_initialized) {
+    endwin();
+    ncurses_initialized = false;
+  }
 }
 
 void UIManager::setProgramDecoder(std::unique_ptr<ProgramDecoder> decoder) {
     program_decoder_ = std::move(decoder);
 }
 
-void UIManager::tearDown() {
-    delwin(win32_);
-    delwin(win64_);
-    delwin(win_text_segment_);
-    delwin(win_ymm_);
-    delwin(win_instruction_description_);
-    delwin(win_legend_);
-    delwin(win_file_tail_);
-    endwin();
-}
+
 
 void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
 			  const RegisterMap& regs,

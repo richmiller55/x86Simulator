@@ -34,6 +34,7 @@ RegisterMap::RegisterMap()
   // All initialization is now done in the member initializer list.
 }
 
+
 uint64_t RegisterMap::get64(const std::string& reg_name) const {
   if (auto it = register_name_map_64_.find(reg_name); it != register_name_map_64_.end()) {
     return registers64_[static_cast<size_t>(it->second)];

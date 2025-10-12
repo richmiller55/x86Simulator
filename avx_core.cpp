@@ -175,3 +175,72 @@ m256i_t _mm256_set_epi16_sim(short e15, short e14, short e13, short e12, short e
 void _mm256_storeu_ps_sim(float* mem_addr, m256i_t a) {
     memcpy(mem_addr, &a, sizeof(m256i_t));
 }
+
+// --- New Implementations ---
+
+m128i_t _mm_setzero_si128_sim() {
+    m128i_t result;
+    result.m128i_u64[0] = 0;
+    result.m128i_u64[1] = 0;
+    return result;
+}
+
+m256i_t _mm256_rsqrt_ps_sim(m256i_t a) {
+    m256i_t result;
+    for (int i = 0; i < 8; ++i) result.m256_f32[i] = 1.0f / sqrtf(a.m256_f32[i]);
+    return result;
+}
+
+m256i_t _mm256_add_epi8_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 32; ++i) result.m256i_i8[i] = a.m256i_i8[i] + b.m256i_i8[i];
+    return result;
+}
+
+m256i_t _mm256_add_epi16_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 16; ++i) result.m256i_i16[i] = a.m256i_i16[i] + b.m256i_i16[i];
+    return result;
+}
+
+m256i_t _mm256_add_epi64_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 4; ++i) result.m256i_i64[i] = a.m256i_i64[i] + b.m256i_i64[i];
+    return result;
+}
+
+m256i_t _mm256_sub_epi8_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 32; ++i) result.m256i_i8[i] = a.m256i_i8[i] - b.m256i_i8[i];
+    return result;
+}
+
+m256i_t _mm256_sub_epi16_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 16; ++i) result.m256i_i16[i] = a.m256i_i16[i] - b.m256i_i16[i];
+    return result;
+}
+
+m256i_t _mm256_sub_epi32_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 8; ++i) result.m256i_i32[i] = a.m256i_i32[i] - b.m256i_i32[i];
+    return result;
+}
+
+m256i_t _mm256_sub_epi64_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 4; ++i) result.m256i_i64[i] = a.m256i_i64[i] - b.m256i_i64[i];
+    return result;
+}
+
+m256i_t _mm256_mullo_epi32_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 8; ++i) result.m256i_i32[i] = a.m256i_i32[i] * b.m256i_i32[i];
+    return result;
+}
+
+m256i_t _mm256_mul_epu32_sim(m256i_t a, m256i_t b) {
+    m256i_t result;
+    for (int i = 0; i < 8; ++i) result.m256i_u32[i] = a.m256i_u32[i] * b.m256i_u32[i];
+    return result;
+}

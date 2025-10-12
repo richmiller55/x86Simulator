@@ -4,14 +4,15 @@
 
 // Constructor for the default memory layout
 Memory::Memory()
+  // Set a larger default text segment size (32MB) as a pragmatic fix.
   : text_segment_start(0),
-    data_segment_start(0x200000),
-    bss_segment_start(0x400000)
+    data_segment_start(0x2000000), // 32 Megabytes for the text segment
+    bss_segment_start(0x2000000 + 0x200000) // Place BSS after text + default data size
 {
     // These member variables are initialized in the constructor's body for clarity.
     text_segment_size = data_segment_start - text_segment_start;
     heap_segment_start = bss_segment_start + initial_heap_size;
-    total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
+    total_memory_size = heap_segment_start + max_stack_size;
     
     // Allocate main memory using std::vector and smart pointer.
     main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
@@ -35,8 +36,7 @@ Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
     bss_segment_start(text_size + data_size)
 {
     // Calculate memory layout based on provided sizes.
-    heap_segment_start = bss_segment_start + bss_size;
-    total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
+    total_memory_size = heap_segment_start + max_stack_size;
 
     // Allocate main memory using std::vector and smart pointer.
     main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
@@ -211,14 +211,14 @@ void Memory::write_stack_dword(address_t address, uint32_t value) {
 
 // Reset function that returns to a default state
 void Memory::reset() {
-    // Re-initialize members to default-constructed state, avoiding assignment.
+    // Re-initialize members to be consistent with the default constructor.
     text_segment_start = 0;
-    data_segment_start = 0x200000;
-    bss_segment_start = 0x400000;
+    data_segment_start = 0x2000000; 
+    bss_segment_start = 0x2000000 + 0x200000;
 
     text_segment_size = data_segment_start - text_segment_start;
     heap_segment_start = bss_segment_start + initial_heap_size;
-    total_memory_size = heap_segment_start + initial_heap_size + max_stack_size;
+    total_memory_size = heap_segment_start + max_stack_size;
     
     main_memory = std::make_unique<std::vector<uint8_t>>(total_memory_size, 0);
 

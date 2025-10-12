@@ -23,7 +23,7 @@ public:
   UIManager(const Memory& memory_instance);
   ~UIManager();
 
-  void tearDown();
+
   void drawMainRegisters(const RegisterMap& regs);
   void drawYmmRegisters(const RegisterMap& regs);
   void drawTextWindow(address_t current_rip);

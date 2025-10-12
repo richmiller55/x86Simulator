@@ -2,43 +2,53 @@
 #define INTEL_HELPERS_H
 
 #include "ir.h"
-#include "architecture.h"
+#include "ir_visitor.h"
 
-// Forward declarations to avoid circular dependencies.
-class X86Simulator;
-class RegisterMap;
-class Memory;
+// Forward declarations
+class ISimulator;
 
-/**
- * @brief Gets the value of an IR operand, resolving registers or memory.
- */
-uint64_t getOperandValue(const IROperand& op, X86Simulator& simulator);
+class X86IRVisitor : public IRVisitor {
+public:
+    void visit(const IRInstruction& instr, ISimulator& simulator) override;
+};
 
-/**
- * @brief Sets the value of an abstract IR register.
- */
-void setRegisterValue(const IRRegister& reg, uint64_t value, X86Simulator& simulator);
+// --- Scalar Handlers ---
+void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator);
 
-/**
- * @brief Sets the value of a memory location based on an IRMemoryOperand.
- */
-void setMemoryValue(const IRMemoryOperand& mem_op, uint64_t value, X86Simulator& simulator);
+// --- Vector Handlers ---
+void handle_ir_vector_move(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_vector_zero(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_vector_zero_upper(const IRInstruction& ir_instr, ISimulator& simulator);
 
-// --- IR-based Instruction Handlers ---
+// FP
+void handle_ir_packed_add_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_sub_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_mul_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_div_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_max_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_min_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_sqrt_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_reciprocal_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_rsqrt_ps(const IRInstruction& ir_instr, ISimulator& simulator);
 
-void handle_ir_add(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_move(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_load(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_store(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_jump(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_call(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_xor(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_branch(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_cmp(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_inc(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_syscall(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_mul(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_imul(const IRInstruction& ir_instr, X86Simulator& simulator);
-void handle_ir_dec(const IRInstruction& ir_instr, X86Simulator& simulator);
+// Integer
+void handle_ir_packed_add_i8(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_add_i16(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_add_i32(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_add_i64(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_sub_i8(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_sub_i16(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_sub_i32(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_sub_i64(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_mul_low_i16(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_mul_low_i32(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_mul_u32(const IRInstruction& ir_instr, ISimulator& simulator);
+
+// Logical
+void handle_ir_packed_and(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_and_not(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_or(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_packed_xor(const IRInstruction& ir_instr, ISimulator& simulator);
 
 #endif // INTEL_HELPERS_H

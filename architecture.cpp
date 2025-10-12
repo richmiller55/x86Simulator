@@ -5,6 +5,7 @@
  */
 Architecture create_x86_architecture() {
     Architecture arch;
+    arch.isa = ISA::X86;
 
     // This map defines the translation from an abstract IRRegister 
     // (type, index, size) to a concrete x86 register name.
@@ -57,6 +58,39 @@ Architecture create_x86_architecture() {
     arch.register_map[{IRRegisterType::VECTOR, 1, 256}] = "ymm1";
     arch.register_map[{IRRegisterType::VECTOR, 0, 128}] = "xmm0";
     arch.register_map[{IRRegisterType::VECTOR, 1, 128}] = "xmm1";
+
+    return arch;
+}
+
+/**
+ * @brief Populates and returns an Architecture object for the ARM Cortex-R8 ISA.
+ */
+Architecture create_arm_cortex_r8_architecture() {
+    Architecture arch;
+    arch.isa = ISA::ARM;
+
+    // --- General Purpose Registers (GPRs) ---
+    // All GPRs in Cortex-R8 (AArch32) are 32-bit.
+    for (int i = 0; i <= 12; ++i) {
+        arch.register_map[{IRRegisterType::GPR, static_cast<uint32_t>(i), 32}] = "r" + std::to_string(i);
+    }
+
+    // --- Special Purpose GPRs ---
+    arch.register_map[{IRRegisterType::GPR, 13, 32}] = "sp"; // Stack Pointer
+    arch.register_map[{IRRegisterType::GPR, 14, 32}] = "lr"; // Link Register
+
+    // --- Program Counter ---
+    arch.register_map[{IRRegisterType::IP, 0, 32}] = "pc"; // Program Counter (r15)
+
+    // --- Status Register ---
+    arch.register_map[{IRRegisterType::FLAGS, 0, 32}] = "cpsr"; // Current Program Status Register
+
+    // --- Vector/SIMD Registers (NEON) ---
+    // Cortex-R8 can have 16 or 32 128-bit registers (d0-d31 or q0-q15)
+    // We will map the 128-bit view (q registers)
+    for (int i = 0; i < 16; ++i) {
+        arch.register_map[{IRRegisterType::VECTOR, static_cast<uint32_t>(i), 128}] = "q" + std::to_string(i);
+    }
 
     return arch;
 }

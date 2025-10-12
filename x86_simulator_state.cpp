@@ -2,6 +2,7 @@
 #include "decoder.h"
 #include "ui_manager.h"
 #include "x86_to_ir.h"
+#include "INTEL_helpers.h"
 
 #include "ir_executor_helpers.h"
 #include <string>
@@ -12,108 +13,8 @@
 
 // New IR-based dispatcher function
 void X86Simulator::execute_ir_instruction(const IRInstruction& ir_instr) {
-    switch (ir_instr.opcode) {
-        case IROpcode::Move:
-            handle_ir_move(ir_instr, *this);
-            break;
-        case IROpcode::Add:
-            handle_ir_add(ir_instr, *this);
-            break;
-        case IROpcode::Sub:
-            handle_ir_sub(ir_instr, *this);
-            break;
-        case IROpcode::Cmp:
-            handle_ir_cmp(ir_instr, *this);
-            break;
-        case IROpcode::Jump:
-            handle_ir_jump(ir_instr, *this);
-            break;
-        case IROpcode::Branch:
-            handle_ir_branch(ir_instr, *this);
-            break;
-        case IROpcode::Call:
-            handle_ir_call(ir_instr, *this);
-            break;
-        case IROpcode::Xor:
-            handle_ir_xor(ir_instr, *this);
-            break;
-        case IROpcode::Syscall:
-            handle_ir_syscall(ir_instr, *this);
-            break;
-        case IROpcode::And:
-            handle_ir_and(ir_instr, *this);
-            break;
-        case IROpcode::Or:
-            handle_ir_or(ir_instr, *this);
-            break;
-        case IROpcode::Not:
-            handle_ir_not(ir_instr, *this);
-            break;
-        case IROpcode::Shl:
-            handle_ir_shl(ir_instr, *this);
-            break;
-        case IROpcode::Shr:
-            handle_ir_shr(ir_instr, *this);
-            break;
-        case IROpcode::Sar:
-            handle_ir_sar(ir_instr, *this);
-            break;
-        case IROpcode::PackedAnd:
-            handle_ir_packed_and(ir_instr, *this);
-            break;
-        case IROpcode::PackedAndNot:
-            handle_ir_packed_and_not(ir_instr, *this);
-            break;
-        case IROpcode::PackedOr:
-            handle_ir_packed_or(ir_instr, *this);
-            break;
-        case IROpcode::PackedXor:
-            handle_ir_packed_xor(ir_instr, *this);
-            break;
-        case IROpcode::PackedAddPS:
-            handle_ir_packed_add_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedSubPS:
-            handle_ir_packed_sub_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedMulPS:
-            handle_ir_packed_mul_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedDivPS:
-            handle_ir_packed_div_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedMaxPS:
-            handle_ir_packed_max_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedMinPS:
-            handle_ir_packed_min_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedSqrtPS:
-            handle_ir_packed_sqrt_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedReciprocalPS:
-            handle_ir_packed_reciprocal_ps(ir_instr, *this);
-            break;
-        case IROpcode::PackedMulLowI16:
-            handle_ir_packed_mul_low_i16(ir_instr, *this);
-            break;
-        case IROpcode::VectorZero:
-            handle_ir_vector_zero(ir_instr, *this);
-            break;
-        case IROpcode::Ret:
-            handle_ir_ret(ir_instr, *this);
-            break;
-        case IROpcode::Div:
-            handle_ir_div(ir_instr, *this);
-            break;
-        // Other opcodes will be added here as their translations are implemented.
-        default:
-        {
-            std::string logmessage = "Unsupported IR Opcode: " + std::to_string(static_cast<int>(ir_instr.opcode));
-            db_manager_.log(session_id_, logmessage, "ERROR", instructionPointer_, __FILE__, __LINE__);
-            break;
-        }
-    }
+    X86IRVisitor visitor;
+    accept(visitor, ir_instr);
 }
 
 // Rewritten executeInstruction to use the new IR pipeline

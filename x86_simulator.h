@@ -33,6 +33,8 @@
 #include "architecture.h"
 #include "ir.h"
 
+#include "i_simulator.h"
+
 class UIManager;
 
 
@@ -60,7 +62,7 @@ const uint64_t RFLAGS_ALWAYS_UNSET_BIT_3 = 3; // Reserved, always unset
 const uint64_t RFLAGS_ALWAYS_UNSET_BIT_5 = 5; // Reserved, always unset
 bool is_number(const std::string& s);
 
-class X86Simulator {
+class X86Simulator : public ISimulator {
 #ifdef GOOGLE_TEST
 friend class SimulatorCoreTest;
 friend class IRExecutorTest;
@@ -74,10 +76,11 @@ public:
   bool executeInstruction(const DecodedInstruction& decoded_instr);
   void runSingleInstruction();
   bool isRunning();
-  bool loadProgram(const std::string& filename);
+  bool loadProgram(const std::string& filename) override;
   bool firstPass();
   bool secondPass();
-  void runProgram();
+  void runProgram() override;
+  void accept(IRVisitor& visitor, const IRInstruction& instr) override;
   void dumpTextSegment(const std::string& filename);
   void dumpDataSegment(const std::string& filename);
   void dumpBssSegment(const std::string& filename);
@@ -87,29 +90,30 @@ public:
   std::string trim(const std::string& str) ;
 
   // --- Getters for helpers ---
-  const Architecture& get_architecture() const { return architecture_; }
-  RegisterMap& getRegisterMap() { return register_map_; }
-  const RegisterMap& getRegisterMap() const { return register_map_; }
-  Memory& getMemory() { return memory_; }
-  const Memory& getMemory() const { return memory_; }
-  int get_session_id() const { return session_id_; }
-  IDatabaseManager& getDatabaseManager() { return db_manager_; }
+  const Architecture& get_architecture() const override { return architecture_; }
+  RegisterMap& getRegisterMap() override { return register_map_; }
+  const RegisterMap& getRegisterMap() const override { return register_map_; }
+  Memory& getMemory() override { return memory_; }
+  const Memory& getMemory() const override { return memory_; }
+  int get_session_id() const override { return session_id_; }
+  IDatabaseManager& getDatabaseManager() override { return db_manager_; }
   bool is_headless() const { return headless_; }
+  address_t get_instruction_pointer() const { return instructionPointer_; }
 
-  bool get_CF() const;
-  void set_CF(bool value);
-  bool get_ZF() const;
-  void set_ZF(bool value);
-  bool get_SF() const;
-  void set_SF(bool value);
-  bool get_OF() const;
-  void set_OF(bool value);
+  bool get_CF() const override;
+  void set_CF(bool value) override;
+  bool get_ZF() const override;
+  void set_ZF(bool value) override;
+  bool get_SF() const override;
+  void set_SF(bool value) override;
+  bool get_OF() const override;
+  void set_OF(bool value) override;
   bool get_DF() const;
   void set_DF(bool value);
   bool get_AF() const;
   void set_AF(bool value);
-  bool get_PF() const;
-    void set_PF(bool val);
+  bool get_PF() const override;
+  void set_PF(bool val) override;
 
     void execute_ir_instruction(const IRInstruction& ir_instr);
     void update_rflags_in_register_map();

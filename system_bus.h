@@ -4,7 +4,8 @@
 #include "i_database_manager.h"
 #include "file_system_device.h"
 #include "memory.h"
-#include "x86_simulator.h"
+#include "i_simulator.h"
+#include "architecture.h"
 #include <vector>
 #include <string>
 #include <memory>
@@ -19,7 +20,7 @@ struct DeviceInfo {
 
 struct Process {
     std::unique_ptr<Memory> memory;
-    std::unique_ptr<X86Simulator> simulator;
+    std::unique_ptr<ISimulator> simulator;
 };
 
 class SystemBus {
@@ -31,7 +32,7 @@ public:
     void run();
 
     size_t get_process_count() const;
-    const X86Simulator* get_process(size_t index) const;
+    const ISimulator* get_process(size_t index) const;
 
 private:
     void create_and_configure_simulator(const nlohmann::json& process_info, bool ui_enabled);

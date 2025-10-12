@@ -1,4 +1,4 @@
-# x86 Simulator: GEMINI Project
+# Simulator: GEMINI Project
 
 ## Project Overview
 

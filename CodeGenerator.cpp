@@ -25,15 +25,34 @@ void CodeGenerator::process_line(const std::string& line_raw) {
     return; // Skip comments and empty lines
   }
 
+  auto comment_pos = line.find(';');
+  if (comment_pos != std::string::npos) {
+      line = line.substr(0, comment_pos);
+      trim(line);
+  }
+
   std::vector<std::string> tokens = parse_line(line);
   if (tokens.empty()) {
     return;
+  }
+
+  // Data directives (db, dd, resb, etc.) are handled in the first pass to lay out memory.
+  // The CodeGenerator's job is to generate executable code, so it should ignore them.
+  for (const auto& token : tokens) {
+    if (token == "db" || token == "dd" || token == "resb" || token == "resw" || token == "resd") {
+        return;
+    }
   }
 
   std::string mnemonic = tokens[0];
   std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
   if (mnemonic.back() == ':') {
     return; // Skip labels in this pass
+  }
+
+  // The 'global' and 'section' directives are for the assembler and do not generate code.
+  if (mnemonic == "global" || mnemonic == "section") {
+      return;
   }
 
   OperandParser operands(tokens);
@@ -417,6 +436,9 @@ void CodeGenerator::process_line(const std::string& line_raw) {
 	current_address_ += 5;
       }
 
+    } else if (mnemonic == "ret") {
+      machine_code_.push_back(0xC3);
+      current_address_ += 1;
     } else if (mnemonic == "int") {
       if (operands.operand_count() < 1) return;
       // Assuming "int 0x80"
@@ -859,6 +881,37 @@ void CodeGenerator::process_line(const std::string& line_raw) {
       } catch (const std::exception& e) {
 	// Error handling for stoi
       }
+    } else if (mnemonic == "vpsubps") {
+      if (operands.operand_count() < 3) return;
+      try {
+        std::string dest_str = operands.get_operand(0);
+        std::string src1_str = operands.get_operand(1);
+        std::string src2_str = operands.get_operand(2);
+
+        uint8_t dest_reg = std::stoi(dest_str.substr(3));
+        uint8_t src1_reg = std::stoi(src1_str.substr(3));
+        uint8_t src2_reg = std::stoi(src2_str.substr(3));
+
+        // VEX prefix (2-byte form: 0xC5)
+        machine_code_.push_back(0xC5);
+
+        // VEX byte 2: [R|vvvv|L|pp]
+        // R=~0=1 (assuming registers 0-7), vvvv=~src1_reg, L=1 (256-bit), pp=00 (no prefix)
+        uint8_t vex_byte2 = (1 << 7) | ((~src1_reg & 0b1111) << 3) | (1 << 2) | 0;
+        machine_code_.push_back(vex_byte2);
+
+        // Opcode for VPSUBPS
+        machine_code_.push_back(0x5C);
+
+        // ModR/M byte: [mod|reg|rm]
+        // mod=11 (register-to-register), reg=dest_reg, rm=src2_reg
+        uint8_t modrm = (0b11 << 6) | ((dest_reg & 0b111) << 3) | (src2_reg & 0b111);
+        machine_code_.push_back(modrm);
+
+        current_address_ += 4; // 2(VEX) + 1(opcode) + 1(ModR/M)
+      } catch (const std::exception& e) {
+        // Error handling
+      }
     } else if (mnemonic == "vmovups") {
       if (operands.operand_count() < 2) return;
       try {
@@ -1008,6 +1061,12 @@ void CodeGenerator::process_line(const std::string& line_raw) {
       } catch (const std::exception& e) {
 	// Error handling
       }
+    } else {
+        // If we reach here, the mnemonic is not recognized.
+        std::string error_message = "CodeGenerator Error: Unknown mnemonic '" + mnemonic + "' on line: " + line_raw;
+        // Log to stderr for immediate visibility during console execution.
+        std::cerr << error_message << std::endl;
+        throw std::runtime_error(error_message);
     }
 }
 	
