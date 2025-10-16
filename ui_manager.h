@@ -12,6 +12,8 @@
 #include "program_decoder.h"
 #include "file_system_device.h"
 
+class Pipeline; // Forward declaration
+
 struct DecodedInstruction; // Forward declaration
 
 struct WindowLayout {
@@ -28,12 +30,14 @@ public:
   void drawYmmRegisters(const RegisterMap& regs);
   void drawTextWindow(address_t current_rip);
   void drawInstructionDescription(address_t current_rip, const RegisterMap& regs);
+  void drawPipelineWindow();
   void drawLegend();
   void drawFileTail();
   void refreshAll();
   bool waitForInput();
-  void setProgramDecoder(std::unique_ptr<ProgramDecoder> decoder);
+  void setProgramDecoder(ProgramDecoder* decoder);
   void setRegisterMap(const RegisterMap* regs); // New method to set current RegisterMap
+  void setPipeline(const Pipeline* pipeline);
   void setSymbolTable(const std::map<std::string, address_t>* symbol_table);
 
 private:
@@ -54,6 +58,7 @@ private:
   WINDOW *win_ymm_;
   WINDOW *win_instruction_description_;
   WINDOW *win_legend_;
+  WINDOW *win_pipeline_;
   WINDOW *win_file_tail_;
   const Memory& memory_;
   size_t text_scroll_offset_;
@@ -65,6 +70,7 @@ private:
 
   DisplayBase display_base_;
   const RegisterMap* current_regs_; // Pointer to the current RegisterMap for input handling
+  const Pipeline* pipeline_;
   const std::map<std::string, address_t>* symbol_table_;
   std::map<address_t, std::string> address_to_label_;
   bool show_labels_in_text_segment_;
@@ -74,7 +80,7 @@ private:
   };
 
 
-  std::unique_ptr<ProgramDecoder> program_decoder_;
+  ProgramDecoder* program_decoder_;
 };
 
 #endif // UI_MANAGER_H

@@ -85,7 +85,7 @@ void SystemBus::create_and_configure_simulator(const json& process_info, bool ui
         simulator = std::move(x86_sim);
     } else if (isa_str == "arm") {
         auto arm_sim = std::make_unique<ArmSimulator>(db_manager_, *memory, session_id, !ui_enabled);
-
+        arm_sim->loadProgram(program_path);
         simulator = std::move(arm_sim);
     } else {
         std::cerr << "Error: Unknown ISA '" << isa_str << "' in configuration." << std::endl;

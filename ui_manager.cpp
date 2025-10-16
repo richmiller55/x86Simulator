@@ -1,6 +1,7 @@
 #include "ui_manager.h"
 #include "register_enums.h"
 #include "x86_simulator.h"
+#include "pipeline.h"
 #include <sstream>
 #include <iomanip>
 #include "decoder.h"
@@ -17,6 +18,7 @@ UIManager::UIManager(const Memory& memory_instance)
   win_ymm_(nullptr),
   win_instruction_description_(nullptr),
   win_legend_(nullptr),
+  win_pipeline_(nullptr),
   win_file_tail_(nullptr),
   memory_(memory_instance),
   text_scroll_offset_(0),
@@ -26,6 +28,7 @@ UIManager::UIManager(const Memory& memory_instance)
   ymm_view_mode_(YmmViewMode::HEX_256),
   display_base_(DisplayBase::HEX),
   current_regs_(nullptr),
+  pipeline_(nullptr),
   symbol_table_(nullptr),
   address_to_label_(),
   show_labels_in_text_segment_(false)
@@ -53,6 +56,7 @@ UIManager::UIManager(const Memory& memory_instance)
     win_ymm_ = newwin(1, 1, 1, 1);
     win_instruction_description_ = newwin(1, 1, 1, 1);
     win_legend_ = newwin(1, 1, 1, 1);
+    win_pipeline_ = newwin(1, 1, 1, 1);
     win_file_tail_ = newwin(1, 1, 1, 1);
     arrangeWindows();
 }
@@ -63,6 +67,7 @@ namespace { // Anonymous namespace for layout constants
     const WindowLayout kNormalTextSegmentLayout = { .y = 14, .x = 1, .height = 23, .width = 30 };
     const WindowLayout kNormalYmmLayout = { .y = 23, .x = 32, .height = 12, .width = 80 };
     const WindowLayout kNormalInstructionDescLayout = { .y = 1, .x = 63, .height = 12, .width = 50 };
+    const WindowLayout kPipelineLayout = { .y = 14, .x = 63, .height = 8, .width = 50 };
     const WindowLayout kNormalLegendLayout = { .y = 37, .x = 1, .height = 3, .width = 90 };
     const WindowLayout kNormalFileTailLayout = { .y = 14, .x = 63, .height = 8, .width = 50 };
 
@@ -90,6 +95,7 @@ void UIManager::arrangeWindows() {
     const auto& win64_layout = kNormalWin64Layout;
     const auto& text_segment_layout = kNormalTextSegmentLayout;
     const auto& instruction_desc_layout = kNormalInstructionDescLayout;
+    const auto& pipeline_layout = kPipelineLayout;
     const auto& legend_layout = kNormalLegendLayout;
     const auto& file_tail_layout = kNormalFileTailLayout;
     const auto& ymm_layout = (current_view_ == UIView::kNormal) ? kNormalYmmLayout : kExpandedYmmLayout;
@@ -108,6 +114,9 @@ void UIManager::arrangeWindows() {
 
     mvwin(win_instruction_description_, instruction_desc_layout.y, instruction_desc_layout.x);
     wresize(win_instruction_description_, instruction_desc_layout.height, instruction_desc_layout.width);
+
+    mvwin(win_pipeline_, pipeline_layout.y, pipeline_layout.x);
+    wresize(win_pipeline_, pipeline_layout.height, pipeline_layout.width);
 
     mvwin(win_legend_, legend_layout.y, legend_layout.x);
     wresize(win_legend_, legend_layout.height, legend_layout.width);
@@ -139,6 +148,7 @@ UIManager::~UIManager() {
   delwin(win_text_segment_);
   delwin(win_ymm_);
   delwin(win_instruction_description_);
+  delwin(win_pipeline_);
   delwin(win_legend_);
   delwin(win_file_tail_);
   if (ncurses_initialized) {
@@ -147,8 +157,12 @@ UIManager::~UIManager() {
   }
 }
 
-void UIManager::setProgramDecoder(std::unique_ptr<ProgramDecoder> decoder) {
-    program_decoder_ = std::move(decoder);
+void UIManager::setProgramDecoder(ProgramDecoder* decoder) {
+    program_decoder_ = decoder;
+}
+
+void UIManager::setPipeline(const Pipeline* pipeline) {
+    pipeline_ = pipeline;
 }
 
 
@@ -395,10 +409,78 @@ void UIManager::refreshAll() {
     wnoutrefresh(win_ymm_);
     wnoutrefresh(win_text_segment_);
     wnoutrefresh(win_instruction_description_);
+    wnoutrefresh(win_pipeline_);
     wnoutrefresh(win_legend_);
     wnoutrefresh(win_file_tail_);
     doupdate();
 }
+
+static std::string to_string(IROpcode opcode) {
+    switch (opcode) {
+        case IROpcode::Add: return "Add";
+        case IROpcode::Sub: return "Sub";
+        case IROpcode::Move: return "Move";
+        case IROpcode::Load: return "Load";
+        case IROpcode::Store: return "Store";
+        case IROpcode::Jump: return "Jump";
+        case IROpcode::Branch: return "Branch";
+        case IROpcode::Cmp: return "Cmp";
+        case IROpcode::Inc: return "Inc";
+        case IROpcode::Dec: return "Dec";
+        case IROpcode::Syscall: return "Syscall";
+        case IROpcode::Mul: return "Mul";
+        case IROpcode::IMul: return "IMul";
+        case IROpcode::Div: return "Div";
+        case IROpcode::Call: return "Call";
+        case IROpcode::Ret: return "Ret";
+        case IROpcode::Push: return "Push";
+        case IROpcode::Pop: return "Pop";
+        case IROpcode::Xor: return "Xor";
+        case IROpcode::And: return "And";
+        case IROpcode::Or: return "Or";
+        case IROpcode::Not: return "Not";
+        case IROpcode::Shl: return "Shl";
+        case IROpcode::Shr: return "Shr";
+        case IROpcode::Sar: return "Sar";
+        default: return "Unknown";
+    }
+}
+
+void UIManager::drawPipelineWindow() {
+    werase(win_pipeline_);
+    box(win_pipeline_, 0, 0);
+    mvwprintw(win_pipeline_, 1, 2, "--- Pipeline ---");
+
+    if (!pipeline_) {
+        mvwprintw(win_pipeline_, 2, 2, "No pipeline data.");
+        return;
+    }
+
+    const auto& pipeline_state = pipeline_->get_pipeline_state();
+    int row = 2;
+    mvwprintw(win_pipeline_, row++, 2, "IF   ID   EX   MEM  WB");
+    mvwprintw(win_pipeline_, row++, 2, "------------------------");
+
+    std::string stages[5];
+    for (const auto& p_instr : pipeline_state) {
+        std::string instr_str = to_string(p_instr.ir_instruction.opcode);
+        switch (p_instr.state) {
+            case InstructionState::Fetched:    stages[0] = instr_str; break;
+            case InstructionState::Decoded:    stages[1] = instr_str; break;
+            case InstructionState::Executing:  stages[2] = instr_str; break;
+            case InstructionState::Memory:     stages[3] = instr_str; break;
+            case InstructionState::Writeback:  stages[4] = instr_str; break;
+            default: break;
+        }
+    }
+
+    std::stringstream ss;
+    for (int i = 0; i < 5; ++i) {
+        ss << std::left << std::setw(5) << stages[i];
+    }
+    mvwprintw(win_pipeline_, row, 2, "%s", ss.str().c_str());
+}
+
 #include <iostream>
 #include <string>
 #include <locale>

@@ -42,10 +42,14 @@ public:
 
     void accept(IRVisitor& visitor, const IRInstruction& instr) override;
 
+    void execute_ir_instruction(const IRInstruction& ir_instr) override;
+    ProgramDecoder* getProgramDecoder() override;
+
     void set_PF(bool value) override;
     bool get_PF() const override;
 
 private:
+    std::unique_ptr<ProgramDecoder> program_decoder_;
     IDatabaseManager& db_manager_;
     Memory& memory_;
     RegisterMap register_map_;

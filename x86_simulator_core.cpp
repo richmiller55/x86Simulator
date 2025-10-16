@@ -17,6 +17,7 @@ X86Simulator::X86Simulator(IDatabaseManager& db_manager, Memory& memory, int ses
       instructionPointer_(0),
       program_size_in_bytes_(0),
       rflags_(0) {
+   pipeline_ = std::make_unique<Pipeline>(*this);
    if (!headless_) {
     ui_ = std::make_unique<UIManager>(memory_);
     ui_->setRegisterMap(&register_map_);

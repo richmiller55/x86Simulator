@@ -11,6 +11,7 @@ class Memory;
 class IDatabaseManager;
 class Architecture;
 class IRVisitor;
+class ProgramDecoder;
 
 /**
  * @class ISimulator
@@ -44,6 +45,8 @@ public:
      */
     virtual bool loadProgram(const std::string& program_path) = 0;
 
+    virtual void execute_ir_instruction(const IRInstruction& ir_instr) = 0;
+
     // --- Generic Component Getters ---
     virtual RegisterMap& getRegisterMap() = 0;
     virtual const RegisterMap& getRegisterMap() const = 0;
@@ -51,6 +54,7 @@ public:
     virtual const Memory& getMemory() const = 0;
     virtual IDatabaseManager& getDatabaseManager() = 0;
     virtual const Architecture& get_architecture() const = 0;
+    virtual ProgramDecoder* getProgramDecoder() = 0;
     virtual int get_session_id() const = 0;
 
     // --- Generic Flag Setters/Getters ---
