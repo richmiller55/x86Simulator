@@ -29,6 +29,7 @@ LIB_SRCS = \
 	instruction_describer.cpp \
 	INTEL_helpers.cpp \
 	ir_executor_helpers.cpp \
+	pipeline.cpp \
 	program_decoder.cpp \
 	formatting_utils.cpp \
 	architecture.cpp \
@@ -62,6 +63,7 @@ $(TARGET): $(MAIN_OBJ) $(LIB_OBJS)
 
 # --- Test Targets ---
 TEST_SRCS = \
+	tests/ir_translation_test.cpp \
 	tests/ir_executor_test.cpp \
 	tests/mock_database_manager.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)

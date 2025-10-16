@@ -253,10 +253,11 @@ bool X86Simulator::secondPass() {
             // Fallback to the start of the text segment if the label is not found
             register_map_.set64("rip", memory_.get_text_segment_start());
         }
-        auto program_decoder = std::make_unique<ProgramDecoder>(memory_);
-        program_decoder->decode();
+        program_decoder_ = std::make_unique<ProgramDecoder>(memory_);
+        program_decoder_->decode();
         if (ui_) {
-            ui_->setProgramDecoder(std::move(program_decoder));
+            ui_->setProgramDecoder(program_decoder_.get());
+            ui_->setPipeline(pipeline_.get());
             ui_->setSymbolTable(&symbolTable_);
         }
         return true;

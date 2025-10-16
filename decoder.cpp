@@ -52,6 +52,7 @@ Decoder::Decoder() {
         {0xEB, "JMP"},
         {0xE9, "JMP"},
         {0xE8, "CALL"},
+        {0xC3, "RET"},
         {0x09, "OR"},
         {0x31, "XOR"},
         {0x21, "AND"},
@@ -383,7 +384,7 @@ std::unique_ptr<DecodedInstruction> Decoder::decodeInstruction(const Memory& mem
         std::string mnemonic = decodeMnemonic(opcode);
         std::transform(mnemonic.begin(), mnemonic.end(), mnemonic.begin(), ::tolower);
         decoded_instr->mnemonic = mnemonic;
-        if (decoded_instr->mnemonic == "UNKNOWN") {
+        if (decoded_instr->mnemonic == "unknown") {
             return nullptr;
         }
 

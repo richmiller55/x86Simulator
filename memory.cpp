@@ -54,7 +54,9 @@ Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
 
 // Generic bounds checking helper function
 void Memory::check_bounds(address_t address, size_t size) const {
-    if (address + size > main_memory->size() || address < 0) {
+    // The address must be within the allocated size, and the range [address, address + size)
+    // must not overflow and must be within the allocated size.
+    if (address >= main_memory->size() || size > main_memory->size() - address) {
         throw std::out_of_range("Memory access out of bounds!");
     }
 }

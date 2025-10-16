@@ -32,6 +32,8 @@
 #include "decoder.h" // Include for DecodedInstruction and DecodedOperand
 #include "architecture.h"
 #include "ir.h"
+#include "pipeline.h"
+#include "program_decoder.h"
 
 #include "i_simulator.h"
 
@@ -91,6 +93,7 @@ public:
 
   // --- Getters for helpers ---
   const Architecture& get_architecture() const override { return architecture_; }
+  ProgramDecoder* getProgramDecoder() override { return program_decoder_.get(); }
   RegisterMap& getRegisterMap() override { return register_map_; }
   const RegisterMap& getRegisterMap() const override { return register_map_; }
   Memory& getMemory() override { return memory_; }
@@ -115,7 +118,7 @@ public:
   bool get_PF() const override;
   void set_PF(bool val) override;
 
-    void execute_ir_instruction(const IRInstruction& ir_instr);
+    void execute_ir_instruction(const IRInstruction& ir_instr) override;
     void update_rflags_in_register_map();
 
     // --- I/O Handling ---
@@ -145,6 +148,8 @@ private:
     uint64_t rflags_;
 
     std::unique_ptr<UIManager> ui_;
+    std::unique_ptr<Pipeline> pipeline_;
+    std::unique_ptr<ProgramDecoder> program_decoder_;
     std::map<std::string, address_t> symbolTable_;
     std::vector<std::pair<uint16_t, uint64_t>> out_log_;
     std::vector<std::string> programLines_; // raw

@@ -12,6 +12,15 @@ public:
     void visit(const IRInstruction& instr, ISimulator& simulator) override;
 };
 
+/**
+ * @class ArmIRVisitor
+ * @brief Implements the visitor pattern for executing IR instructions on the ARM simulator.
+ */
+class ArmIRVisitor : public IRVisitor {
+public:
+    void visit(const IRInstruction& instr, ISimulator& simulator) override;
+};
+
 // --- Scalar Handlers ---
 void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator);

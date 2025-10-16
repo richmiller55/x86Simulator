@@ -80,7 +80,7 @@ void X86Simulator::runProgram() {
                 db_manager_.log(session_id_, "End of program", "INFO", instruction_pointer, __FILE__, __LINE__);
                 break; // Program finished
             }
-            runSingleInstruction();
+            pipeline_->cycle();
         }
         return;
     }
@@ -93,6 +93,7 @@ void X86Simulator::runProgram() {
     ui_->drawYmmRegisters(register_map_);
     ui_->drawTextWindow(register_map_.get64("rip"));
     ui_->drawInstructionDescription(register_map_.get64("rip"), register_map_);
+    ui_->drawPipelineWindow();
     ui_->drawLegend();
 
     while (isRunning) {
@@ -103,8 +104,8 @@ void X86Simulator::runProgram() {
             continue;
         }
 
-        // User pressed 'n', so execute one instruction
-        runSingleInstruction();
+        // User pressed 'n', so execute one cycle
+        pipeline_->cycle();
 
         // Check for end of program
         address_t instruction_pointer = register_map_.get64("rip");
@@ -118,6 +119,7 @@ void X86Simulator::runProgram() {
         ui_->drawYmmRegisters(register_map_);
         ui_->drawTextWindow(register_map_.get64("rip"));
         ui_->drawInstructionDescription(register_map_.get64("rip"), register_map_);
+        ui_->drawPipelineWindow();
     }
 }
 

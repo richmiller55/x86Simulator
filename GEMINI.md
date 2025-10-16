@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project is an x86 simulator built in C++17, designed to execute x86 instructions and simulate the core components of a computer system. It is integrated with a PostgreSQL database and features a text-based user interface built with ncurses.
+This project is an simulator built in C++17, designed to execute instructions and simulate the core components of a computer system. It is integrated with a PostgreSQL database and features a text-based user interface built with ncurses. It strives to be a ISA simulator with a IR stucture . currently limited coverage is implemented for Intel 86 and even less coverage for ARM, Plans for future support for powerPC RISC-V, The simulator will support pipelining
 
 ### Key Technologies
 
@@ -19,13 +19,14 @@ This project is an x86 simulator built in C++17, designed to execute x86 instruc
 
 The simulator is structured around these key classes:
 
-*   `X86Simulator`: The main class that orchestrates the overall simulation process.
+*   `SystemBus`: Reads a config file. system_bus.json that sets process up
+*   `ISimulator`: An interface for a generic instruction set simulator
 *   `DatabaseManager`: Handles all interactions with the PostgreSQL database.
 *   `RegisterMap`: Manages the state of the CPU's registers.
 *   `Memory`: Simulates the computer's memory for instruction and data storage.
 *   `UIManager`: Manages the ncurses-based text user interface.
 *   `Decoder`: Responsible for decoding x86 instructions for execution.
-*   `SystemBus`: Responsible a vector of memory object which it gives to the simulator
+*   `IROpcode`: Generic/Scalar Operations
 
 
 ## Building and Running
@@ -84,10 +85,6 @@ The simulator should be refactored to support multiple architectures by creating
 
 ### Specific TODO List
 
-1.  **Intermediate Representation (IR) Development:**
-    *   Design a canonical set of operations for the IR (e.g., `Move`, `Add`, `Load`, `Store`) that can represent instructions from various ISAs.
-    *   Define a flexible structure within the IR to represent diverse operand types and complex addressing modes (e.g., x86's `base + index*scale + displacement`).
-    *   Abstract control flow instructions in the IR, creating a generic `Branch` operation with properties for the target address and condition codes.
     *   Create a generic representation for system calls (e.g., `Syscall`) that can be mapped to specific ISA implementations like `syscall` (x86) or `ecall` (RISC-V).
 
 2.  **Abstraction Layer Implementation:**
@@ -99,4 +96,3 @@ The simulator should be refactored to support multiple architectures by creating
     *   Create distinct "front-end" parsers for each target ISA (e.g., one for x86, another for ARM) responsible for translating assembly into the IR.
     *   Refactor the core simulator engine to operate exclusively on the abstract IR, removing any direct dependencies on x86-specific logic.
     *   Implement "back-end" modules that can translate the simulator's state (from the IR) back into an architecture-specific view for debugging and output.
-    *   Add a configuration system that allows the user to specify the target architecture (ISA, endianness, etc.) at startup.

@@ -11,7 +11,7 @@ void ProgramDecoder::decode() {
         if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, addr)) {
             address_to_index_map_[addr] = index++;
             addr += decoded_instr_opt->length_in_bytes;
-            decoded_program_.push_back(std::move(decoded_instr_opt));
+            decoded_program_.push_back(std::make_unique<DecodedInstruction>(std::move(*decoded_instr_opt)));
         } else {
             addr++;
         }
