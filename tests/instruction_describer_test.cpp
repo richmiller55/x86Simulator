@@ -6,9 +6,11 @@
 
 class InstructionDescriberTest : public ::testing::Test {
 protected:
+    InstructionDescriberTest() : arch_(create_x86_architecture()), regs(arch_) {}
     void SetUp() override {
     }
 
+    Architecture arch_;
     RegisterMap regs;
     Decoder& decoder = Decoder::getInstance();
     Memory memory{1024, 1024, 1024};

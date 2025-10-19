@@ -10,12 +10,11 @@
 class IRTranslationTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        db_manager = &MockDatabaseManager::getInstance();
-        simulator = std::make_unique<X86Simulator>(*db_manager, memory, 0, true);
+        simulator = std::make_unique<X86Simulator>(mock_db_manager, memory, 0, true);
     }
 
     Memory memory;
-    IDatabaseManager* db_manager;
+    MockDatabaseManager mock_db_manager;
     std::unique_ptr<X86Simulator> simulator;
 };
 
@@ -23,6 +22,8 @@ TEST_F(IRTranslationTest, MovImmediateToRegister) {
     // 1. Create a DecodedInstruction for "mov eax, 123"
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "mov";
+    decoded_instr.address = 0x4000; // Dummy address
+    decoded_instr.length_in_bytes = 5; // Typical length for mov eax, imm32
     
     DecodedOperand dest_op;
     dest_op.type = OperandType::REGISTER;
@@ -121,8 +122,17 @@ TEST_F(IRTranslationTest, CmpAndJump) {
     // 2. Create and execute "cmp eax, 100"
     DecodedInstruction cmp_instr;
     cmp_instr.mnemonic = "cmp";
-    cmp_instr.operands.push_back({OperandType::REGISTER, "eax"});
-    cmp_instr.operands.push_back({OperandType::IMMEDIATE, "100", 100});
+    cmp_instr.address = 0x4000;
+    cmp_instr.length_in_bytes = 3;
+    DecodedOperand cmp_op1;
+    cmp_op1.type = OperandType::REGISTER;
+    cmp_op1.text = "eax";
+    cmp_instr.operands.push_back(cmp_op1);
+    DecodedOperand cmp_op2;
+    cmp_op2.type = OperandType::IMMEDIATE;
+    cmp_op2.text = "100";
+    cmp_op2.value = 100;
+    cmp_instr.operands.push_back(cmp_op2);
 
     auto ir_cmp = translate_to_ir(cmp_instr);
     ASSERT_NE(ir_cmp, nullptr);
@@ -135,7 +145,13 @@ TEST_F(IRTranslationTest, CmpAndJump) {
     address_t original_rip = simulator->getRegisterMap().get64("rip");
     DecodedInstruction jne_instr;
     jne_instr.mnemonic = "jne";
-    jne_instr.operands.push_back({OperandType::IMMEDIATE, "0x1000", 0x1000});
+    jne_instr.address = 0x4003;
+    jne_instr.length_in_bytes = 2;
+    DecodedOperand jne_op;
+    jne_op.type = OperandType::IMMEDIATE;
+    jne_op.text = "0x1000";
+    jne_op.value = 0x1000;
+    jne_instr.operands.push_back(jne_op);
 
     auto ir_jne = translate_to_ir(jne_instr);
     ASSERT_NE(ir_jne, nullptr);

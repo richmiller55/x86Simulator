@@ -36,6 +36,7 @@ Memory::Memory(size_t text_size, size_t data_size, size_t bss_size)
     bss_segment_start(text_size + data_size)
 {
     // Calculate memory layout based on provided sizes.
+    heap_segment_start = bss_segment_start + bss_size;
     total_memory_size = heap_segment_start + max_stack_size;
 
     // Allocate main memory using std::vector and smart pointer.

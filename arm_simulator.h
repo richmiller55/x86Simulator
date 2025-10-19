@@ -52,8 +52,8 @@ private:
     std::unique_ptr<ProgramDecoder> program_decoder_;
     IDatabaseManager& db_manager_;
     Memory& memory_;
-    RegisterMap register_map_;
     Architecture architecture_;
+    RegisterMap register_map_;
     IRProgram ir_program_;
     int session_id_;
     bool headless_;

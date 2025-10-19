@@ -72,13 +72,23 @@ void SystemBus::create_and_configure_simulator(const json& process_info, bool ui
 
     int session_id = db_manager_.createSession(program_path);
     auto memory = std::make_unique<Memory>();
+    memory->reset(); // Reset memory before use
     std::unique_ptr<ISimulator> simulator;
 
     if (isa_str == "x86") {
         auto x86_sim = std::make_unique<X86Simulator>(db_manager_, *memory, session_id, !ui_enabled);
-        x86_sim->loadProgram(program_path);
-        x86_sim->firstPass();
-        x86_sim->secondPass();
+        if (!x86_sim->loadProgram(program_path)) {
+            std::cerr << "Error: Failed to load program '" << program_path << "'" << std::endl;
+            return;
+        }
+        if (!x86_sim->firstPass()) {
+            std::cerr << "Error: First pass failed for program '" << program_path << "'" << std::endl;
+            return;
+        }
+        if (!x86_sim->secondPass()) {
+            std::cerr << "Error: Second pass failed for program '" << program_path << "'" << std::endl;
+            return;
+        }
         x86_sim->dumpTextSegment("text_segment.dump");
         x86_sim->dumpDataSegment("data_segment.dump");
         x86_sim->dumpSymbolTable("symbol_table.dump");

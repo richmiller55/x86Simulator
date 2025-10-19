@@ -53,11 +53,16 @@ Architecture create_x86_architecture() {
     arch.register_map[{IRRegisterType::IP, 0, 16}] = "ip";
 
     // --- Vector Registers ---
-    // For simplicity, only adding a few here. A full implementation would have all.
-    arch.register_map[{IRRegisterType::VECTOR, 0, 256}] = "ymm0";
-    arch.register_map[{IRRegisterType::VECTOR, 1, 256}] = "ymm1";
-    arch.register_map[{IRRegisterType::VECTOR, 0, 128}] = "xmm0";
-    arch.register_map[{IRRegisterType::VECTOR, 1, 128}] = "xmm1";
+    // XMM (128-bit) and YMM (256-bit)
+    for (int i = 0; i < 16; ++i) {
+        arch.register_map[{IRRegisterType::VECTOR, static_cast<uint32_t>(i), 128}] = "xmm" + std::to_string(i);
+        arch.register_map[{IRRegisterType::VECTOR, static_cast<uint32_t>(i), 256}] = "ymm" + std::to_string(i);
+    }
+
+    // --- Flags Register ---
+    arch.register_map[{IRRegisterType::FLAGS, 0, 64}] = "rflags";
+    arch.register_map[{IRRegisterType::FLAGS, 0, 32}] = "eflags";
+    arch.register_map[{IRRegisterType::FLAGS, 0, 16}] = "flags";
 
     return arch;
 }

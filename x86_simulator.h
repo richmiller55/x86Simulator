@@ -137,8 +137,8 @@ private:
     // --- Member Variables ---
     IDatabaseManager& db_manager_;
     Memory& memory_;
-    RegisterMap register_map_;
     Architecture architecture_;
+    RegisterMap register_map_;
 
     int session_id_;
     bool headless_;

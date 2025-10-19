@@ -35,7 +35,6 @@ std::vector<std::string> readLinesFromFile(const std::string& filePath) {
 }
 
 bool X86Simulator::loadProgram(const std::string& filename) {
-  memory_.reset();
   register_map_.set64("rsp", memory_.get_stack_bottom());
   programLines_ = readLinesFromFile(filename);
   return !programLines_.empty(); // Or a more robust check for successful read.

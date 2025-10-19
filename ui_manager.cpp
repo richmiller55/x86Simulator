@@ -196,8 +196,8 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
   mvwprintw(win, 1, 2, "--- %s ---", actual_title.c_str());
 
   int row = 2;
-  const auto& map64 = regs.getRegisterNameMap64();
-  const auto& map32 = regs.getRegisterNameMap32();
+  const auto& map64 = regs.getGprMap64();
+  const auto& map32 = regs.getGprMap32();
 
   size_t end = (max_regs == -1) ? order.size() : std::min(order.size(), scroll_offset + static_cast<size_t>(max_regs));
   for (size_t i = scroll_offset; i < end; ++i) {
@@ -215,7 +215,7 @@ void UIManager::drawRegisterWindow(WINDOW* win, const std::string& title,
           ss << "0x" << std::hex << std::setfill('0') << std::right << std::setw(16) << regValue;
       }
       found = true;
-    } else if (auto it_ymm = regs.getRegisterNameMapYmm().find(regName); it_ymm != regs.getRegisterNameMapYmm().end()) {
+    } else if (auto it_ymm = regs.getVectorMap().find(regName); it_ymm != regs.getVectorMap().end()) {
         m256i_t ymmValue = regs.getYmm(regName);
         ss << format_ymm_register(ymmValue, current_ymm_view_mode, current_display_base);
         found = true;
