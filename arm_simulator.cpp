@@ -1,6 +1,7 @@
 #include "arm_simulator.h"
 #include "ir_visitor.h"
 #include "program_decoder.h"
+#include "ir_executor_helpers.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -14,25 +15,77 @@ std::string ir_op_to_string(IROpcode opcode) {
         case IROpcode::Add: return "Add";
         case IROpcode::Sub: return "Sub";
         case IROpcode::Mul: return "Mul";
+        case IROpcode::IMul: return "IMul";
+        case IROpcode::Div: return "Div";
+        case IROpcode::And: return "And";
+        case IROpcode::Or: return "Or";
+        case IROpcode::Xor: return "Xor";
+        case IROpcode::Not: return "Not";
+        case IROpcode::Shl: return "Shl";
+        case IROpcode::Shr: return "Shr";
+        case IROpcode::Sar: return "Sar";
         case IROpcode::Jump: return "Jump";
         case IROpcode::Branch: return "Branch";
-        // Add other opcodes as needed
+        case IROpcode::Call: return "Call";
+        case IROpcode::Ret: return "Ret";
+        case IROpcode::Push: return "Push";
+        case IROpcode::Pop: return "Pop";
+        case IROpcode::Inc: return "Inc";
+        case IROpcode::Dec: return "Dec";
+        case IROpcode::Cmp: return "Cmp";
+        case IROpcode::Syscall: return "Syscall";
         default: return "Unknown";
     }
 }
 
-// A basic visitor for executing ARM IR instructions.
+// A visitor for executing ARM IR instructions by dispatching to generic handlers.
 class ArmIRVisitor : public IRVisitor {
 public:
     void visit(const IRInstruction& instr, ISimulator& simulator) override {
-        simulator.getDatabaseManager().log(
-            simulator.get_session_id(), 
-            "Executing ARM IR instruction: " + ir_op_to_string(instr.opcode), 
-            "INFO", 
-            0, 
-            __FILE__, 
-            __LINE__
-        );
+        switch (instr.opcode) {
+            case IROpcode::Move:    handle_ir_move(instr, simulator); break;
+            case IROpcode::Load:    handle_ir_load(instr, simulator); break;
+            case IROpcode::Store:   handle_ir_store(instr, simulator); break;
+            case IROpcode::Add:     handle_ir_add(instr, simulator); break;
+            case IROpcode::Sub:     handle_ir_sub(instr, simulator); break;
+            case IROpcode::AddC:    handle_ir_addc(instr, simulator); break;
+            case IROpcode::SubC:    handle_ir_subc(instr, simulator); break;
+            case IROpcode::Mul:     handle_ir_mul(instr, simulator); break;
+            case IROpcode::IMul:    handle_ir_imul(instr, simulator); break;
+            case IROpcode::Div:     handle_ir_div(instr, simulator); break;
+            case IROpcode::And:     handle_ir_and(instr, simulator); break;
+            case IROpcode::Or:      handle_ir_or(instr, simulator); break;
+            case IROpcode::Xor:     handle_ir_xor(instr, simulator); break;
+            case IROpcode::Not:     handle_ir_not(instr, simulator); break;
+            case IROpcode::Shl:     handle_ir_shl(instr, simulator); break;
+            case IROpcode::Shr:     handle_ir_shr(instr, simulator); break;
+            case IROpcode::Sar:     handle_ir_sar(instr, simulator); break;
+            case IROpcode::Jump:    handle_ir_jump(instr, simulator); break;
+            case IROpcode::Branch:  handle_ir_branch(instr, simulator); break;
+            case IROpcode::Call:    handle_ir_call(instr, simulator); break;
+            case IROpcode::Ret:     handle_ir_ret(instr, simulator); break;
+            case IROpcode::Push:    handle_ir_push(instr, simulator); break;
+            case IROpcode::Pop:     handle_ir_pop(instr, simulator); break;
+            case IROpcode::Inc:     handle_ir_inc(instr, simulator); break;
+            case IROpcode::Dec:     handle_ir_dec(instr, simulator); break;
+            case IROpcode::Cmp:     handle_ir_cmp(instr, simulator); break;
+            case IROpcode::Tst:     handle_ir_tst(instr, simulator); break;
+            case IROpcode::Teq:     handle_ir_teq(instr, simulator); break;
+            case IROpcode::Cmn:     handle_ir_cmn(instr, simulator); break;
+            case IROpcode::MoveNot: handle_ir_movenot(instr, simulator); break;
+            case IROpcode::AndNot:  handle_ir_andnot(instr, simulator); break;
+            case IROpcode::Syscall: handle_ir_syscall(instr, simulator); break;
+            default:
+                simulator.getDatabaseManager().log(
+                    simulator.get_session_id(),
+                    "Unsupported IR Opcode in ArmIRVisitor: " + ir_op_to_string(instr.opcode),
+                    "WARNING",
+                    0,
+                    __FILE__,
+                    __LINE__
+                );
+                break;
+        }
     }
 };
 
@@ -40,6 +93,7 @@ ArmSimulator::ArmSimulator(IDatabaseManager& db_manager, Memory& memory, int ses
     : db_manager_(db_manager),
       memory_(memory),
       architecture_(create_arm_cortex_r8_architecture()),
+      register_map_(architecture_),
       session_id_(session_id),
       headless_(headless) {}
 

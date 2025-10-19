@@ -3,9 +3,11 @@
 
 class RegisterMapTest : public ::testing::Test {
 protected:
+    RegisterMapTest() : arch_(create_x86_architecture()), regs(arch_) {}
     void SetUp() override {
     }
 
+    Architecture arch_;
     RegisterMap regs;
 };
 

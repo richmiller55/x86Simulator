@@ -226,16 +226,7 @@ void handle_ir_vector_zero_upper(const IRInstruction& ir_instr, ISimulator& simu
     }
 }
 
-void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator) {
-    X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
-    auto& regs = x86_sim.getRegisterMap();
-    auto& mem = x86_sim.getMemory();
 
-    address_t rsp = regs.get64("rsp");
-    address_t return_address = mem.read_stack(rsp);
-    regs.set64("rsp", rsp + 8);
-    regs.set64("rip", return_address);
-}
 
 void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
@@ -260,7 +251,8 @@ void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     switch (size) {
         case 8: {
-            uint8_t divisor = getOperandValue(src_op, simulator);
+            int64_t divisor_val = getOperandValue(src_op, simulator);
+            uint8_t divisor = static_cast<uint8_t>(divisor_val);
             if (divisor == 0) { return halt_for_exception(); }
             uint16_t dividend = regs.get16("ax");
             uint16_t quotient = dividend / divisor;
@@ -271,7 +263,8 @@ void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
             break;
         }
         case 16: {
-            uint16_t divisor = getOperandValue(src_op, simulator);
+            int64_t divisor_val = getOperandValue(src_op, simulator);
+            uint16_t divisor = static_cast<uint16_t>(divisor_val);
             if (divisor == 0) { return halt_for_exception(); }
             uint32_t dividend = (static_cast<uint32_t>(regs.get16("dx")) << 16) | regs.get16("ax");
             uint32_t quotient = dividend / divisor;
@@ -282,18 +275,20 @@ void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
             break;
         }
         case 32: {
-            uint32_t divisor = getOperandValue(src_op, simulator);
+            int64_t divisor_val = getOperandValue(src_op, simulator);
+            uint32_t divisor = static_cast<uint32_t>(divisor_val);
             if (divisor == 0) { return halt_for_exception(); }
             uint64_t dividend = (static_cast<uint64_t>(regs.get32("edx")) << 32) | regs.get32("eax");
             uint64_t quotient = dividend / divisor;
             if (quotient > 0xFFFFFFFF) { return halt_for_exception(); } // Check for overflow
             uint32_t remainder = dividend % divisor;
-            regs.set32("eax", quotient);
+            regs.set32("eax", static_cast<uint32_t>(quotient));
             regs.set32("edx", remainder);
             break;
         }
         case 64: {
-            uint64_t divisor = getOperandValue(src_op, simulator);
+            int64_t divisor_val = getOperandValue(src_op, simulator);
+            uint64_t divisor = static_cast<uint64_t>(divisor_val);
             if (divisor == 0) { return halt_for_exception(); }
             unsigned __int128 dividend = (static_cast<unsigned __int128>(regs.get64("rdx")) << 64) | regs.get64("rax");
             unsigned __int128 quotient = dividend / divisor;
@@ -331,6 +326,8 @@ void X86IRVisitor::visit(const IRInstruction& instr, ISimulator& simulator) {
         case IROpcode::Shl:             handle_ir_shl(instr, simulator); break;
         case IROpcode::Shr:             handle_ir_shr(instr, simulator); break;
         case IROpcode::Sar:             handle_ir_sar(instr, simulator); break;
+        case IROpcode::In:              handle_ir_in(instr, simulator); break;
+        case IROpcode::Out:             handle_ir_out(instr, simulator); break;
 
         // Handlers in this file
         case IROpcode::Ret:             handle_ir_ret(instr, simulator); break;

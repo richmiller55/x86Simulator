@@ -13,12 +13,23 @@ class Memory;
 /**
  * @brief Gets the value of an IR operand, resolving registers or memory.
  */
-uint64_t getOperandValue(const IROperand& op, ISimulator& simulator);
+int64_t getOperandValue(const IROperand& op, ISimulator& simulator);
 
 /**
  * @brief Sets the value of an abstract IR register.
  */
-void setRegisterValue(const IRRegister& reg, uint64_t value, ISimulator& simulator);
+void setRegisterValue(const IRRegister& reg, int64_t value, ISimulator& simulator);
+
+/**
+ * @brief Sets the value of a memory location.
+ * @deprecated Use the int64_t version.
+ */
+void setMemoryValue(const IRMemoryOperand& mem_op, uint64_t value, ISimulator& simulator);
+
+/**
+ * @brief Sets the value of a memory location.
+ */
+void setMemoryValue(const IRMemoryOperand& mem_op, int64_t value, ISimulator& simulator);
 
 /**
  * @brief Executes an IR 'Add' instruction and updates simulator state.
@@ -29,6 +40,9 @@ void handle_ir_add(const IRInstruction& ir_instr, ISimulator& simulator);
  * @brief Executes an IR 'Sub' instruction and updates simulator state.
  */
 void handle_ir_sub(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_addc(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_subc(const IRInstruction& ir_instr, ISimulator& simulator);
 
 /**
  * @brief Executes an IR 'Move' instruction (reg to reg) and updates simulator state.
@@ -59,6 +73,10 @@ void handle_ir_branch(const IRInstruction& ir_instr, ISimulator& simulator);
  * @brief Executes an IR 'Cmp' instruction and updates the status flags.
  */
 void handle_ir_cmp(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_tst(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_teq(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_cmn(const IRInstruction& ir_instr, ISimulator& simulator);
 
 /**
  * @brief Executes an IR 'Add' instruction with one operand (inc) and updates status flags.
@@ -93,9 +111,14 @@ void handle_ir_xor(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_and(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_or(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_not(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_movenot(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_andnot(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_shl(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_shr(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_sar(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_in(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_out(const IRInstruction& ir_instr, ISimulator& simulator);
 
 void handle_ir_packed_and(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_packed_and_not(const IRInstruction& ir_instr, ISimulator& simulator);

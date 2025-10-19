@@ -22,7 +22,7 @@ protected:
 };
 
 TEST_F(IRExecutorTest, HandleIrAnd) {
-    auto& regs = simulator.getRegisterMapForTesting();
+    auto& regs = simulator.getRegisterMap();
     regs.set32("eax", 0b1100);
     regs.set32("ebx", 0b1010);
 
@@ -41,7 +41,7 @@ TEST_F(IRExecutorTest, HandleIrAnd) {
 }
 
 TEST_F(IRExecutorTest, HandleIrOr) {
-    auto& regs = simulator.getRegisterMapForTesting();
+    auto& regs = simulator.getRegisterMap();
     regs.set32("eax", 0b1100);
     regs.set32("ebx", 0b1010);
 
@@ -58,7 +58,7 @@ TEST_F(IRExecutorTest, HandleIrOr) {
 }
 
 TEST_F(IRExecutorTest, HandleIrNot) {
-    auto& regs = simulator.getRegisterMapForTesting();
+    auto& regs = simulator.getRegisterMap();
     regs.set32("eax", 0xFFFFFF00);
 
     IRInstruction not_instr(IROpcode::Not, {
@@ -71,7 +71,7 @@ TEST_F(IRExecutorTest, HandleIrNot) {
 }
 
 TEST_F(IRExecutorTest, HandleIrShl) {
-    auto& regs = simulator.getRegisterMapForTesting();
+    auto& regs = simulator.getRegisterMap();
     regs.set32("eax", 0b1011);
 
     IRInstruction shl_instr(IROpcode::Shl, {
@@ -82,11 +82,11 @@ TEST_F(IRExecutorTest, HandleIrShl) {
     simulator.execute_ir_instruction(shl_instr);
 
     EXPECT_EQ(regs.get32("eax"), 0b101100);
-    EXPECT_TRUE(simulator.get_CF()); // Last bit shifted out was 1
+    EXPECT_FALSE(simulator.get_CF()); // Last bit shifted out was 0
 }
 
 TEST_F(IRExecutorTest, HandleIrShr) {
-    auto& regs = simulator.getRegisterMapForTesting();
+    auto& regs = simulator.getRegisterMap();
     regs.set32("eax", 0b1011);
 
     IRInstruction shr_instr(IROpcode::Shr, {
@@ -101,7 +101,7 @@ TEST_F(IRExecutorTest, HandleIrShr) {
 }
 
 TEST_F(IRExecutorTest, HandleIrSar) {
-    auto& regs = simulator.getRegisterMapForTesting();
+    auto& regs = simulator.getRegisterMap();
     regs.set32("eax", 0b10000000000000000000000000001011); // Negative number
 
     IRInstruction sar_instr(IROpcode::Sar, {
@@ -113,4 +113,117 @@ TEST_F(IRExecutorTest, HandleIrSar) {
 
     EXPECT_EQ(regs.get32("eax"), 0b11100000000000000000000000000010);
     EXPECT_TRUE(simulator.get_CF()); // Last bit shifted out was 1
+}
+
+TEST_F(IRExecutorTest, HandleIrInc) {
+    auto& regs = simulator.getRegisterMap();
+    regs.set32("eax", 10);
+    // Preserve initial CF
+    simulator.set_CF(true);
+
+    IRInstruction inc_instr(IROpcode::Inc, {
+        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+    });
+
+    simulator.execute_ir_instruction(inc_instr);
+
+    EXPECT_EQ(regs.get32("eax"), 11);
+    EXPECT_FALSE(simulator.get_ZF());
+    EXPECT_FALSE(simulator.get_SF());
+    EXPECT_TRUE(simulator.get_CF()); // Check that CF is not affected
+}
+
+TEST_F(IRExecutorTest, HandleIrIncToZero) {
+    auto& regs = simulator.getRegisterMap();
+    regs.set32("eax", -1); // 0xFFFFFFFF
+
+    IRInstruction inc_instr(IROpcode::Inc, {
+        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+    });
+
+    simulator.execute_ir_instruction(inc_instr);
+
+    EXPECT_EQ(regs.get32("eax"), 0);
+    EXPECT_TRUE(simulator.get_ZF());
+    EXPECT_FALSE(simulator.get_SF());
+}
+
+TEST_F(IRExecutorTest, HandleIrDec) {
+    auto& regs = simulator.getRegisterMap();
+    regs.set32("eax", 10);
+    // Preserve initial CF
+    simulator.set_CF(true);
+
+    IRInstruction dec_instr(IROpcode::Dec, {
+        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+    });
+
+    simulator.execute_ir_instruction(dec_instr);
+
+    EXPECT_EQ(regs.get32("eax"), 9);
+    EXPECT_FALSE(simulator.get_ZF());
+    EXPECT_FALSE(simulator.get_SF());
+    EXPECT_TRUE(simulator.get_CF()); // Check that CF is not affected
+}
+
+TEST_F(IRExecutorTest, HandleIrDecToZero) {
+    auto& regs = simulator.getRegisterMap();
+    regs.set32("eax", 1);
+
+    IRInstruction dec_instr(IROpcode::Dec, {
+        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+    });
+
+    simulator.execute_ir_instruction(dec_instr);
+
+    EXPECT_EQ(regs.get32("eax"), 0);
+    EXPECT_TRUE(simulator.get_ZF());
+    EXPECT_FALSE(simulator.get_SF());
+}
+
+TEST_F(IRExecutorTest, HandleIrPush) {
+    auto& regs = simulator.getRegisterMap();
+    address_t initial_rsp = memory.get_stack_bottom();
+    regs.set64("rsp", initial_rsp);
+    regs.set32("eax", 0xDEADBEEF);
+
+    IRInstruction push_instr(IROpcode::Push, {
+        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+    });
+
+    simulator.execute_ir_instruction(push_instr);
+
+    EXPECT_EQ(regs.get64("rsp"), initial_rsp - 4);
+    EXPECT_EQ(memory.read_dword(regs.get64("rsp")), 0xDEADBEEF);
+}
+
+TEST_F(IRExecutorTest, HandleIrPop) {
+    auto& regs = simulator.getRegisterMap();
+    address_t initial_rsp = memory.get_stack_bottom() - 4;
+    regs.set64("rsp", initial_rsp);
+    memory.write_dword(initial_rsp, 0xCAFEBABE);
+
+    IRInstruction pop_instr(IROpcode::Pop, {
+        IRRegister{IRRegisterType::GPR, 1, 32} // ecx
+    });
+
+    simulator.execute_ir_instruction(pop_instr);
+
+    EXPECT_EQ(regs.get32("ecx"), 0xCAFEBABE);
+    EXPECT_EQ(regs.get64("rsp"), initial_rsp + 4);
+}
+
+TEST_F(IRExecutorTest, HandleIrRet) {
+    auto& regs = simulator.getRegisterMap();
+    address_t initial_rsp = memory.get_stack_bottom() - 4;
+    uint32_t return_addr = 0x2000;
+    regs.set64("rsp", initial_rsp);
+    memory.write_dword(initial_rsp, return_addr);
+
+    IRInstruction ret_instr(IROpcode::Ret);
+
+    simulator.execute_ir_instruction(ret_instr);
+
+    EXPECT_EQ(regs.get64("rip"), return_addr);
+    EXPECT_EQ(regs.get64("rsp"), initial_rsp + 4);
 }

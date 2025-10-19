@@ -24,6 +24,8 @@ enum class IROpcode {
     // Arithmetic
     Add,    // dest, src1, src2 (or dest, src1 for inc)
     Sub,    // dest, src1, src2 (or dest, src1 for dec)
+    AddC,
+    SubC,
     Mul,    // dest, src1, src2
     IMul,   // dest, src1, src2 (signed multiply)
     Div,    // dest, src1, src2
@@ -33,6 +35,8 @@ enum class IROpcode {
     Or,     // dest, src1, src2
     Xor,    // dest, src1, src2
     Not,    // dest, src
+    MoveNot,
+    AndNot,
     Shl,    // dest, src, count
     Shr,    // dest, src, count
     Sar,    // dest, src, count
@@ -85,12 +89,16 @@ enum class IROpcode {
     VectorZeroUpper, // For VZEROUPPER
 
     // System
+    In,
     Out,
     Syscall,
     Nop,
 
     // Comparison
     Cmp,    // src1, src2 (sets flags)
+    Tst,
+    Teq,
+    Cmn,
 };
 
 /**

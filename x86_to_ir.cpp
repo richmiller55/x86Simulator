@@ -192,6 +192,14 @@ std::unique_ptr<IRInstruction> translate_to_ir(const DecodedInstruction& decoded
 
     } else if (decoded_instr.mnemonic == "ret") {
         opcode = IROpcode::Ret;
+    } else if (decoded_instr.mnemonic == "in") {
+        opcode = IROpcode::In;
+        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
+        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch));
+    } else if (decoded_instr.mnemonic == "out") {
+        opcode = IROpcode::Out;
+        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
+        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch));
     } else if (decoded_instr.mnemonic == "div") {
         opcode = IROpcode::Div;
         ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
@@ -248,11 +256,20 @@ std::unique_ptr<IRInstruction> translate_to_ir(const DecodedInstruction& decoded
         ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
         ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
         ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
+    } else if (decoded_instr.mnemonic == "vpor") {
+        opcode = IROpcode::PackedOr;
+        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
+        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
+        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
     } else if (decoded_instr.mnemonic == "vpmullw") {
         opcode = IROpcode::PackedMulLowI16;
         ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
         ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
         ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
+    } else if (decoded_instr.mnemonic == "vmovups") {
+        opcode = IROpcode::VectorMove;
+        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
+        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch));
     } else {
         supported = false;
     }

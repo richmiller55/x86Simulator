@@ -63,8 +63,22 @@ $(TARGET): $(MAIN_OBJ) $(LIB_OBJS)
 
 # --- Test Targets ---
 TEST_SRCS = \
+	tests/decoder_test.cpp \
+	tests/formatting_utils_test.cpp \
+	tests/instruction_describer_test.cpp \
+	tests/memory_test.cpp \
+	tests/operand_parser_test.cpp \
+	tests/program_decoder_test.cpp \
+	tests/register_map_test.cpp \
+	tests/rflags_test.cpp \
+	tests/simulator_core_test.cpp \
+	tests/system_bus_test.cpp \
 	tests/ir_translation_test.cpp \
 	tests/ir_executor_test.cpp \
+	tests/arm_ir_executor_test.cpp \
+	tests/file_system_device_test.cpp \
+	tests/parser_utils_test.cpp \
+	tests/simulator_integration_test.cpp \
 	tests/mock_database_manager.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
 TEST_TARGET = x86_decoder_test

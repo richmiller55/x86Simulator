@@ -4,12 +4,12 @@
 TEST(MemoryTest, DefaultConstructor) {
     Memory mem;
     EXPECT_EQ(mem.get_text_segment_start(), 0);
-    EXPECT_EQ(mem.get_data_segment_start(), 0x200000);
-    EXPECT_EQ(mem.get_bss_segment_start(), 0x400000);
-    EXPECT_EQ(mem.get_heap_segment_start(), 0x1400000);
-    EXPECT_EQ(mem.get_total_memory_size(), 0x2500000);
-    EXPECT_EQ(mem.get_stack_bottom(), 0x2500000);
-    EXPECT_EQ(mem.get_text_segment_size(), 0x200000);
+    EXPECT_EQ(mem.get_data_segment_start(), 0x2000000);
+    EXPECT_EQ(mem.get_bss_segment_start(), 0x2200000);
+    EXPECT_EQ(mem.get_heap_segment_start(), 0x3200000);
+    EXPECT_EQ(mem.get_total_memory_size(), 0x3300000);
+    EXPECT_EQ(mem.get_stack_bottom(), 0x3300000);
+    EXPECT_EQ(mem.get_text_segment_size(), 0x2000000);
 }
 
 TEST(MemoryTest, ParameterizedConstructor) {
@@ -23,7 +23,7 @@ TEST(MemoryTest, ParameterizedConstructor) {
     EXPECT_EQ(mem.get_bss_segment_start(), text_size + data_size);
     EXPECT_EQ(mem.get_heap_segment_start(), text_size + data_size + bss_size);
     
-    size_t expected_total_size = text_size + data_size + bss_size + 0x1000000 + 0x100000;
+    size_t expected_total_size = text_size + data_size + bss_size + 0x100000; // max_stack_size
     EXPECT_EQ(mem.get_total_memory_size(), expected_total_size);
     EXPECT_EQ(mem.get_stack_bottom(), expected_total_size);
 }

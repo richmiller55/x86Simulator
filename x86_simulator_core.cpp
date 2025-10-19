@@ -10,8 +10,8 @@
 X86Simulator::X86Simulator(IDatabaseManager& db_manager, Memory& memory, int session_id, bool headless)
     : db_manager_(db_manager),
       memory_(memory),
-      register_map_(),
       architecture_(create_x86_architecture()),
+      register_map_(architecture_),
       session_id_(session_id),
       headless_(headless),
       instructionPointer_(0),

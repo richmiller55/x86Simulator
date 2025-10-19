@@ -87,7 +87,7 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::parse_line(const std::string& l
     // Convert mnemonic to lower case for consistent matching
     for (char& c : mnemonic) { c = tolower(c); }
 
-    if (mnemonic == "mov" || mnemonic == "add" || mnemonic == "sub" || mnemonic == "cmp") {
+    if (mnemonic == "mov" || mnemonic == "add" || mnemonic == "sub" || mnemonic == "cmp" || mnemonic == "orr" || mnemonic == "eor" || mnemonic == "rsb" || mnemonic == "adc" || mnemonic == "sbc" || mnemonic == "rsc" || mnemonic == "tst" || mnemonic == "teq" || mnemonic == "cmn" || mnemonic == "mvn" || mnemonic == "bic") {
         return translate_data_processing(mnemonic, operands);
     } else if (mnemonic == "ldr" || mnemonic == "str") {
         return translate_load_store(mnemonic, operands);
@@ -185,6 +185,28 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_data_processing(const
         opcode = IROpcode::Sub;
     } else if (mnemonic == "cmp") {
         opcode = IROpcode::Cmp;
+    } else if (mnemonic == "orr") {
+        opcode = IROpcode::Or;
+    } else if (mnemonic == "eor") {
+        opcode = IROpcode::Xor;
+    } else if (mnemonic == "rsb") {
+        opcode = IROpcode::Sub;
+    } else if (mnemonic == "adc") {
+        opcode = IROpcode::AddC;
+    } else if (mnemonic == "sbc") {
+        opcode = IROpcode::SubC;
+    } else if (mnemonic == "rsc") {
+        opcode = IROpcode::SubC;
+    } else if (mnemonic == "tst") {
+        opcode = IROpcode::Tst;
+    } else if (mnemonic == "teq") {
+        opcode = IROpcode::Teq;
+    } else if (mnemonic == "cmn") {
+        opcode = IROpcode::Cmn;
+    } else if (mnemonic == "mvn") {
+        opcode = IROpcode::MoveNot;
+    } else if (mnemonic == "bic") {
+        opcode = IROpcode::AndNot;
     } else {
         return nullptr; // Not a data processing op we handle yet
     }
@@ -195,10 +217,23 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_data_processing(const
     }
 
     // CMP is a special case - it's like SUB but the destination is implicit.
-    // The IR for Cmp expects two operands, not three.
-    if (opcode == IROpcode::Cmp) {
-        // ARM CMP is `CMP Rn, Operand2`. We create a 2-operand IR instruction.
+    // The IR for Cmp, Tst, Teq, Cmn expects two operands, not three.
+    if (opcode == IROpcode::Cmp || opcode == IROpcode::Tst || opcode == IROpcode::Teq || opcode == IROpcode::Cmn) {
         return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{ir_operands[0], ir_operands[1]});
+    }
+
+    // MVN is a 2-operand instruction (dest, src)
+    if (opcode == IROpcode::MoveNot) {
+        return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{ir_operands[0], ir_operands[1]});
+    }
+
+    // RSB/RSC are special cases of SUB/SUBC with swapped operands.
+    if (mnemonic == "rsb" || mnemonic == "rsc") {
+        // RSB rd, rn, op2  =>  rd = op2 - rn
+        // RSC rd, rn, op2  =>  rd = op2 - rn - !CF
+        // We map this to Sub(rd, op2, rn) or SubC(rd, op2, rn)
+        auto opcode = (mnemonic == "rsb") ? IROpcode::Sub : IROpcode::SubC;
+        return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{ir_operands[0], ir_operands[2], ir_operands[1]});
     }
 
     // Standard data processing is `DEST, SRC, OP2`
