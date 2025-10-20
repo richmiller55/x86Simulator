@@ -74,6 +74,30 @@ public:
             case IROpcode::Cmn:     handle_ir_cmn(instr, simulator); break;
             case IROpcode::MoveNot: handle_ir_movenot(instr, simulator); break;
             case IROpcode::AndNot:  handle_ir_andnot(instr, simulator); break;
+            case IROpcode::Nop:     handle_ir_nop(instr, simulator); break;
+            case IROpcode::Swap:    handle_ir_swap(instr, simulator); break;
+            case IROpcode::MoveToSystemRegister: handle_ir_move_to_system_register(instr, simulator); break;
+            case IROpcode::MoveFromSystemRegister: handle_ir_move_from_system_register(instr, simulator); break;
+            case IROpcode::CountLeadingZeros: handle_ir_count_leading_zeros(instr, simulator); break;
+            case IROpcode::ReverseBits: handle_ir_reverse_bits(instr, simulator); break;
+            case IROpcode::ReverseBytes: handle_ir_reverse_bytes(instr, simulator); break;
+            case IROpcode::ReverseBytes16: handle_ir_reverse_bytes16(instr, simulator); break;
+            case IROpcode::ReverseBytesSignedHalfword: handle_ir_reverse_bytes_signed_halfword(instr, simulator); break;
+            case IROpcode::SaturatingAdd: handle_ir_saturating_add(instr, simulator); break;
+            case IROpcode::SaturatingSub: handle_ir_saturating_sub(instr, simulator); break;
+            case IROpcode::SaturatingDoubleAdd: handle_ir_saturating_double_add(instr, simulator); break;
+            case IROpcode::SaturatingDoubleSub: handle_ir_saturating_double_sub(instr, simulator); break;
+            case IROpcode::MultiplyAccumulate: handle_ir_multiply_accumulate(instr, simulator); break;
+            case IROpcode::MultiplySubtract: handle_ir_multiply_subtract(instr, simulator); break;
+            case IROpcode::UnsignedMultiplyLong: handle_ir_unsigned_multiply_long(instr, simulator); break;
+            case IROpcode::SignedMultiplyLong: handle_ir_signed_multiply_long(instr, simulator); break;
+            case IROpcode::UnsignedMultiplyAccumulateLong: handle_ir_unsigned_multiply_accumulate_long(instr, simulator); break;
+            case IROpcode::SignedMultiplyAccumulateLong: handle_ir_signed_multiply_accumulate_long(instr, simulator); break;
+            case IROpcode::Breakpoint: handle_ir_breakpoint(instr, simulator); break;
+            case IROpcode::WaitForInterrupt: handle_ir_wait_for_interrupt(instr, simulator); break;
+            case IROpcode::WaitForEvent: handle_ir_wait_for_event(instr, simulator); break;
+            case IROpcode::SendEvent: handle_ir_send_event(instr, simulator); break;
+            case IROpcode::CompareAndBranchIfNotZero: handle_ir_compare_and_branch_if_not_zero(instr, simulator); break;
             case IROpcode::Syscall: handle_ir_syscall(instr, simulator); break;
             default:
                 simulator.getDatabaseManager().log(
@@ -116,6 +140,13 @@ void ArmSimulator::set_CF(bool value) {
 }
 void ArmSimulator::set_OF(bool value) { 
     if (value) cpsr_ |= (1 << V_BIT); else cpsr_ &= ~(1 << V_BIT); 
+}
+
+void ArmSimulator::set_NZCV(bool n, bool z, bool c, bool v) {
+    set_SF(n);
+    set_ZF(z);
+    set_CF(c);
+    set_OF(v);
 }
 
 bool ArmSimulator::get_ZF() const { return (cpsr_ >> Z_BIT) & 1; }
@@ -175,4 +206,19 @@ void ArmSimulator::execute_ir_instruction(const IRInstruction& ir_instr) {
 
 ProgramDecoder* ArmSimulator::getProgramDecoder() {
     return program_decoder_.get();
+}
+
+uint64_t ArmSimulator::get_system_register(const std::string& name) {
+    if (name == "cpsr") {
+        return cpsr_;
+    }
+    throw std::runtime_error("Unknown ARM system register: " + name);
+}
+
+void ArmSimulator::set_system_register(const std::string& name, uint64_t value) {
+    if (name == "cpsr") {
+        cpsr_ = value;
+    } else {
+        throw std::runtime_error("Unknown ARM system register: " + name);
+    }
 }

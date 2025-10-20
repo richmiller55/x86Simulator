@@ -215,15 +215,15 @@ TEST_F(IRExecutorTest, HandleIrPop) {
 
 TEST_F(IRExecutorTest, HandleIrRet) {
     auto& regs = simulator.getRegisterMap();
-    address_t initial_rsp = memory.get_stack_bottom() - 4;
-    uint32_t return_addr = 0x2000;
+    address_t initial_rsp = memory.get_stack_bottom() - 8;
+    uint64_t return_addr = 0x2000;
     regs.set64("rsp", initial_rsp);
-    memory.write_dword(initial_rsp, return_addr);
+    memory.write_qword(initial_rsp, return_addr);
 
     IRInstruction ret_instr(IROpcode::Ret);
 
     simulator.execute_ir_instruction(ret_instr);
 
     EXPECT_EQ(regs.get64("rip"), return_addr);
-    EXPECT_EQ(regs.get64("rsp"), initial_rsp + 4);
+    EXPECT_EQ(regs.get64("rsp"), initial_rsp + 8);
 }

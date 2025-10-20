@@ -57,6 +57,9 @@ public:
     virtual ProgramDecoder* getProgramDecoder() = 0;
     virtual int get_session_id() const = 0;
 
+    virtual const char* get_stack_pointer_name() const = 0;
+    virtual const char* get_instruction_pointer_name() const = 0;
+
     // --- Generic Flag Setters/Getters ---
     // These abstract away the details of specific flag registers like RFLAGS or CPSR.
     virtual void set_ZF(bool value) = 0;
@@ -70,6 +73,10 @@ public:
     virtual bool get_CF() const = 0;
     virtual bool get_OF() const = 0;
     virtual bool get_PF() const = 0;
+
+    // --- System Register Access ---
+    virtual uint64_t get_system_register(const std::string& name) = 0;
+    virtual void set_system_register(const std::string& name, uint64_t value) = 0;
 };
 
 #endif // I_SIMULATOR_H

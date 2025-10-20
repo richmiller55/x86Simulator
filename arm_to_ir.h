@@ -87,6 +87,36 @@ private:
      * @brief Translates branch instructions (e.g., B, BL, BEQ).
      */
     std::unique_ptr<IRInstruction> translate_branch(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates compare and branch instructions (e.g., CBNZ).
+     */
+    std::unique_ptr<IRInstruction> translate_compare_and_branch(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates software interrupt instructions (e.g., SWI).
+     */
+    std::unique_ptr<IRInstruction> translate_swi(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates atomic swap instructions (e.g., SWP).
+     */
+    std::unique_ptr<IRInstruction> translate_swap(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates system register access instructions (e.g., MRS, MSR).
+     */
+    std::unique_ptr<IRInstruction> translate_mrs_msr(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates special instructions (e.g., BKPT, WFI, WFE, SEV).
+     */
+    std::unique_ptr<IRInstruction> translate_special(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates PUSH and POP instructions.
+     */
+    std::unique_ptr<IRInstruction> translate_push_pop(const std::string& mnemonic, const std::vector<std::string>& operands);
 };
 
 #endif // ARM_TO_IR_H

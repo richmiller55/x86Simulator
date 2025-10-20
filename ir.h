@@ -20,6 +20,7 @@ enum class IROpcode {
     Move,   // reg_dest, src (reg or immediate)
     Load,   // reg_dest, mem_src
     Store,  // mem_dest, reg_src
+    Swap,   // reg_dest, reg_src, mem_operand
 
     // Arithmetic
     Add,    // dest, src1, src2 (or dest, src1 for inc)
@@ -29,6 +30,20 @@ enum class IROpcode {
     Mul,    // dest, src1, src2
     IMul,   // dest, src1, src2 (signed multiply)
     Div,    // dest, src1, src2
+
+    // Saturating Arithmetic
+    SaturatingAdd,
+    SaturatingSub,
+    SaturatingDoubleAdd,
+    SaturatingDoubleSub,
+
+    // Multiply-Accumulate
+    MultiplyAccumulate,
+    MultiplySubtract,
+    UnsignedMultiplyLong,
+    SignedMultiplyLong,
+    UnsignedMultiplyAccumulateLong,
+    SignedMultiplyAccumulateLong,
 
     // Logical
     And,    // dest, src1, src2
@@ -44,6 +59,7 @@ enum class IROpcode {
     // Control Flow
     Jump,   // target
     Branch, // target, condition
+    CompareAndBranchIfNotZero, // reg, target
     Call,
     Push,
     Pop,
@@ -93,6 +109,19 @@ enum class IROpcode {
     Out,
     Syscall,
     Nop,
+    MoveToSystemRegister,
+    MoveFromSystemRegister,
+    CountLeadingZeros,
+    ReverseBits,
+    ReverseBytes,
+    ReverseBytes16,
+    ReverseBytesSignedHalfword,
+
+    // Special
+    Breakpoint,
+    WaitForInterrupt,
+    WaitForEvent,
+    SendEvent,
 
     // Comparison
     Cmp,    // src1, src2 (sets flags)

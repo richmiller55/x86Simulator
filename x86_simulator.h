@@ -99,6 +99,8 @@ public:
   Memory& getMemory() override { return memory_; }
   const Memory& getMemory() const override { return memory_; }
   int get_session_id() const override { return session_id_; }
+  const char* get_stack_pointer_name() const override { return "rsp"; }
+  const char* get_instruction_pointer_name() const override { return "rip"; }
   IDatabaseManager& getDatabaseManager() override { return db_manager_; }
   bool is_headless() const { return headless_; }
   address_t get_instruction_pointer() const { return instructionPointer_; }
@@ -116,10 +118,12 @@ public:
   bool get_AF() const;
   void set_AF(bool value);
   bool get_PF() const override;
-  void set_PF(bool val) override;
-
-    void execute_ir_instruction(const IRInstruction& ir_instr) override;
-    void update_rflags_in_register_map();
+      void set_PF(bool val) override;
+  
+      uint64_t get_system_register(const std::string& name) override;
+      void set_system_register(const std::string& name, uint64_t value) override;
+  
+      void execute_ir_instruction(const IRInstruction& ir_instr) override;    void update_rflags_in_register_map();
 
     // --- I/O Handling ---
     void log_out(uint16_t port, uint64_t value);

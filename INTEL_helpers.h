@@ -23,7 +23,7 @@ public:
 
 // --- Scalar Handlers ---
 void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator);
-void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_x86_ir_div(const IRInstruction& ir_instr, ISimulator& simulator);
 
 // --- Vector Handlers ---
 void handle_ir_vector_move(const IRInstruction& ir_instr, ISimulator& simulator);

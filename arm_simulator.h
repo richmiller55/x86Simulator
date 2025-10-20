@@ -30,10 +30,14 @@ public:
     const Architecture& get_architecture() const override { return architecture_; }
     int get_session_id() const override { return session_id_; }
 
+    const char* get_stack_pointer_name() const override { return "sp"; }
+    const char* get_instruction_pointer_name() const override { return "pc"; }
+
     void set_ZF(bool value) override;
     void set_SF(bool value) override;
     void set_CF(bool value) override;
     void set_OF(bool value) override;
+    void set_NZCV(bool n, bool z, bool c, bool v);
 
     bool get_ZF() const override;
     bool get_SF() const override;
@@ -47,6 +51,10 @@ public:
 
     void set_PF(bool value) override;
     bool get_PF() const override;
+
+    // System Register Access
+    uint64_t get_system_register(const std::string& name) override;
+    void set_system_register(const std::string& name, uint64_t value) override;
 
 private:
     std::unique_ptr<ProgramDecoder> program_decoder_;

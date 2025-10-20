@@ -87,15 +87,109 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::parse_line(const std::string& l
     // Convert mnemonic to lower case for consistent matching
     for (char& c : mnemonic) { c = tolower(c); }
 
-    if (mnemonic == "mov" || mnemonic == "add" || mnemonic == "sub" || mnemonic == "cmp" || mnemonic == "orr" || mnemonic == "eor" || mnemonic == "rsb" || mnemonic == "adc" || mnemonic == "sbc" || mnemonic == "rsc" || mnemonic == "tst" || mnemonic == "teq" || mnemonic == "cmn" || mnemonic == "mvn" || mnemonic == "bic") {
+    if (mnemonic == "mov" || mnemonic == "add" || mnemonic == "sub" || mnemonic == "cmp" || mnemonic == "orr" || mnemonic == "eor" || mnemonic == "rsb" || mnemonic == "adc" || mnemonic == "sbc" || mnemonic == "rsc" || mnemonic == "tst" || mnemonic == "teq" || mnemonic == "cmn" || mnemonic == "mvn" || mnemonic == "bic" || mnemonic == "clz" || mnemonic == "rbit" || mnemonic == "rev" || mnemonic == "rev16" || mnemonic == "revsh" || mnemonic == "qadd" || mnemonic == "qsub" || mnemonic == "qdadd" || mnemonic == "qdsub" || mnemonic == "mla" || mnemonic == "mls" || mnemonic == "umull" || mnemonic == "smull" || mnemonic == "umlal" || mnemonic == "smlal" || mnemonic == "movw") {
         return translate_data_processing(mnemonic, operands);
     } else if (mnemonic == "ldr" || mnemonic == "str") {
         return translate_load_store(mnemonic, operands);
-    } else if (mnemonic[0] == 'b') { // b, bl, beq, etc.
+    } else if (mnemonic[0] == 'b') { // b, bl, beq, bx, blx, etc.
         return translate_branch(mnemonic, operands);
+    } else if (mnemonic == "cbnz") {
+        return translate_compare_and_branch(mnemonic, operands);
+    } else if (mnemonic == "push" || mnemonic == "pop") {
+        return translate_push_pop(mnemonic, operands);
+    } else if (mnemonic == "swi") {
+        return translate_swi(mnemonic, operands);
+    } else if (mnemonic == "swp") {
+        return translate_swap(mnemonic, operands);
+    } else if (mnemonic == "mrs" || mnemonic == "msr") {
+        return translate_mrs_msr(mnemonic, operands);
+    } else if (mnemonic == "bkpt" || mnemonic == "wfi" || mnemonic == "wfe" || mnemonic == "sev") {
+        return translate_special(mnemonic, operands);
     }
 
     return nullptr;
+}
+
+std::unique_ptr<IRInstruction> ArmToIrConverter::translate_compare_and_branch(const std::string& mnemonic, const std::vector<std::string>& operands) {
+    if (operands.size() != 2) {
+        throw std::runtime_error("Invalid number of operands for " + mnemonic);
+    }
+
+    IROperand reg = parse_operand(operands[0]);
+    IROperand label = parse_operand(operands[1]);
+
+    if (mnemonic == "cbnz") {
+        return std::make_unique<IRInstruction>(IROpcode::CompareAndBranchIfNotZero, std::vector<IROperand>{reg, label});
+    }
+
+    return nullptr;
+}
+
+std::unique_ptr<IRInstruction> ArmToIrConverter::translate_special(const std::string& mnemonic, const std::vector<std::string>& operands) {
+    IROpcode opcode;
+    if (mnemonic == "bkpt") {
+        opcode = IROpcode::Breakpoint;
+    } else if (mnemonic == "wfi") {
+        opcode = IROpcode::WaitForInterrupt;
+    } else if (mnemonic == "wfe") {
+        opcode = IROpcode::WaitForEvent;
+    } else if (mnemonic == "sev") {
+        opcode = IROpcode::SendEvent;
+    } else {
+        return nullptr;
+    }
+
+    std::vector<IROperand> ir_operands;
+    for (const auto& op_str : operands) {
+        if (!op_str.empty()) {
+            ir_operands.push_back(parse_operand(op_str));
+        }
+    }
+
+    return std::make_unique<IRInstruction>(opcode, std::move(ir_operands));
+}
+
+std::unique_ptr<IRInstruction> ArmToIrConverter::translate_swi(const std::string& mnemonic, const std::vector<std::string>& operands) {
+    if (operands.empty()) {
+        throw std::runtime_error("Missing operand for SWI instruction");
+    }
+
+    // The operand is an immediate value, which we pass to the Syscall IR.
+    IROperand interrupt_vector = parse_operand(operands[0]);
+
+    return std::make_unique<IRInstruction>(IROpcode::Syscall, std::vector<IROperand>{interrupt_vector});
+}
+
+std::unique_ptr<IRInstruction> ArmToIrConverter::translate_swap(const std::string& mnemonic, const std::vector<std::string>& operands) {
+    if (operands.size() != 3) {
+        throw std::runtime_error("Invalid number of operands for SWP");
+    }
+
+    IROperand rd = parse_operand(operands[0]);
+    IROperand rm = parse_operand(operands[1]);
+    IROperand rn_mem = parse_operand(operands[2]);
+
+    return std::make_unique<IRInstruction>(IROpcode::Swap, std::vector<IROperand>{rd, rm, rn_mem});
+}
+
+std::unique_ptr<IRInstruction> ArmToIrConverter::translate_mrs_msr(const std::string& mnemonic, const std::vector<std::string>& operands) {
+    if (operands.size() != 2) {
+        throw std::runtime_error("Invalid number of operands for " + mnemonic);
+    }
+
+    if (mnemonic == "mrs") {
+        // MRS Rd, CPSR -> MoveFromSystemRegister(Rd, "cpsr")
+        IROperand rd = parse_operand(operands[0]);
+        std::string sys_reg = operands[1];
+        for (char& c : sys_reg) { c = tolower(c); }
+        return std::make_unique<IRInstruction>(IROpcode::MoveFromSystemRegister, std::vector<IROperand>{rd, sys_reg});
+    } else { // msr
+        // MSR CPSR_fs, Rm -> MoveToSystemRegister("cpsr_fs", Rm)
+        std::string sys_reg = operands[0];
+        for (char& c : sys_reg) { c = tolower(c); }
+        IROperand rm = parse_operand(operands[1]);
+        return std::make_unique<IRInstruction>(IROpcode::MoveToSystemRegister, std::vector<IROperand>{sys_reg, rm});
+    }
 }
 
 IROperand ArmToIrConverter::parse_operand(const std::string& operand_str) {
@@ -177,7 +271,7 @@ IRMemoryOperand ArmToIrConverter::parse_memory_operand(const std::string& mem_st
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_data_processing(const std::string& mnemonic, const std::vector<std::string>& operands) {
     IROpcode opcode;
-    if (mnemonic == "mov") {
+    if (mnemonic == "mov" || mnemonic == "movw") {
         opcode = IROpcode::Move;
     } else if (mnemonic == "add") {
         opcode = IROpcode::Add;
@@ -207,6 +301,36 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_data_processing(const
         opcode = IROpcode::MoveNot;
     } else if (mnemonic == "bic") {
         opcode = IROpcode::AndNot;
+    } else if (mnemonic == "clz") {
+        opcode = IROpcode::CountLeadingZeros;
+    } else if (mnemonic == "rbit") {
+        opcode = IROpcode::ReverseBits;
+    } else if (mnemonic == "rev") {
+        opcode = IROpcode::ReverseBytes;
+    } else if (mnemonic == "rev16") {
+        opcode = IROpcode::ReverseBytes16;
+    } else if (mnemonic == "revsh") {
+        opcode = IROpcode::ReverseBytesSignedHalfword;
+    } else if (mnemonic == "qadd") {
+        opcode = IROpcode::SaturatingAdd;
+    } else if (mnemonic == "qsub") {
+        opcode = IROpcode::SaturatingSub;
+    } else if (mnemonic == "qdadd") {
+        opcode = IROpcode::SaturatingDoubleAdd;
+    } else if (mnemonic == "qdsub") {
+        opcode = IROpcode::SaturatingDoubleSub;
+    } else if (mnemonic == "mla") {
+        opcode = IROpcode::MultiplyAccumulate;
+    } else if (mnemonic == "mls") {
+        opcode = IROpcode::MultiplySubtract;
+    } else if (mnemonic == "umull") {
+        opcode = IROpcode::UnsignedMultiplyLong;
+    } else if (mnemonic == "smull") {
+        opcode = IROpcode::SignedMultiplyLong;
+    } else if (mnemonic == "umlal") {
+        opcode = IROpcode::UnsignedMultiplyAccumulateLong;
+    } else if (mnemonic == "smlal") {
+        opcode = IROpcode::SignedMultiplyAccumulateLong;
     } else {
         return nullptr; // Not a data processing op we handle yet
     }
@@ -285,6 +409,18 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_branch(const std::str
         return std::make_unique<IRInstruction>(IROpcode::Call, std::vector<IROperand>{target});
     }
 
+    // Branch and Exchange: BX <register>
+    if (mnemonic == "bx") {
+        // Note: Thumb mode exchange is not supported.
+        return std::make_unique<IRInstruction>(IROpcode::Jump, std::vector<IROperand>{target});
+    }
+
+    // Branch with Link and Exchange: BLX <register>
+    if (mnemonic == "blx") {
+        // Note: Thumb mode exchange is not supported.
+        return std::make_unique<IRInstruction>(IROpcode::Call, std::vector<IROperand>{target});
+    }
+
     // --- Conditional Branches ---
     // Extract the condition code suffix from the mnemonic (e.g., "eq" from "beq").
     std::string cond_str = mnemonic.substr(1);
@@ -308,4 +444,19 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_branch(const std::str
     }
 
     throw std::runtime_error("Unsupported branch instruction: " + mnemonic);
+}
+
+std::unique_ptr<IRInstruction> ArmToIrConverter::translate_push_pop(const std::string& mnemonic, const std::vector<std::string>& operands) {
+    IROpcode opcode = (mnemonic == "push") ? IROpcode::Push : IROpcode::Pop;
+
+    // This is a simplified handler for single-register push/pop, e.g., PUSH r0
+    // The standard ARM syntax is PUSH {r0, r1, ...}
+    if (operands.size() != 1) {
+        throw std::runtime_error("Unsupported multi-register PUSH/POP syntax. Only single register is supported for now.");
+    }
+
+    // The operand is the register to push or pop.
+    IROperand reg_op = parse_operand(operands[0]);
+
+    return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{reg_op});
 }

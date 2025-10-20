@@ -228,7 +228,7 @@ void handle_ir_vector_zero_upper(const IRInstruction& ir_instr, ISimulator& simu
 
 
 
-void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
+void handle_x86_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
     auto& regs = x86_sim.getRegisterMap();
     const auto& src_op = ir_instr.operands[0];
@@ -331,7 +331,7 @@ void X86IRVisitor::visit(const IRInstruction& instr, ISimulator& simulator) {
 
         // Handlers in this file
         case IROpcode::Ret:             handle_ir_ret(instr, simulator); break;
-        case IROpcode::Div:             handle_ir_div(instr, simulator); break;
+        case IROpcode::Div:             handle_x86_ir_div(instr, simulator); break;
         case IROpcode::VectorMove:      handle_ir_vector_move(instr, simulator); break;
         case IROpcode::VectorZero:      handle_ir_vector_zero(instr, simulator); break;
         case IROpcode::VectorZeroUpper: handle_ir_vector_zero_upper(instr, simulator); break;
