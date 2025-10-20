@@ -31,6 +31,7 @@ struct IRRegisterKey {
 class Architecture {
 public:
     ISA isa;
+    uint32_t pointer_size_bits;
 
     // Maps an abstract IRRegister to its concrete ISA-specific name (e.g., "eax").
     std::map<IRRegisterKey, std::string> register_map;
@@ -39,14 +40,9 @@ public:
      * @brief Gets the ISA-specific name for a given abstract register.
      * @throws std::runtime_error if no mapping is found.
      */
-    const std::string& get_register_name(const IRRegister& reg) const {
-        IRRegisterKey key = {reg.type, reg.index, reg.size};
-        auto it = register_map.find(key);
-        if (it == register_map.end()) {
-            throw std::runtime_error("Register mapping not found for the given IRRegister.");
-        }
-        return it->second;
-    }
+    const std::string& get_register_name(const IRRegister& reg) const;
+
+    uint32_t get_pointer_size_bits() const { return pointer_size_bits; }
 
     // In the future, this class could also hold other ISA-specific details,
     // such as endianness, address size, etc.

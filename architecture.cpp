@@ -6,6 +6,7 @@
 Architecture create_x86_architecture() {
     Architecture arch;
     arch.isa = ISA::X86;
+    arch.pointer_size_bits = 64;
 
     // This map defines the translation from an abstract IRRegister 
     // (type, index, size) to a concrete x86 register name.
@@ -73,6 +74,7 @@ Architecture create_x86_architecture() {
 Architecture create_arm_cortex_r8_architecture() {
     Architecture arch;
     arch.isa = ISA::ARM;
+    arch.pointer_size_bits = 32;
 
     // --- General Purpose Registers (GPRs) ---
     // All GPRs in Cortex-R8 (AArch32) are 32-bit.
@@ -98,4 +100,13 @@ Architecture create_arm_cortex_r8_architecture() {
     }
 
     return arch;
+}
+
+const std::string& Architecture::get_register_name(const IRRegister& reg) const {
+    IRRegisterKey key = {reg.type, reg.index, reg.size};
+    auto it = register_map.find(key);
+    if (it == register_map.end()) {
+        throw std::runtime_error("Register mapping not found for the given IRRegister.");
+    }
+    return it->second;
 }

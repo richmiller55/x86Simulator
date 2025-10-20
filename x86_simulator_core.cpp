@@ -36,3 +36,11 @@ void X86Simulator::init(const std::string& program_name) {
 void X86Simulator::accept(IRVisitor& visitor, const IRInstruction& instr) {
     visitor.visit(instr, *this);
 }
+
+uint64_t X86Simulator::get_system_register(const std::string& name) {
+    throw std::runtime_error("get_system_register not implemented for x86");
+}
+
+void X86Simulator::set_system_register(const std::string& name, uint64_t value) {
+    throw std::runtime_error("set_system_register not implemented for x86");
+}

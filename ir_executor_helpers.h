@@ -138,5 +138,39 @@ void handle_ir_packed_mul_low_i16(const IRInstruction& ir_instr, ISimulator& sim
 void handle_ir_vector_zero(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_nop(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_swap(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_move_to_system_register(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_move_from_system_register(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_count_leading_zeros(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_reverse_bits(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_reverse_bytes(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_reverse_bytes16(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_reverse_bytes_signed_halfword(const IRInstruction& ir_instr, ISimulator& simulator);
+
+// Saturating Arithmetic
+void handle_ir_saturating_add(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_saturating_sub(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_saturating_double_add(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_saturating_double_sub(const IRInstruction& ir_instr, ISimulator& simulator);
+
+// Multiply-Accumulate
+void handle_ir_multiply_accumulate(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_multiply_subtract(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_unsigned_multiply_long(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_signed_multiply_long(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_unsigned_multiply_accumulate_long(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_signed_multiply_accumulate_long(const IRInstruction& ir_instr, ISimulator& simulator);
+
+// Special Instructions
+void handle_ir_breakpoint(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_wait_for_interrupt(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_wait_for_event(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_send_event(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_compare_and_branch_if_not_zero(const IRInstruction& ir_instr, ISimulator& simulator);
 
 #endif // IR_EXECUTOR_HELPERS_H
