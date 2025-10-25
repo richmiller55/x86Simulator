@@ -1,112 +1,129 @@
 #include "architecture.h"
 
-/**
- * @brief Populates and returns an Architecture object for the x86 ISA.
- */
+bool Architecture::is_register(const std::string& name) const {
+    for (const auto& [type, file_def] : register_files) {
+        for (const auto& phys_reg : file_def.registers) {
+            for (const auto& alias : phys_reg.aliases) {
+                if (alias.name == name) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+uint32_t Architecture::get_register_size_bits(const std::string& name) const {
+    for (const auto& [type, file_def] : register_files) {
+        for (const auto& phys_reg : file_def.registers) {
+            for (const auto& alias : phys_reg.aliases) {
+                if (alias.name == name) {
+                    return alias.size_bits;
+                }
+            }
+        }
+    }
+    return 0; // Indicates not found
+}
+
 Architecture create_x86_architecture() {
     Architecture arch;
     arch.isa = ISA::X86;
     arch.pointer_size_bits = 64;
 
-    // This map defines the translation from an abstract IRRegister 
-    // (type, index, size) to a concrete x86 register name.
-
-    // --- General Purpose Registers (GPRs) ---
-    // 64-bit
-    arch.register_map[{IRRegisterType::GPR, 0, 64}] = "rax";
-    arch.register_map[{IRRegisterType::GPR, 1, 64}] = "rcx";
-    arch.register_map[{IRRegisterType::GPR, 2, 64}] = "rdx";
-    arch.register_map[{IRRegisterType::GPR, 3, 64}] = "rbx";
-    arch.register_map[{IRRegisterType::GPR, 4, 64}] = "rsp";
-    arch.register_map[{IRRegisterType::GPR, 5, 64}] = "rbp";
-    arch.register_map[{IRRegisterType::GPR, 6, 64}] = "rsi";
-    arch.register_map[{IRRegisterType::GPR, 7, 64}] = "rdi";
-
-    // 32-bit
-    arch.register_map[{IRRegisterType::GPR, 0, 32}] = "eax";
-    arch.register_map[{IRRegisterType::GPR, 1, 32}] = "ecx";
-    arch.register_map[{IRRegisterType::GPR, 2, 32}] = "edx";
-    arch.register_map[{IRRegisterType::GPR, 3, 32}] = "ebx";
-    arch.register_map[{IRRegisterType::GPR, 4, 32}] = "esp";
-    arch.register_map[{IRRegisterType::GPR, 5, 32}] = "ebp";
-    arch.register_map[{IRRegisterType::GPR, 6, 32}] = "esi";
-    arch.register_map[{IRRegisterType::GPR, 7, 32}] = "edi";
-
-    // 16-bit
-    arch.register_map[{IRRegisterType::GPR, 0, 16}] = "ax";
-    arch.register_map[{IRRegisterType::GPR, 1, 16}] = "cx";
-    arch.register_map[{IRRegisterType::GPR, 2, 16}] = "dx";
-    arch.register_map[{IRRegisterType::GPR, 3, 16}] = "bx";
-    arch.register_map[{IRRegisterType::GPR, 4, 16}] = "sp";
-    arch.register_map[{IRRegisterType::GPR, 5, 16}] = "bp";
-    arch.register_map[{IRRegisterType::GPR, 6, 16}] = "si";
-    arch.register_map[{IRRegisterType::GPR, 7, 16}] = "di";
-
-    // 8-bit (low)
-    arch.register_map[{IRRegisterType::GPR, 0, 8}] = "al";
-    arch.register_map[{IRRegisterType::GPR, 1, 8}] = "cl";
-    arch.register_map[{IRRegisterType::GPR, 2, 8}] = "dl";
-    arch.register_map[{IRRegisterType::GPR, 3, 8}] = "bl";
+    // --- General Purpose Registers ---
+    RegisterFileDef gpr_file;
+    gpr_file.type = IRRegisterType::GPR;
+    gpr_file.registers.resize(16); // 16 GPRs in x86-64
+    gpr_file.registers[0] = {"GPR0", 64, {{"rax", 64, 0}, {"eax", 32, 0}, {"ax", 16, 0}, {"al", 8, 0}, {"ah", 8, 8}}};
+    gpr_file.registers[1] = {"GPR1", 64, {{"rcx", 64, 0}, {"ecx", 32, 0}, {"cx", 16, 0}, {"cl", 8, 0}, {"ch", 8, 8}}};
+    gpr_file.registers[2] = {"GPR2", 64, {{"rdx", 64, 0}, {"edx", 32, 0}, {"dx", 16, 0}, {"dl", 8, 0}, {"dh", 8, 8}}};
+    gpr_file.registers[3] = {"GPR3", 64, {{"rbx", 64, 0}, {"ebx", 32, 0}, {"bx", 16, 0}, {"bl", 8, 0}, {"bh", 8, 8}}};
+    gpr_file.registers[4] = {"GPR4", 64, {{"rsp", 64, 0}, {"esp", 32, 0}, {"sp", 16, 0}, {"spl", 8, 0}}};
+    gpr_file.registers[5] = {"GPR5", 64, {{"rbp", 64, 0}, {"ebp", 32, 0}, {"bp", 16, 0}, {"bpl", 8, 0}}};
+    gpr_file.registers[6] = {"GPR6", 64, {{"rsi", 64, 0}, {"esi", 32, 0}, {"si", 16, 0}, {"sil", 8, 0}}};
+    gpr_file.registers[7] = {"GPR7", 64, {{"rdi", 64, 0}, {"edi", 32, 0}, {"di", 16, 0}, {"dil", 8, 0}}};
+    // R8-R15
+    for (int i = 8; i < 16; ++i) {
+        std::string r_64 = "r" + std::to_string(i);
+        std::string r_32 = r_64 + "d";
+        std::string r_16 = r_64 + "w";
+        std::string r_8 = r_64 + "b";
+        gpr_file.registers[i] = {"GPR" + std::to_string(i), 64, {{r_64, 64, 0}, {r_32, 32, 0}, {r_16, 16, 0}, {r_8, 8, 0}}};
+    }
+    arch.register_files[IRRegisterType::GPR] = gpr_file;
 
     // --- Instruction Pointer ---
-    arch.register_map[{IRRegisterType::IP, 0, 64}] = "rip";
-    arch.register_map[{IRRegisterType::IP, 0, 32}] = "eip";
-    arch.register_map[{IRRegisterType::IP, 0, 16}] = "ip";
+    RegisterFileDef ip_file;
+    ip_file.type = IRRegisterType::IP;
+    ip_file.registers.resize(1);
+    ip_file.registers[0] = {"IP", 64, {{"rip", 64, 0}, {"eip", 32, 0}, {"ip", 16, 0}}};
+    arch.register_files[IRRegisterType::IP] = ip_file;
 
     // --- Vector Registers ---
-    // XMM (128-bit) and YMM (256-bit)
+    RegisterFileDef vector_file;
+    vector_file.type = IRRegisterType::VECTOR;
+    vector_file.registers.resize(16); // YMM0-YMM15
     for (int i = 0; i < 16; ++i) {
-        arch.register_map[{IRRegisterType::VECTOR, static_cast<uint32_t>(i), 128}] = "xmm" + std::to_string(i);
-        arch.register_map[{IRRegisterType::VECTOR, static_cast<uint32_t>(i), 256}] = "ymm" + std::to_string(i);
+        vector_file.registers[i] = {"VEC" + std::to_string(i), 256, {{"ymm" + std::to_string(i), 256, 0}, {"xmm" + std::to_string(i), 128, 0}}};
     }
+    arch.register_files[IRRegisterType::VECTOR] = vector_file;
 
     // --- Flags Register ---
-    arch.register_map[{IRRegisterType::FLAGS, 0, 64}] = "rflags";
-    arch.register_map[{IRRegisterType::FLAGS, 0, 32}] = "eflags";
-    arch.register_map[{IRRegisterType::FLAGS, 0, 16}] = "flags";
+    RegisterFileDef flags_file;
+    flags_file.type = IRRegisterType::FLAGS;
+    flags_file.registers.resize(1);
+    flags_file.registers[0] = {"FLAGS", 64, {{"rflags", 64, 0}, {"eflags", 32, 0}, {"flags", 16, 0}}};
+    arch.register_files[IRRegisterType::FLAGS] = flags_file;
 
     return arch;
 }
 
-/**
- * @brief Populates and returns an Architecture object for the ARM Cortex-R8 ISA.
- */
 Architecture create_arm_cortex_r8_architecture() {
     Architecture arch;
     arch.isa = ISA::ARM;
     arch.pointer_size_bits = 32;
 
-    // --- General Purpose Registers (GPRs) ---
-    // All GPRs in Cortex-R8 (AArch32) are 32-bit.
+    // --- General Purpose Registers ---
+    RegisterFileDef gpr_file;
+    gpr_file.type = IRRegisterType::GPR;
+    gpr_file.registers.resize(16);
     for (int i = 0; i <= 12; ++i) {
-        arch.register_map[{IRRegisterType::GPR, static_cast<uint32_t>(i), 32}] = "r" + std::to_string(i);
+        gpr_file.registers[i] = {"GPR" + std::to_string(i), 32, {{"r" + std::to_string(i), 32, 0}}};
     }
+    gpr_file.registers[13] = {"GPR13", 32, {{"sp", 32, 0}}};
+    gpr_file.registers[14] = {"GPR14", 32, {{"lr", 32, 0}}};
+    gpr_file.registers[15] = {"GPR15", 32, {{"pc", 32, 0}}}; // PC is also a GPR in ARM
+    arch.register_files[IRRegisterType::GPR] = gpr_file;
 
-    // --- Special Purpose GPRs ---
-    arch.register_map[{IRRegisterType::GPR, 13, 32}] = "sp"; // Stack Pointer
-    arch.register_map[{IRRegisterType::GPR, 14, 32}] = "lr"; // Link Register
 
-    // --- Program Counter ---
-    arch.register_map[{IRRegisterType::IP, 0, 32}] = "pc"; // Program Counter (r15)
 
     // --- Status Register ---
-    arch.register_map[{IRRegisterType::FLAGS, 0, 32}] = "cpsr"; // Current Program Status Register
+    RegisterFileDef flags_file;
+    flags_file.type = IRRegisterType::FLAGS;
+    flags_file.registers.resize(1);
+    flags_file.registers[0] = {"FLAGS", 32, {{"cpsr", 32, 0}}};
+    arch.register_files[IRRegisterType::FLAGS] = flags_file;
 
-    // --- Vector/SIMD Registers (NEON) ---
-    // Cortex-R8 can have 16 or 32 128-bit registers (d0-d31 or q0-q15)
-    // We will map the 128-bit view (q registers)
-    for (int i = 0; i < 16; ++i) {
-        arch.register_map[{IRRegisterType::VECTOR, static_cast<uint32_t>(i), 128}] = "q" + std::to_string(i);
+    // --- Vector/FPU Registers ---
+    RegisterFileDef vector_file;
+    vector_file.type = IRRegisterType::VECTOR;
+    vector_file.registers.resize(32); // 32 physical 64-bit registers (can be viewed as s, d, or q)
+    for (int i = 0; i < 32; ++i) {
+        // Each physical register is 64 bits (d register size)
+        vector_file.registers[i] = {"VEC" + std::to_string(i), 64, 
+            {{"d" + std::to_string(i), 64, 0}}};
+        // Add s register aliases
+        vector_file.registers[i].aliases.push_back({"s" + std::to_string(i*2), 32, 0});
+        vector_file.registers[i].aliases.push_back({"s" + std::to_string(i*2+1), 32, 32});
     }
+    // q registers are pairs of d registers
+    for (int i = 0; i < 16; ++i) {
+        // This is tricky because q registers span two physical d registers.
+        // The model might need another level of abstraction for this.
+        // For now, we will omit q registers from the new architecture definition.
+    }
+    arch.register_files[IRRegisterType::VECTOR] = vector_file;
 
     return arch;
-}
-
-const std::string& Architecture::get_register_name(const IRRegister& reg) const {
-    IRRegisterKey key = {reg.type, reg.index, reg.size};
-    auto it = register_map.find(key);
-    if (it == register_map.end()) {
-        throw std::runtime_error("Register mapping not found for the given IRRegister.");
-    }
-    return it->second;
 }

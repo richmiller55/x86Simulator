@@ -6,7 +6,7 @@ class IRInstruction; // Forward declaration
 #include <string>
 
 // Forward declarations for components
-class RegisterMap;
+class IRegisterMap;
 class Memory;
 class IDatabaseManager;
 class Architecture;
@@ -45,11 +45,14 @@ public:
      */
     virtual bool loadProgram(const std::string& program_path) = 0;
 
+    virtual bool firstPass() = 0;
+    virtual bool secondPass() = 0;
+
     virtual void execute_ir_instruction(const IRInstruction& ir_instr) = 0;
 
     // --- Generic Component Getters ---
-    virtual RegisterMap& getRegisterMap() = 0;
-    virtual const RegisterMap& getRegisterMap() const = 0;
+    virtual IRegisterMap& getRegisterMap() = 0;
+    virtual const IRegisterMap& getRegisterMap() const = 0;
     virtual Memory& getMemory() = 0;
     virtual const Memory& getMemory() const = 0;
     virtual IDatabaseManager& getDatabaseManager() = 0;

@@ -8,6 +8,39 @@
 #include "x86_simulator.h"
 #include <variant>
 #include <limits>
+#include "avx_core.h"
+#include <cmath>
+
+float getFloatOperandValue(const IROperand& op, ISimulator& simulator) {
+    if (const std::string* reg_name = std::get_if<std::string>(&op)) {
+        return simulator.getRegisterMap().get_float(*reg_name);
+    } else if (const uint64_t* imm = std::get_if<uint64_t>(&op)) {
+        // Immediate is integer, needs conversion. Or it could be a label.
+        // This path might need more thought depending on how float immediates are represented.
+        return static_cast<float>(*imm);
+    }
+    // Handle memory operands if necessary
+    throw std::runtime_error("Unsupported operand type for getFloatOperandValue");
+}
+
+double getDoubleOperandValue(const IROperand& op, ISimulator& simulator) {
+    if (const std::string* reg_name = std::get_if<std::string>(&op)) {
+        return simulator.getRegisterMap().get_double(*reg_name);
+    } else if (const uint64_t* imm = std::get_if<uint64_t>(&op)) {
+        return static_cast<double>(*imm);
+    }
+    // Handle memory operands if necessary
+    throw std::runtime_error("Unsupported operand type for getDoubleOperandValue");
+}
+
+void setFloatRegisterValue(const std::string& reg_name, float value, ISimulator& simulator) {
+    simulator.getRegisterMap().set_float(reg_name, value);
+}
+
+void setDoubleRegisterValue(const std::string& reg_name, double value, ISimulator& simulator) {
+    simulator.getRegisterMap().set_double(reg_name, value);
+}
+
 
 
 
@@ -15,19 +48,27 @@
  * @brief Gets the value of an IR operand by using the architecture map.
  */
 int64_t getOperandValue(const IROperand& op, ISimulator& simulator) {
-    if (std::holds_alternative<IRRegister>(op)) {
-        const auto& ir_reg = std::get<IRRegister>(op);
+    if (std::holds_alternative<std::string>(op)) {
+        const auto& reg_name = std::get<std::string>(op);
         const auto& arch = simulator.get_architecture();
-        const std::string& reg_name = arch.get_register_name(ir_reg);
+        if (!arch.is_register(reg_name)) {
+            // This could be a label, but for getOperandValue it must be a register.
+            // Label addresses should already be resolved into uint64_t.
+            throw std::runtime_error("Invalid register name or unresolved label in getOperandValue: " + reg_name);
+        }
         auto& regs = simulator.getRegisterMap();
+        uint32_t size = arch.get_register_size_bits(reg_name);
 
-        switch (ir_reg.size) {
-            case 8:   return static_cast<int8_t>(regs.get8(reg_name));
-            case 16:  return static_cast<int16_t>(regs.get16(reg_name));
-            case 32:  return static_cast<int32_t>(regs.get32(reg_name));
-            case 64:  return static_cast<int64_t>(regs.get64(reg_name));
+        switch (size) {
+            case 8:   return regs.get8(reg_name);
+            case 16:  return regs.get16(reg_name);
+            case 32:  return regs.get32(reg_name);
+            case 64:  return regs.get64(reg_name);
             default:
-                throw std::runtime_error("Unsupported register size in getOperandValue: " + std::to_string(ir_reg.size));
+                if (size > 64) { // Vector registers
+                    throw std::runtime_error("Vector register " + reg_name + " cannot be used as a scalar operand in getOperandValue");
+                }
+                throw std::runtime_error("Unsupported register size in getOperandValue: " + std::to_string(size));
         }
     } else if (std::holds_alternative<uint64_t>(op)) {
         return static_cast<int64_t>(std::get<uint64_t>(op));
@@ -38,17 +79,17 @@ int64_t getOperandValue(const IROperand& op, ISimulator& simulator) {
         const auto& arch = simulator.get_architecture();
 
         address_t addr = mem_op.displacement;
-        if (mem_op.base_reg) {
-            const std::string& reg_name = arch.get_register_name(*mem_op.base_reg);
-            if (arch.get_pointer_size_bits() == 32) {
+        if (mem_op.base_reg.has_value()) {
+            const std::string& reg_name = mem_op.base_reg.value();
+            if (arch.pointer_size_bits == 32) {
                 addr += regs.get32(reg_name);
             } else {
                 addr += regs.get64(reg_name);
             }
         }
-        if (mem_op.index_reg) {
-            const std::string& reg_name = arch.get_register_name(*mem_op.index_reg);
-            if (arch.get_pointer_size_bits() == 32) {
+        if (mem_op.index_reg.has_value()) {
+            const std::string& reg_name = mem_op.index_reg.value();
+            if (arch.pointer_size_bits == 32) {
                 uint32_t index_val = regs.get32(reg_name);
                 addr += index_val * mem_op.scale;
             } else {
@@ -58,10 +99,10 @@ int64_t getOperandValue(const IROperand& op, ISimulator& simulator) {
         }
 
         switch (mem_op.size) {
-            case 8:   return static_cast<int8_t>(mem.read_byte(addr));
-            case 16:  return static_cast<int16_t>(mem.read_word(addr));
-            case 32:  return static_cast<int32_t>(mem.read_dword(addr));
-            case 64:  return static_cast<int64_t>(mem.read_qword(addr));
+            case 8:   return mem.read_byte(addr);
+            case 16:  return mem.read_word(addr);
+            case 32:  return mem.read_dword(addr);
+            case 64:  return mem.read_qword(addr);
             default:
                 throw std::runtime_error("Unsupported memory access size in getOperandValue: " + std::to_string(mem_op.size));
         }
@@ -70,20 +111,20 @@ int64_t getOperandValue(const IROperand& op, ISimulator& simulator) {
 }
 
 /**
- * @brief Sets the value of an abstract IR register using the architecture map.
+ * @brief Sets the value of a register by name.
  */
-void setRegisterValue(const IRRegister& reg, int64_t value, ISimulator& simulator) {
+void setRegisterValue(const std::string& reg_name, int64_t value, ISimulator& simulator) {
     const auto& arch = simulator.get_architecture();
-    const std::string& reg_name = arch.get_register_name(reg);
     auto& regs = simulator.getRegisterMap();
+    uint32_t size = arch.get_register_size_bits(reg_name);
 
-    switch (reg.size) {
+    switch (size) {
         case 8:   regs.set8(reg_name, static_cast<uint8_t>(value)); break;
         case 16:  regs.set16(reg_name, static_cast<uint16_t>(value)); break;
         case 32:  regs.set32(reg_name, static_cast<uint32_t>(value)); break;
         case 64:  regs.set64(reg_name, static_cast<uint64_t>(value)); break;
         default:
-            throw std::runtime_error("Unsupported register size in setRegisterValue: " + std::to_string(reg.size));
+            throw std::runtime_error("Unsupported register size in setRegisterValue: " + std::to_string(size));
     }
 }
 
@@ -97,17 +138,17 @@ void setMemoryValue(const IRMemoryOperand& mem_op, int64_t value, ISimulator& si
     const auto& arch = simulator.get_architecture();
 
     address_t addr = mem_op.displacement;
-    if (mem_op.base_reg) {
-        const std::string& reg_name = arch.get_register_name(*mem_op.base_reg);
-        if (arch.get_pointer_size_bits() == 32) {
+    if (mem_op.base_reg.has_value()) {
+        const std::string& reg_name = mem_op.base_reg.value();
+        if (arch.pointer_size_bits == 32) {
             addr += regs.get32(reg_name);
         } else {
             addr += regs.get64(reg_name);
         }
     }
-    if (mem_op.index_reg) {
-        const std::string& reg_name = arch.get_register_name(*mem_op.index_reg);
-        if (arch.get_pointer_size_bits() == 32) {
+    if (mem_op.index_reg.has_value()) {
+        const std::string& reg_name = mem_op.index_reg.value();
+        if (arch.pointer_size_bits == 32) {
             uint32_t index_val = regs.get32(reg_name);
             addr += index_val * mem_op.scale;
         } else {
@@ -136,11 +177,13 @@ void handle_ir_add(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Add requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     if (ir_instr.operands.size() == 2) { // 2-operand form: dest += src
@@ -151,10 +194,10 @@ void handle_ir_add(const IRInstruction& ir_instr, ISimulator& simulator) {
         val2 = getOperandValue(ir_instr.operands[2], simulator);
     }
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             uint8_t result = static_cast<uint8_t>(val1) + static_cast<uint8_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             simulator.set_CF(static_cast<uint16_t>(val1) + static_cast<uint16_t>(val2) > 0xFF);
@@ -163,7 +206,7 @@ void handle_ir_add(const IRInstruction& ir_instr, ISimulator& simulator) {
         }
         case 16: {
             uint16_t result = static_cast<uint16_t>(val1) + static_cast<uint16_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             simulator.set_CF(static_cast<uint32_t>(val1) + static_cast<uint32_t>(val2) > 0xFFFF);
@@ -175,7 +218,7 @@ void handle_ir_add(const IRInstruction& ir_instr, ISimulator& simulator) {
             uint32_t u_val2 = static_cast<uint32_t>(val2);
             uint64_t result64 = static_cast<uint64_t>(u_val1) + static_cast<uint64_t>(u_val2);
             uint32_t result = static_cast<uint32_t>(result64);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
 
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
@@ -192,7 +235,7 @@ void handle_ir_add(const IRInstruction& ir_instr, ISimulator& simulator) {
         }
         case 64: {
             uint64_t result = static_cast<uint64_t>(val1) + static_cast<uint64_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             simulator.set_CF(static_cast<uint64_t>(val1) > result); // If result wrapped around, it will be less than the original.
@@ -212,11 +255,13 @@ void handle_ir_sub(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Sub requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     if (ir_instr.operands.size() == 2) { // 2-operand form: dest -= src
@@ -227,10 +272,10 @@ void handle_ir_sub(const IRInstruction& ir_instr, ISimulator& simulator) {
         val2 = getOperandValue(ir_instr.operands[2], simulator);
     }
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             uint8_t result = static_cast<uint8_t>(val1) - static_cast<uint8_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             simulator.set_CF(static_cast<uint8_t>(val1) < static_cast<uint8_t>(val2));
@@ -239,7 +284,7 @@ void handle_ir_sub(const IRInstruction& ir_instr, ISimulator& simulator) {
         }
         case 16: {
             uint16_t result = static_cast<uint16_t>(val1) - static_cast<uint16_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             simulator.set_CF(static_cast<uint16_t>(val1) < static_cast<uint16_t>(val2));
@@ -249,7 +294,7 @@ void handle_ir_sub(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 32: {
             int64_t result64 = val1 - val2;
             uint32_t result = static_cast<uint32_t>(result64);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
             simulator.set_CF(static_cast<uint64_t>(val1) < static_cast<uint64_t>(val2));
@@ -258,7 +303,7 @@ void handle_ir_sub(const IRInstruction& ir_instr, ISimulator& simulator) {
         }
         case 64: {
             uint64_t result = static_cast<uint64_t>(val1) - static_cast<uint64_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             simulator.set_CF(static_cast<uint64_t>(val1) < static_cast<uint64_t>(val2));
@@ -278,11 +323,13 @@ void handle_ir_addc(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR AddC requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     uint8_t carry = simulator.get_CF();
@@ -295,11 +342,11 @@ void handle_ir_addc(const IRInstruction& ir_instr, ISimulator& simulator) {
         val2 = getOperandValue(ir_instr.operands[2], simulator);
     }
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 32: { // Assuming 32-bit for ARM
             uint64_t result64 = static_cast<uint64_t>(val1) + static_cast<uint64_t>(val2) + carry;
             uint32_t result32 = static_cast<uint32_t>(result64);
-            setRegisterValue(dest_reg, result32, simulator);
+            setRegisterValue(dest_name, result32, simulator);
             simulator.set_ZF(result32 == 0);
             simulator.set_SF((result32 & 0x80000000) != 0);
             simulator.set_CF(result64 > 0xFFFFFFFF);
@@ -319,11 +366,13 @@ void handle_ir_subc(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR SubC requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     uint8_t borrow = 1 - simulator.get_CF();
@@ -336,11 +385,11 @@ void handle_ir_subc(const IRInstruction& ir_instr, ISimulator& simulator) {
         val2 = getOperandValue(ir_instr.operands[2], simulator);
     }
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 32: { // Assuming 32-bit for ARM
             uint64_t result64 = static_cast<uint64_t>(val1) - static_cast<uint64_t>(val2) - borrow;
             uint32_t result32 = static_cast<uint32_t>(result64);
-            setRegisterValue(dest_reg, result32, simulator);
+            setRegisterValue(dest_name, result32, simulator);
             simulator.set_ZF(result32 == 0);
             simulator.set_SF((result32 & 0x80000000) != 0);
             simulator.set_CF(static_cast<uint64_t>(val1) < (static_cast<uint64_t>(val2) + borrow));
@@ -366,15 +415,15 @@ void handle_ir_move(const IRInstruction& ir_instr, ISimulator& simulator) {
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
 
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Move requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     int64_t sourceValue = getOperandValue(src_op, simulator);
 
-    setRegisterValue(dest_reg, sourceValue, simulator);
+    setRegisterValue(dest_name, sourceValue, simulator);
 }
 
 /**
@@ -389,7 +438,7 @@ void handle_ir_load(const IRInstruction& ir_instr, ISimulator& simulator) {
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
 
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Load requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
@@ -398,10 +447,10 @@ void handle_ir_load(const IRInstruction& ir_instr, ISimulator& simulator) {
         return;
     }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     int64_t sourceValue = getOperandValue(src_op, simulator);
 
-    setRegisterValue(dest_reg, sourceValue, simulator);
+    setRegisterValue(dest_name, sourceValue, simulator);
 }
 
 /**
@@ -441,7 +490,7 @@ void handle_ir_jump(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     if (std::holds_alternative<uint64_t>(target_op)) {
         target_address = std::get<uint64_t>(target_op);
-    } else if (std::holds_alternative<IRRegister>(target_op)) {
+    } else if (std::holds_alternative<std::string>(target_op)) {
         target_address = getOperandValue(target_op, simulator);
     } else {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Jump target is not a valid address or register.", "ERROR", 0, __FILE__, __LINE__);
@@ -559,8 +608,8 @@ void handle_ir_cmp(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     // Determine size from the first operand, assuming they match.
     uint32_t size = 0;
-    if (const IRRegister* reg = std::get_if<IRRegister>(&op1)) {
-        size = reg->size;
+    if (const std::string* reg_name = std::get_if<std::string>(&op1)) {
+        size = simulator.get_architecture().get_register_size_bits(*reg_name);
     } else if (const IRMemoryOperand* mem = std::get_if<IRMemoryOperand>(&op1)) {
         size = mem->size;
     } else { // Should not happen if IR is well-formed
@@ -639,18 +688,20 @@ void handle_ir_inc(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     const auto& op = ir_instr.operands[0];
 
-    if (!std::holds_alternative<IRRegister>(op)) {
+    if (!std::holds_alternative<std::string>(op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Inc requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
 
-    const auto& dest_reg = std::get<IRRegister>(op);
+    const auto& dest_name = std::get<std::string>(op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             int8_t value = getOperandValue(op, simulator);
             uint8_t result = value + 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             simulator.set_OF(value == 0x7F);
@@ -659,7 +710,7 @@ void handle_ir_inc(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 16: {
             int16_t value = getOperandValue(op, simulator);
             uint16_t result = value + 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             simulator.set_OF(value == 0x7FFF);
@@ -668,7 +719,7 @@ void handle_ir_inc(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 32: {
             int32_t value = getOperandValue(op, simulator);
             uint32_t result = value + 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
             simulator.set_OF(value == 0x7FFFFFFF);
@@ -677,7 +728,7 @@ void handle_ir_inc(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 64: {
             int64_t value = getOperandValue(op, simulator);
             uint64_t result = value + 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             simulator.set_OF(value == 0x7FFFFFFFFFFFFFFFULL);
@@ -839,20 +890,22 @@ void handle_ir_dec(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     const auto& op = ir_instr.operands[0];
 
-    if (!std::holds_alternative<IRRegister>(op)) {
+    if (!std::holds_alternative<std::string>(op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(),
 					   "IR Dec requires a register destination.", "ERROR",
 					   0, __FILE__, __LINE__);
         return;
     }
 
-    const auto& dest_reg = std::get<IRRegister>(op);
+    const auto& dest_name = std::get<std::string>(op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             int8_t value = getOperandValue(op, simulator);
             uint8_t result = value - 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             simulator.set_OF(value == 0x80);
@@ -861,7 +914,7 @@ void handle_ir_dec(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 16: {
             int16_t value = getOperandValue(op, simulator);
             uint16_t result = value - 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             simulator.set_OF(value == 0x8000);
@@ -870,7 +923,7 @@ void handle_ir_dec(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 32: {
             int32_t value = getOperandValue(op, simulator);
             uint32_t result = value - 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
             simulator.set_OF(static_cast<uint32_t>(value) == 0x80000000);
@@ -879,7 +932,7 @@ void handle_ir_dec(const IRInstruction& ir_instr, ISimulator& simulator) {
         case 64: {
             int64_t value = getOperandValue(op, simulator);
             uint64_t result = value - 1;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             simulator.set_OF(static_cast<uint64_t>(value) == 0x8000000000000000ULL);
@@ -899,7 +952,7 @@ void handle_ir_call(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     if (std::holds_alternative<uint64_t>(target_op)) {
         target_address = std::get<uint64_t>(target_op);
-    } else if (std::holds_alternative<IRRegister>(target_op)) {
+    } else if (std::holds_alternative<std::string>(target_op)) {
         target_address = getOperandValue(target_op, simulator);
     } else {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Call target is not a valid address or register.", "ERROR", 0, __FILE__, __LINE__);
@@ -945,8 +998,8 @@ void handle_ir_push(const IRInstruction& ir_instr, ISimulator& simulator) {
     address_t sp = regs.get64(sp_name);
 
     uint32_t push_size = 0;
-    if (const IRRegister* reg = std::get_if<IRRegister>(&src_op)) {
-        push_size = reg->size / 8; // size is in bits
+    if (const std::string* reg_name = std::get_if<std::string>(&src_op)) {
+        push_size = simulator.get_architecture().get_register_size_bits(*reg_name) / 8;
     } else if (std::holds_alternative<uint64_t>(src_op)) {
         push_size = 4; // Assume 32-bit for immediates
     }
@@ -970,24 +1023,26 @@ void handle_ir_pop(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         return; // Or log error, pop destination must be a register
     }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     auto& regs = simulator.getRegisterMap();
     auto& mem = simulator.getMemory();
     const char* sp_name = simulator.get_stack_pointer_name();
     address_t sp = regs.get64(sp_name);
 
-    if (dest_reg.size == 32) {
+    if (size == 32) {
         uint32_t value = mem.read_stack_dword(sp);
-        setRegisterValue(dest_reg, static_cast<int64_t>(value), simulator);
+        setRegisterValue(dest_name, static_cast<int64_t>(value), simulator);
         regs.set64(sp_name, sp + 4);
-    } else if (dest_reg.size == 64) {
+    } else if (size == 64) {
         uint64_t value = mem.read_stack(sp);
-        setRegisterValue(dest_reg, static_cast<int64_t>(value), simulator);
+        setRegisterValue(dest_name, static_cast<int64_t>(value), simulator);
         regs.set64(sp_name, sp + 8);
     } else {
         // Unsupported pop size, log error
@@ -997,8 +1052,10 @@ void handle_ir_pop(const IRInstruction& ir_instr, ISimulator& simulator) {
 void handle_ir_and(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() < 2 || ir_instr.operands.size() > 3) { return; }
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) { return; }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    if (!std::holds_alternative<std::string>(dest_op)) { return; }
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     if (ir_instr.operands.size() == 2) { // 2-operand form: dest &= src
@@ -1013,31 +1070,31 @@ void handle_ir_and(const IRInstruction& ir_instr, ISimulator& simulator) {
     simulator.set_CF(false);
     simulator.set_OF(false);
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             uint8_t result = static_cast<uint8_t>(val1) & static_cast<uint8_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             break;
         }
         case 16: {
             uint16_t result = static_cast<uint16_t>(val1) & static_cast<uint16_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             break;
         }
         case 32: {
             uint32_t result = static_cast<uint32_t>(val1) & static_cast<uint32_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
             break;
         }
         case 64: {
             uint64_t result = val1 & val2;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             break;
@@ -1049,8 +1106,10 @@ void handle_ir_and(const IRInstruction& ir_instr, ISimulator& simulator) {
 void handle_ir_or(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() < 2 || ir_instr.operands.size() > 3) { return; }
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) { return; }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    if (!std::holds_alternative<std::string>(dest_op)) { return; }
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     if (ir_instr.operands.size() == 2) { // 2-operand form: dest |= src
@@ -1065,31 +1124,31 @@ void handle_ir_or(const IRInstruction& ir_instr, ISimulator& simulator) {
     simulator.set_CF(false);
     simulator.set_OF(false);
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             uint8_t result = static_cast<uint8_t>(val1) | static_cast<uint8_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             break;
         }
         case 16: {
             uint16_t result = static_cast<uint16_t>(val1) | static_cast<uint16_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             break;
         }
         case 32: {
             uint32_t result = static_cast<uint32_t>(val1) | static_cast<uint32_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
             break;
         }
         case 64: {
             uint64_t result = val1 | val2;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             break;
@@ -1101,8 +1160,10 @@ void handle_ir_or(const IRInstruction& ir_instr, ISimulator& simulator) {
 void handle_ir_xor(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() < 2 || ir_instr.operands.size() > 3) { return; }
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) { return; }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    if (!std::holds_alternative<std::string>(dest_op)) { return; }
+    const auto& dest_name = std::get<std::string>(dest_op);
+    const auto& arch = simulator.get_architecture();
+    uint32_t size = arch.get_register_size_bits(dest_name);
 
     int64_t val1, val2;
     if (ir_instr.operands.size() == 2) { // 2-operand form: dest ^= src
@@ -1117,31 +1178,31 @@ void handle_ir_xor(const IRInstruction& ir_instr, ISimulator& simulator) {
     simulator.set_CF(false);
     simulator.set_OF(false);
 
-    switch (dest_reg.size) {
+    switch (size) {
         case 8: {
             uint8_t result = static_cast<uint8_t>(val1) ^ static_cast<uint8_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80) != 0);
             break;
         }
         case 16: {
             uint16_t result = static_cast<uint16_t>(val1) ^ static_cast<uint16_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000) != 0);
             break;
         }
         case 32: {
             uint32_t result = static_cast<uint32_t>(val1) ^ static_cast<uint32_t>(val2);
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x80000000) != 0);
             break;
         }
         case 64: {
             uint64_t result = val1 ^ val2;
-            setRegisterValue(dest_reg, result, simulator);
+            setRegisterValue(dest_name, result, simulator);
             simulator.set_ZF(result == 0);
             simulator.set_SF((result & 0x8000000000000000ULL) != 0);
             break;
@@ -1156,15 +1217,15 @@ void handle_ir_not(const IRInstruction& ir_instr, ISimulator& simulator) {
         return;
     }
     const auto& dest_op = ir_instr.operands[0];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Not requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
 
     int64_t destValue = getOperandValue(dest_op, simulator);
     uint32_t result = ~static_cast<uint32_t>(destValue);
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_shl(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1174,16 +1235,16 @@ void handle_ir_shl(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
     const auto& dest_op = ir_instr.operands[0];
     const auto& count_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Shl requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
 
     int64_t destValue = getOperandValue(dest_op, simulator);
     uint8_t count = getOperandValue(count_op, simulator);
     uint32_t result = static_cast<uint32_t>(destValue) << count;
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 
     simulator.set_ZF(result == 0);
     simulator.set_SF((result & 0x80000000) != 0);
@@ -1209,16 +1270,16 @@ void handle_ir_shr(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
     const auto& dest_op = ir_instr.operands[0];
     const auto& count_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Shr requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
 
     int64_t destValue = getOperandValue(dest_op, simulator);
     uint8_t count = getOperandValue(count_op, simulator);
     uint32_t result = static_cast<uint32_t>(destValue) >> count;
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 
     simulator.set_ZF(result == 0);
     simulator.set_SF((result & 0x80000000) != 0);
@@ -1244,16 +1305,16 @@ void handle_ir_sar(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
     const auto& dest_op = ir_instr.operands[0];
     const auto& count_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op)) {
+    if (!std::holds_alternative<std::string>(dest_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "IR Sar requires a register destination.", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
 
     int64_t destValue = getOperandValue(dest_op, simulator);
     uint8_t count = getOperandValue(count_op, simulator);
     int32_t result = static_cast<int32_t>(destValue) >> count;
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 
     simulator.set_ZF(result == 0);
     simulator.set_SF(result < 0);
@@ -1277,8 +1338,8 @@ void handle_ir_in(const IRInstruction& ir_instr, ISimulator& simulator) {
     char input_char;
     std::cin >> input_char;
     const auto& dest_op = ir_instr.operands[0];
-    if (const IRRegister* dest_reg = std::get_if<IRRegister>(&dest_op)) {
-        setRegisterValue(*dest_reg, input_char, simulator);
+    if (const std::string* dest_name = std::get_if<std::string>(&dest_op)) {
+        setRegisterValue(*dest_name, input_char, simulator);
     }
 }
 
@@ -1298,7 +1359,7 @@ void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator) {
     const auto& arch = simulator.get_architecture();
 
     uint64_t return_address = 0;
-    uint32_t pop_size = arch.get_pointer_size_bits() / 8;
+    uint32_t pop_size = arch.pointer_size_bits / 8;
 
     if (pop_size == 4) {
         return_address = mem.read_stack_dword(sp);
@@ -1351,11 +1412,11 @@ void handle_ir_movenot(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() != 2) { return; }
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op)) { return; }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    if (!std::holds_alternative<std::string>(dest_op)) { return; }
+    const auto& dest_name = std::get<std::string>(dest_op);
     int64_t src_val = getOperandValue(src_op, simulator);
     uint64_t result = ~static_cast<uint64_t>(src_val);
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_andnot(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1363,12 +1424,12 @@ void handle_ir_andnot(const IRInstruction& ir_instr, ISimulator& simulator) {
     const auto& dest_op = ir_instr.operands[0];
     const auto& src1_op = ir_instr.operands[1];
     const auto& src2_op = ir_instr.operands[2];
-    if (!std::holds_alternative<IRRegister>(dest_op)) { return; }
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    if (!std::holds_alternative<std::string>(dest_op)) { return; }
+    const auto& dest_name = std::get<std::string>(dest_op);
     int64_t src1_val = getOperandValue(src1_op, simulator);
     int64_t src2_val = getOperandValue(src2_op, simulator);
     uint64_t result = static_cast<uint64_t>(src1_val) & ~static_cast<uint64_t>(src2_val);
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1378,7 +1439,7 @@ void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
     const auto& src1_op = ir_instr.operands[1];
     const auto& src2_op = ir_instr.operands[2];
 
-    if (!std::holds_alternative<IRRegister>(dest_op)) return;
+    if (!std::holds_alternative<std::string>(dest_op)) return;
 
     int32_t src1_val = getOperandValue(src1_op, simulator);
     int32_t src2_val = getOperandValue(src2_op, simulator);
@@ -1391,8 +1452,8 @@ void handle_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     int32_t result = src1_val / src2_val;
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
-    setRegisterValue(dest_reg, result, simulator);
+    const auto& dest_name = std::get<std::string>(dest_op);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_nop(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1409,22 +1470,21 @@ void handle_ir_swap(const IRInstruction& ir_instr, ISimulator& simulator) {
     const auto& rm_op = ir_instr.operands[1]; // Source register
     const auto& rn_mem_op = ir_instr.operands[2]; // Memory operand
 
-    if (!std::holds_alternative<IRRegister>(rd_op) || !std::holds_alternative<IRRegister>(rm_op) || !std::holds_alternative<IRMemoryOperand>(rn_mem_op)) {
+    if (!std::holds_alternative<std::string>(rd_op) || !std::holds_alternative<std::string>(rm_op) || !std::holds_alternative<IRMemoryOperand>(rn_mem_op)) {
         simulator.getDatabaseManager().log(simulator.get_session_id(), "Invalid operand types for IR Swap", "ERROR", 0, __FILE__, __LINE__);
         return;
     }
 
-    const auto& rd_reg = std::get<IRRegister>(rd_op);
-    const auto& rm_reg = std::get<IRRegister>(rm_op);
+    const auto& rd_name = std::get<std::string>(rd_op);
     const auto& rn_mem = std::get<IRMemoryOperand>(rn_mem_op);
 
     // Note: This implementation is not atomic.
     // In a multi-threaded environment, this would need a lock.
     int64_t value_from_mem = getOperandValue(rn_mem, simulator);
-    int64_t value_from_rm = getOperandValue(rm_reg, simulator);
+    int64_t value_from_rm = getOperandValue(rm_op, simulator);
 
     setMemoryValue(rn_mem, value_from_rm, simulator);
-    setRegisterValue(rd_reg, value_from_mem, simulator);
+    setRegisterValue(rd_name, value_from_mem, simulator);
 }
 
 void handle_ir_move_to_system_register(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1447,13 +1507,13 @@ void handle_ir_move_from_system_register(const IRInstruction& ir_instr, ISimulat
     const auto& dest_op = ir_instr.operands[0]; // Destination GPR
     const auto& src_op = ir_instr.operands[1];  // System register name (string)
 
-    if (!std::holds_alternative<IRRegister>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
+    if (!std::holds_alternative<std::string>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     const std::string& sys_reg_name = std::get<std::string>(src_op);
 
     uint64_t value = simulator.get_system_register(sys_reg_name);
-    setRegisterValue(dest_reg, value, simulator);
+    setRegisterValue(dest_name, value, simulator);
 }
 
 void handle_ir_count_leading_zeros(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1462,15 +1522,15 @@ void handle_ir_count_leading_zeros(const IRInstruction& ir_instr, ISimulator& si
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
 
-    if (!std::holds_alternative<IRRegister>(dest_op) || !std::holds_alternative<IRRegister>(src_op)) { return; }
+    if (!std::holds_alternative<std::string>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     uint32_t src_val = getOperandValue(src_op, simulator);
 
     if (src_val == 0) {
-        setRegisterValue(dest_reg, 32, simulator);
+        setRegisterValue(dest_name, 32, simulator);
     } else {
-        setRegisterValue(dest_reg, __builtin_clz(src_val), simulator);
+        setRegisterValue(dest_name, __builtin_clz(src_val), simulator);
     }
 }
 
@@ -1478,9 +1538,9 @@ void handle_ir_reverse_bits(const IRInstruction& ir_instr, ISimulator& simulator
     if (ir_instr.operands.size() != 2) { return; }
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op) || !std::holds_alternative<IRRegister>(src_op)) { return; }
+    if (!std::holds_alternative<std::string>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     uint32_t src_val = getOperandValue(src_op, simulator);
     uint32_t result = 0;
     for (int i = 0; i < 32; ++i) {
@@ -1488,47 +1548,47 @@ void handle_ir_reverse_bits(const IRInstruction& ir_instr, ISimulator& simulator
             result |= 1 << (31 - i);
         }
     }
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_reverse_bytes(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() != 2) { return; }
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op) || !std::holds_alternative<IRRegister>(src_op)) { return; }
+    if (!std::holds_alternative<std::string>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     uint32_t src_val = getOperandValue(src_op, simulator);
     uint32_t result = __builtin_bswap32(src_val);
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_reverse_bytes16(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() != 2) { return; }
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op) || !std::holds_alternative<IRRegister>(src_op)) { return; }
+    if (!std::holds_alternative<std::string>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     uint32_t src_val = getOperandValue(src_op, simulator);
     uint32_t result = ((src_val & 0xFF00FF00) >> 8) | ((src_val & 0x00FF00FF) << 8);
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 void handle_ir_reverse_bytes_signed_halfword(const IRInstruction& ir_instr, ISimulator& simulator) {
     if (ir_instr.operands.size() != 2) { return; }
     const auto& dest_op = ir_instr.operands[0];
     const auto& src_op = ir_instr.operands[1];
-    if (!std::holds_alternative<IRRegister>(dest_op) || !std::holds_alternative<IRRegister>(src_op)) { return; }
+    if (!std::holds_alternative<std::string>(dest_op) || !std::holds_alternative<std::string>(src_op)) { return; }
 
-    const auto& dest_reg = std::get<IRRegister>(dest_op);
+    const auto& dest_name = std::get<std::string>(dest_op);
     uint32_t src_val = getOperandValue(src_op, simulator);
     // Reverse bytes in lower 16 bits
     uint16_t bottom_half = src_val & 0xFFFF;
     uint16_t reversed_bottom = (bottom_half >> 8) | (bottom_half << 8);
     // Sign-extend from the new bit 7 of the reversed value
     int32_t result = static_cast<int16_t>(reversed_bottom);
-    setRegisterValue(dest_reg, result, simulator);
+    setRegisterValue(dest_name, result, simulator);
 }
 
 // Helper function for 32-bit signed saturating addition
@@ -1564,8 +1624,8 @@ void handle_ir_saturating_add(const IRInstruction& ir_instr, ISimulator& simulat
 
     int32_t result = saturate_add(src1_val, src2_val);
 
-    if (const IRRegister* dest_reg = std::get_if<IRRegister>(&dest_op)) {
-        setRegisterValue(*dest_reg, result, simulator);
+    if (const std::string* dest_name = std::get_if<std::string>(&dest_op)) {
+        setRegisterValue(*dest_name, result, simulator);
     }
     // Note: This simplified implementation does not set the Q flag.
 }
@@ -1581,8 +1641,8 @@ void handle_ir_saturating_sub(const IRInstruction& ir_instr, ISimulator& simulat
 
     int32_t result = saturate_sub(src1_val, src2_val);
 
-    if (const IRRegister* dest_reg = std::get_if<IRRegister>(&dest_op)) {
-        setRegisterValue(*dest_reg, result, simulator);
+    if (const std::string* dest_name = std::get_if<std::string>(&dest_op)) {
+        setRegisterValue(*dest_name, result, simulator);
     }
     // Note: This simplified implementation does not set the Q flag.
 }
@@ -1599,8 +1659,8 @@ void handle_ir_saturating_double_add(const IRInstruction& ir_instr, ISimulator& 
     int32_t doubled_src2 = saturate_add(src2_val, src2_val);
     int32_t result = saturate_add(src1_val, doubled_src2);
 
-    if (const IRRegister* dest_reg = std::get_if<IRRegister>(&dest_op)) {
-        setRegisterValue(*dest_reg, result, simulator);
+    if (const std::string* dest_name = std::get_if<std::string>(&dest_op)) {
+        setRegisterValue(*dest_name, result, simulator);
     }
     // Note: This simplified implementation does not set the Q flag.
 }
@@ -1617,8 +1677,8 @@ void handle_ir_saturating_double_sub(const IRInstruction& ir_instr, ISimulator& 
     int32_t doubled_src2 = saturate_add(src2_val, src2_val);
     int32_t result = saturate_sub(src1_val, doubled_src2);
 
-    if (const IRRegister* dest_reg = std::get_if<IRRegister>(&dest_op)) {
-        setRegisterValue(*dest_reg, result, simulator);
+    if (const std::string* dest_name = std::get_if<std::string>(&dest_op)) {
+        setRegisterValue(*dest_name, result, simulator);
     }
     // Note: This simplified implementation does not set the Q flag.
 }
@@ -1637,8 +1697,8 @@ void handle_ir_multiply_accumulate(const IRInstruction& ir_instr, ISimulator& si
 
     int32_t result = (rm_val * rs_val) + rn_val;
 
-    if (const IRRegister* rd_reg = std::get_if<IRRegister>(&rd_op)) {
-        setRegisterValue(*rd_reg, result, simulator);
+    if (const std::string* rd_name = std::get_if<std::string>(&rd_op)) {
+        setRegisterValue(*rd_name, result, simulator);
     }
 }
 
@@ -1656,8 +1716,8 @@ void handle_ir_multiply_subtract(const IRInstruction& ir_instr, ISimulator& simu
 
     int32_t result = rn_val - (rm_val * rs_val);
 
-    if (const IRRegister* rd_reg = std::get_if<IRRegister>(&rd_op)) {
-        setRegisterValue(*rd_reg, result, simulator);
+    if (const std::string* rd_name = std::get_if<std::string>(&rd_op)) {
+        setRegisterValue(*rd_name, result, simulator);
     }
 }
 
@@ -1674,11 +1734,11 @@ void handle_ir_unsigned_multiply_long(const IRInstruction& ir_instr, ISimulator&
 
     uint64_t result = static_cast<uint64_t>(rm_val) * rs_val;
 
-    if (const IRRegister* rdlo_reg = std::get_if<IRRegister>(&rdlo_op)) {
-        setRegisterValue(*rdlo_reg, static_cast<uint32_t>(result), simulator);
+    if (const std::string* rdlo_name = std::get_if<std::string>(&rdlo_op)) {
+        setRegisterValue(*rdlo_name, static_cast<uint32_t>(result), simulator);
     }
-    if (const IRRegister* rdhi_reg = std::get_if<IRRegister>(&rdhi_op)) {
-        setRegisterValue(*rdhi_reg, static_cast<uint32_t>(result >> 32), simulator);
+    if (const std::string* rdhi_name = std::get_if<std::string>(&rdhi_op)) {
+        setRegisterValue(*rdhi_name, static_cast<uint32_t>(result >> 32), simulator);
     }
 }
 
@@ -1695,11 +1755,11 @@ void handle_ir_signed_multiply_long(const IRInstruction& ir_instr, ISimulator& s
 
     int64_t result = static_cast<int64_t>(rm_val) * rs_val;
 
-    if (const IRRegister* rdlo_reg = std::get_if<IRRegister>(&rdlo_op)) {
-        setRegisterValue(*rdlo_reg, static_cast<uint32_t>(result), simulator);
+    if (const std::string* rdlo_name = std::get_if<std::string>(&rdlo_op)) {
+        setRegisterValue(*rdlo_name, static_cast<uint32_t>(result), simulator);
     }
-    if (const IRRegister* rdhi_reg = std::get_if<IRRegister>(&rdhi_op)) {
-        setRegisterValue(*rdhi_reg, static_cast<uint32_t>(result >> 32), simulator);
+    if (const std::string* rdhi_name = std::get_if<std::string>(&rdhi_op)) {
+        setRegisterValue(*rdhi_name, static_cast<uint32_t>(result >> 32), simulator);
     }
 }
 
@@ -1720,11 +1780,11 @@ void handle_ir_unsigned_multiply_accumulate_long(const IRInstruction& ir_instr, 
     uint64_t product = static_cast<uint64_t>(rm_val) * rs_val;
     uint64_t result = product + existing_val;
 
-    if (const IRRegister* rdlo_reg = std::get_if<IRRegister>(&rdlo_op)) {
-        setRegisterValue(*rdlo_reg, static_cast<uint32_t>(result), simulator);
+    if (const std::string* rdlo_name = std::get_if<std::string>(&rdlo_op)) {
+        setRegisterValue(*rdlo_name, static_cast<uint32_t>(result), simulator);
     }
-    if (const IRRegister* rdhi_reg = std::get_if<IRRegister>(&rdhi_op)) {
-        setRegisterValue(*rdhi_reg, static_cast<uint32_t>(result >> 32), simulator);
+    if (const std::string* rdhi_name = std::get_if<std::string>(&rdhi_op)) {
+        setRegisterValue(*rdhi_name, static_cast<uint32_t>(result >> 32), simulator);
     }
 }
 
@@ -1745,11 +1805,11 @@ void handle_ir_signed_multiply_accumulate_long(const IRInstruction& ir_instr, IS
     int64_t product = static_cast<int64_t>(rm_val) * rs_val;
     int64_t result = product + existing_val;
 
-    if (const IRRegister* rdlo_reg = std::get_if<IRRegister>(&rdlo_op)) {
-        setRegisterValue(*rdlo_reg, static_cast<uint32_t>(result), simulator);
+    if (const std::string* rdlo_name = std::get_if<std::string>(&rdlo_op)) {
+        setRegisterValue(*rdlo_name, static_cast<uint32_t>(result), simulator);
     }
-    if (const IRRegister* rdhi_reg = std::get_if<IRRegister>(&rdhi_op)) {
-        setRegisterValue(*rdhi_reg, static_cast<uint32_t>(result >> 32), simulator);
+    if (const std::string* rdhi_name = std::get_if<std::string>(&rdhi_op)) {
+        setRegisterValue(*rdhi_name, static_cast<uint32_t>(result >> 32), simulator);
     }
 }
 
@@ -1793,3 +1853,183 @@ void handle_ir_compare_and_branch_if_not_zero(const IRInstruction& ir_instr, ISi
         simulator.getRegisterMap().set64(ip_name, target_address);
     }
 }
+
+
+void handle_ir_float_add_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    float src1 = getFloatOperandValue(src1_op, simulator);
+    float src2 = getFloatOperandValue(src2_op, simulator);
+    float result = src1 + src2;
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_sub_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    float src1 = getFloatOperandValue(src1_op, simulator);
+    float src2 = getFloatOperandValue(src2_op, simulator);
+    float result = src1 - src2;
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_mul_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    float src1 = getFloatOperandValue(src1_op, simulator);
+    float src2 = getFloatOperandValue(src2_op, simulator);
+    float result = src1 * src2;
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_div_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    float src1 = getFloatOperandValue(src1_op, simulator);
+    float src2 = getFloatOperandValue(src2_op, simulator);
+    float result = src1 / src2;
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_sqrt_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    float src = getFloatOperandValue(src_op, simulator);
+    float result = std::sqrt(src);
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_add_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    double src1 = getDoubleOperandValue(src1_op, simulator);
+    double src2 = getDoubleOperandValue(src2_op, simulator);
+    double result = src1 + src2;
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_sub_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    double src1 = getDoubleOperandValue(src1_op, simulator);
+    double src2 = getDoubleOperandValue(src2_op, simulator);
+    double result = src1 - src2;
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_mul_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    double src1 = getDoubleOperandValue(src1_op, simulator);
+    double src2 = getDoubleOperandValue(src2_op, simulator);
+    double result = src1 * src2;
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_div_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src1_op = ir_instr.operands[1];
+    const auto& src2_op = ir_instr.operands[2];
+    double src1 = getDoubleOperandValue(src1_op, simulator);
+    double src2 = getDoubleOperandValue(src2_op, simulator);
+    double result = src1 / src2;
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_sqrt_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    double src = getDoubleOperandValue(src_op, simulator);
+    double result = std::sqrt(src);
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_cmp_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& src1_op = ir_instr.operands[0];
+    const auto& src2_op = ir_instr.operands[1];
+    float src1 = getFloatOperandValue(src1_op, simulator);
+    float src2 = getFloatOperandValue(src2_op, simulator);
+    if (src1 == src2) {
+        simulator.set_ZF(true);
+        simulator.set_CF(false);
+    } else if (src1 < src2) {
+        simulator.set_ZF(false);
+        simulator.set_CF(true);
+    } else {
+        simulator.set_ZF(false);
+        simulator.set_CF(false);
+    }
+}
+
+void handle_ir_float_cmp_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& src1_op = ir_instr.operands[0];
+    const auto& src2_op = ir_instr.operands[1];
+    double src1 = getDoubleOperandValue(src1_op, simulator);
+    double src2 = getDoubleOperandValue(src2_op, simulator);
+    if (src1 == src2) {
+        simulator.set_ZF(true);
+        simulator.set_CF(false);
+    } else if (src1 < src2) {
+        simulator.set_ZF(false);
+        simulator.set_CF(true);
+    } else {
+        simulator.set_ZF(false);
+        simulator.set_CF(false);
+    }
+}
+
+void handle_ir_float_to_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    double src = getDoubleOperandValue(src_op, simulator);
+    float result = static_cast<float>(src);
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_to_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    float src = getFloatOperandValue(src_op, simulator);
+    double result = static_cast<double>(src);
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_int_to_float_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    int64_t src = getOperandValue(src_op, simulator);
+    float result = static_cast<float>(src);
+    setFloatRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_int_to_float_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    int64_t src = getOperandValue(src_op, simulator);
+    double result = static_cast<double>(src);
+    setDoubleRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_to_int_s(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    float src = getFloatOperandValue(src_op, simulator);
+    int64_t result = static_cast<int64_t>(src);
+    setRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+
+void handle_ir_float_to_int_d(const IRInstruction& ir_instr, ISimulator& simulator) {
+    const auto& dest_op = ir_instr.operands[0];
+    const auto& src_op = ir_instr.operands[1];
+    double src = getDoubleOperandValue(src_op, simulator);
+    int64_t result = static_cast<int64_t>(src);
+    setRegisterValue(std::get<std::string>(dest_op), result, simulator);
+}
+

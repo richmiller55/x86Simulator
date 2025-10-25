@@ -6,8 +6,13 @@
 #include "arm_to_ir.h"
 #include "ir.h"
 #include "memory.h"
-#include "register_map.h"
+#include "i_register_map.h"
+#include <memory>
+#include <map>
+#include <string>
+#include <vector>
 #include "i_database_manager.h"
+#include "arm_ui_manager.h"
 
 /**
  * @class ArmSimulator
@@ -20,10 +25,12 @@ public:
 
     void runProgram() override;
     bool loadProgram(const std::string& program_path) override;
+    bool firstPass() override;
+    bool secondPass() override;
 
     // --- ISimulator Interface Implementation ---
-    RegisterMap& getRegisterMap() override { return register_map_; }
-    const RegisterMap& getRegisterMap() const override { return register_map_; }
+    IRegisterMap& getRegisterMap() override { return *register_map_; }
+    const IRegisterMap& getRegisterMap() const override { return *register_map_; }
     Memory& getMemory() override { return memory_; }
     const Memory& getMemory() const override { return memory_; }
     IDatabaseManager& getDatabaseManager() override { return db_manager_; }
@@ -56,16 +63,21 @@ public:
     uint64_t get_system_register(const std::string& name) override;
     void set_system_register(const std::string& name, uint64_t value) override;
 
+    ArmUIManager* getUIManager() { return ui_manager_.get(); }
+
 private:
     std::unique_ptr<ProgramDecoder> program_decoder_;
     IDatabaseManager& db_manager_;
     Memory& memory_;
     Architecture architecture_;
-    RegisterMap register_map_;
+    std::unique_ptr<IRegisterMap> register_map_;
     IRProgram ir_program_;
     int session_id_;
     bool headless_;
-    uint32_t cpsr_; // To hold the state of the Current Program Status Register
+    std::unique_ptr<ArmUIManager> ui_manager_;
+    std::map<std::string, address_t> symbolTable_;
+    std::vector<std::string> programLines_;
+    std::string entryPointLabel_ = "_start";
 };
 
 #endif // ARM_SIMULATOR_H

@@ -13,6 +13,8 @@
 #include <vector>
 #include <sstream>
 
+
+
 namespace fs = std::filesystem;
 
 // Implement the helper functions here if they are not part of a class
@@ -34,9 +36,9 @@ std::vector<std::string> readLinesFromFile(const std::string& filePath) {
   return lines;
 }
 
-bool X86Simulator::loadProgram(const std::string& filename) {
-  register_map_.set64("rsp", memory_.get_stack_bottom());
-  programLines_ = readLinesFromFile(filename);
+bool X86Simulator::loadProgram(const std::string& program_path) {
+  register_map_->set64("rsp", memory_.get_stack_bottom());
+  programLines_ = readLinesFromFile(program_path);
   return !programLines_.empty(); // Or a more robust check for successful read.
 }
 
@@ -50,7 +52,7 @@ bool X86Simulator::firstPass() {
     address_t* current_lc = &text_lc; 
 
     for (const std::string& line_raw : programLines_) {
-        std::string line = trim(line_raw);
+        std::string line = this->trim(line_raw);
         if (line.empty() || line[0] == ';') {
             continue;
         }
@@ -58,7 +60,7 @@ bool X86Simulator::firstPass() {
         auto comment_pos = line.find(';');
         if (comment_pos != std::string::npos) {
             line = line.substr(0, comment_pos);
-            line = trim(line);
+            line = this->trim(line);
         }
 
         std::vector<std::string> tokens = parse_line(line);
@@ -246,11 +248,11 @@ bool X86Simulator::secondPass() {
         // Set the initial instruction pointer (RIP) to the address of the entry point label.
         auto it = symbolTable_.find(entryPointLabel_);
         if (it != symbolTable_.end()) {
-            register_map_.set64("rip", it->second);
+            register_map_->set64("rip", it->second);
         } else {
             db_manager_.log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
             // Fallback to the start of the text segment if the label is not found
-            register_map_.set64("rip", memory_.get_text_segment_start());
+            register_map_->set64("rip", memory_.get_text_segment_start());
         }
         program_decoder_ = std::make_unique<ProgramDecoder>(memory_);
         program_decoder_->decode();

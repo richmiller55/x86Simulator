@@ -24,8 +24,9 @@ public:
     /**
      * @brief Constructs an ARM-to-IR converter for a specific ARM architecture.
      * @param arm_arch The ARM architecture description.
+     * @param symbol_table A pointer to the symbol table built in the first pass.
      */
-    ArmToIrConverter(const Architecture& arm_arch);
+    ArmToIrConverter(const Architecture& arm_arch, const std::map<std::string, address_t>* symbol_table);
 
     /**
      * @brief Converts a block of ARM assembly code into an IRProgram using a two-pass approach.
@@ -37,18 +38,11 @@ public:
 
 private:
     const Architecture& architecture_;
-    std::map<std::string, address_t> symbol_table_;
-    address_t current_address_;
+    const std::map<std::string, address_t>* symbol_table_;
+    size_t current_assembly_line_index_; // Tracks the current line number in assembly
+    std::map<size_t, size_t> assembly_line_to_ir_index_map_; // Maps assembly line index to the first IR instruction index it generates
 
-    /**
-     * @brief First pass: Scans assembly to populate the symbol table with label addresses.
-     */
-    void first_pass(const std::string& arm_assembly);
 
-    /**
-     * @brief Second pass: Parses instructions and generates the IR program.
-     */
-    IRProgram second_pass(const std::string& arm_assembly);
 
     /**
      * @brief Parses a single line of assembly into an IRInstruction.
@@ -64,7 +58,7 @@ private:
     /**
      * @brief Parses a register name (e.g., "r0", "sp") into an IRRegister struct.
      */
-    IRRegister parse_register(const std::string& reg_str);
+    std::string parse_register(const std::string& reg_str);
 
     /**
      * @brief Parses a memory operand string (e.g., "[r1, #4]") into an IRMemoryOperand.
@@ -117,6 +111,11 @@ private:
      * @brief Translates PUSH and POP instructions.
      */
     std::unique_ptr<IRInstruction> translate_push_pop(const std::string& mnemonic, const std::vector<std::string>& operands);
+
+    /**
+     * @brief Translates VFP/NEON floating-point instructions.
+     */
+    std::unique_ptr<IRInstruction> translate_vfp_instruction(const std::string& mnemonic, const std::vector<std::string>& operands);
 };
 
 #endif // ARM_TO_IR_H

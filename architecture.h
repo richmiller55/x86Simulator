@@ -3,8 +3,9 @@
 
 #include "ir.h"
 #include <string>
+#include <vector>
 #include <map>
-#include <stdexcept>
+#include <cstdint>
 
 // Enum to identify the Instruction Set Architecture
 enum class ISA {
@@ -12,40 +13,40 @@ enum class ISA {
     ARM
 };
 
-// A helper struct to allow IRRegister to be used as a key in std::map.
-struct IRRegisterKey {
-    IRRegisterType type;
-    uint32_t index;
-    uint32_t size;
+// Struct to define a register alias (a named view into a physical register)
+struct RegisterAlias {
+    std::string name;
+    uint32_t size_bits;
+    uint32_t offset_bits;
+};
 
-    bool operator<(const IRRegisterKey& other) const {
-        if (type != other.type) return type < other.type;
-        if (index != other.index) return index < other.index;
-        return size < other.size;
-    }
+// Struct to define a physical register and all its aliases
+struct PhysicalRegisterDef {
+    std::string name; // e.g., "GPR0"
+    uint32_t size_bits;
+    std::vector<RegisterAlias> aliases;
+};
+
+// Struct to define a complete register file (e.g., GPRs, Vector Regs)
+struct RegisterFileDef {
+    IRRegisterType type;
+    std::vector<PhysicalRegisterDef> registers;
 };
 
 /**
- * @brief Describes the properties of a specific ISA, like its register set.
+ * @brief Describes the properties of a specific ISA, like its register set and endianness.
  */
 class Architecture {
 public:
     ISA isa;
     uint32_t pointer_size_bits;
+    // Endianness endianness; // TODO: Add endianness
 
-    // Maps an abstract IRRegister to its concrete ISA-specific name (e.g., "eax").
-    std::map<IRRegisterKey, std::string> register_map;
+    // A map of all the register files in the architecture
+    std::map<IRRegisterType, RegisterFileDef> register_files;
 
-    /**
-     * @brief Gets the ISA-specific name for a given abstract register.
-     * @throws std::runtime_error if no mapping is found.
-     */
-    const std::string& get_register_name(const IRRegister& reg) const;
-
-    uint32_t get_pointer_size_bits() const { return pointer_size_bits; }
-
-    // In the future, this class could also hold other ISA-specific details,
-    // such as endianness, address size, etc.
+    bool is_register(const std::string& name) const;
+    uint32_t get_register_size_bits(const std::string& name) const;
 };
 
 /**
