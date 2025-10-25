@@ -11,10 +11,30 @@
 #include <fstream>
 #include <sstream>
 
-// New IR-based dispatcher function
 void X86Simulator::execute_ir_instruction(const IRInstruction& ir_instr) {
-    X86IRVisitor visitor;
-    accept(visitor, ir_instr);
+    switch (ir_instr.opcode) {
+        case IROpcode::Add:
+            handle_ir_add(ir_instr, *this);
+            break;
+        case IROpcode::Sub:
+            handle_ir_sub(ir_instr, *this);
+            break;
+        case IROpcode::Move:
+            handle_ir_move(ir_instr, *this);
+            break;
+        case IROpcode::Load:
+            handle_ir_load(ir_instr, *this);
+            break;
+        case IROpcode::Store:
+            handle_ir_store(ir_instr, *this);
+            break;
+        case IROpcode::PackedAddPS:
+            handle_ir_packed_add_ps(ir_instr, *this);
+            break;
+        default:
+            db_manager_.log(session_id_, "Unhandled IR opcode", "ERROR", 0, __FILE__, __LINE__);
+            break;
+    }
 }
 
 // Rewritten executeInstruction to use the new IR pipeline
@@ -30,15 +50,15 @@ bool X86Simulator::executeInstruction(const DecodedInstruction& decoded_instr) {
     } else {
         // If translation is not supported yet, log an error.
         std::string logmessage = "Unsupported instruction for IR translation: " + decoded_instr.mnemonic;
-        db_manager_.log(session_id_, logmessage, "ERROR", register_map_.get64("rip"), __FILE__, __LINE__);
+        db_manager_.log(session_id_, logmessage, "ERROR", register_map_->get64("rip"), __FILE__, __LINE__);
         return false;
     }
 }
 
-// --- UNCHANGED FUNCTIONS ---
+
 
 void X86Simulator::runSingleInstruction() {
-    address_t instruction_pointer = register_map_.get64("rip");
+    address_t instruction_pointer = register_map_->get64("rip");
 
     // FETCH & DECODE
     Decoder& decoder = Decoder::getInstance();
@@ -53,7 +73,7 @@ void X86Simulator::runSingleInstruction() {
 
     if (decoded_instr->length_in_bytes == 0) {
         db_manager_.log(session_id_, "Decoder returned 0-length instruction at address " + std::to_string(instruction_pointer), "ERROR", instruction_pointer, __FILE__, __LINE__);
-        register_map_.set64("rip", instruction_pointer + 1); // Prevent infinite loop
+        register_map_->set64("rip", instruction_pointer + 1); // Prevent infinite loop
         return;
     }
 
@@ -62,8 +82,8 @@ void X86Simulator::runSingleInstruction() {
     bool success = executeInstruction(*decoded_instr);
 
     if (success) {
-        if (register_map_.get64("rip") == instruction_pointer) {
-            register_map_.set64("rip", next_ip);
+        if (register_map_->get64("rip") == instruction_pointer) {
+            register_map_->set64("rip", next_ip);
 	    }
     } else {
         db_manager_.log(session_id_, "Execution failed for: " + decoded_instr->mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);
@@ -75,7 +95,7 @@ void X86Simulator::runSingleInstruction() {
 void X86Simulator::runProgram() {
     if (headless_) { // Handle headless mode separately
         while (true) {
-            address_t instruction_pointer = register_map_.get64("rip");
+            address_t instruction_pointer = register_map_->get64("rip");
             if (instruction_pointer >= memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
                 db_manager_.log(session_id_, "End of program", "INFO", instruction_pointer, __FILE__, __LINE__);
                 break; // Program finished
@@ -89,10 +109,10 @@ void X86Simulator::runProgram() {
     bool isRunning = true;
 
     // Initial Draw
-    ui_->drawMainRegisters(register_map_);
-    ui_->drawYmmRegisters(register_map_);
-    ui_->drawTextWindow(register_map_.get64("rip"));
-    ui_->drawInstructionDescription(register_map_.get64("rip"), register_map_);
+    ui_->drawMainRegisters(*register_map_);
+    ui_->drawYmmRegisters(*register_map_);
+    ui_->drawTextWindow(register_map_->get64("rip"));
+    ui_->drawInstructionDescription(register_map_->get64("rip"), *register_map_);
     ui_->drawPipelineWindow();
     ui_->drawLegend();
 
@@ -108,17 +128,17 @@ void X86Simulator::runProgram() {
         pipeline_->cycle();
 
         // Check for end of program
-        address_t instruction_pointer = register_map_.get64("rip");
+        address_t instruction_pointer = register_map_->get64("rip");
         if (instruction_pointer >= memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
             isRunning = false;
             db_manager_.log(session_id_, "End of program", "INFO", instruction_pointer, __FILE__, __LINE__);
         }
 
         // Update UI with new state
-        ui_->drawMainRegisters(register_map_);
-        ui_->drawYmmRegisters(register_map_);
-        ui_->drawTextWindow(register_map_.get64("rip"));
-        ui_->drawInstructionDescription(register_map_.get64("rip"), register_map_);
+        ui_->drawMainRegisters(*register_map_);
+        ui_->drawYmmRegisters(*register_map_);
+        ui_->drawTextWindow(register_map_->get64("rip"));
+        ui_->drawInstructionDescription(register_map_->get64("rip"), *register_map_);
         ui_->drawPipelineWindow();
     }
 }
@@ -165,7 +185,8 @@ void X86Simulator::dumpTextSegment(const std::string& filename) {
         if (decoded_instr->length_in_bytes == 0) {
             db_manager_.log(session_id_, "Decoder returned 0-length instruction at address " + std::to_string(current_address), "ERROR", current_address, __FILE__, __LINE__);
             current_address++;
-        } else {
+        }
+        else {
             current_address += decoded_instr->length_in_bytes;
         }
     }
@@ -223,9 +244,9 @@ void X86Simulator::dumpSymbolTable(const std::string& filename) {
         return;
     }
 
-    outputFile << "--- Symbol Table Dump ---\\n";
-    outputFile << std::left << std::setw(24) << "Symbol" << "Address\\n";
-    outputFile << "----------------------------------------\\n";
+    outputFile << "--- Symbol Table Dump ---\n";
+    outputFile << std::left << std::setw(24) << "Symbol" << "Address\n";
+    outputFile << "----------------------------------------\n";
 
     for (const auto& pair : symbolTable_) {
         std::string symbol = pair.first;
@@ -235,7 +256,7 @@ void X86Simulator::dumpSymbolTable(const std::string& filename) {
         }
         outputFile << "\t";
 
-        outputFile << "0x" << std::hex << std::setw(8) << std::right << std::setfill('0') << pair.second << "\\n";
+        outputFile << "0x" << std::hex << std::setw(8) << std::right << std::setfill('0') << pair.second << "\n";
     }
     outputFile.close();
 }

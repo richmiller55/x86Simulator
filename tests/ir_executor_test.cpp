@@ -27,8 +27,8 @@ TEST_F(IRExecutorTest, HandleIrAnd) {
     regs.set32("ebx", 0b1010);
 
     IRInstruction and_instr(IROpcode::And, {
-        IRRegister{IRRegisterType::GPR, 0, 32}, // eax
-        IRRegister{IRRegisterType::GPR, 3, 32}  // ebx
+        std::string("eax"),
+        std::string("ebx")
     });
 
     simulator.execute_ir_instruction(and_instr);
@@ -46,8 +46,8 @@ TEST_F(IRExecutorTest, HandleIrOr) {
     regs.set32("ebx", 0b1010);
 
     IRInstruction or_instr(IROpcode::Or, {
-        IRRegister{IRRegisterType::GPR, 0, 32}, // eax
-        IRRegister{IRRegisterType::GPR, 3, 32}  // ebx
+        std::string("eax"),
+        std::string("ebx")
     });
 
     simulator.execute_ir_instruction(or_instr);
@@ -62,7 +62,7 @@ TEST_F(IRExecutorTest, HandleIrNot) {
     regs.set32("eax", 0xFFFFFF00);
 
     IRInstruction not_instr(IROpcode::Not, {
-        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+        std::string("eax")
     });
 
     simulator.execute_ir_instruction(not_instr);
@@ -75,7 +75,7 @@ TEST_F(IRExecutorTest, HandleIrShl) {
     regs.set32("eax", 0b1011);
 
     IRInstruction shl_instr(IROpcode::Shl, {
-        IRRegister{IRRegisterType::GPR, 0, 32}, // eax
+        std::string("eax"),
         (uint64_t)2
     });
 
@@ -90,7 +90,7 @@ TEST_F(IRExecutorTest, HandleIrShr) {
     regs.set32("eax", 0b1011);
 
     IRInstruction shr_instr(IROpcode::Shr, {
-        IRRegister{IRRegisterType::GPR, 0, 32}, // eax
+        std::string("eax"),
         (uint64_t)2
     });
 
@@ -105,7 +105,7 @@ TEST_F(IRExecutorTest, HandleIrSar) {
     regs.set32("eax", 0b10000000000000000000000000001011); // Negative number
 
     IRInstruction sar_instr(IROpcode::Sar, {
-        IRRegister{IRRegisterType::GPR, 0, 32}, // eax
+        std::string("eax"),
         (uint64_t)2
     });
 
@@ -122,7 +122,7 @@ TEST_F(IRExecutorTest, HandleIrInc) {
     simulator.set_CF(true);
 
     IRInstruction inc_instr(IROpcode::Inc, {
-        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+        std::string("eax")
     });
 
     simulator.execute_ir_instruction(inc_instr);
@@ -138,7 +138,7 @@ TEST_F(IRExecutorTest, HandleIrIncToZero) {
     regs.set32("eax", -1); // 0xFFFFFFFF
 
     IRInstruction inc_instr(IROpcode::Inc, {
-        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+        std::string("eax")
     });
 
     simulator.execute_ir_instruction(inc_instr);
@@ -155,7 +155,7 @@ TEST_F(IRExecutorTest, HandleIrDec) {
     simulator.set_CF(true);
 
     IRInstruction dec_instr(IROpcode::Dec, {
-        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+        std::string("eax")
     });
 
     simulator.execute_ir_instruction(dec_instr);
@@ -171,7 +171,7 @@ TEST_F(IRExecutorTest, HandleIrDecToZero) {
     regs.set32("eax", 1);
 
     IRInstruction dec_instr(IROpcode::Dec, {
-        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+        std::string("eax")
     });
 
     simulator.execute_ir_instruction(dec_instr);
@@ -188,7 +188,7 @@ TEST_F(IRExecutorTest, HandleIrPush) {
     regs.set32("eax", 0xDEADBEEF);
 
     IRInstruction push_instr(IROpcode::Push, {
-        IRRegister{IRRegisterType::GPR, 0, 32} // eax
+        std::string("eax")
     });
 
     simulator.execute_ir_instruction(push_instr);
@@ -204,7 +204,7 @@ TEST_F(IRExecutorTest, HandleIrPop) {
     memory.write_dword(initial_rsp, 0xCAFEBABE);
 
     IRInstruction pop_instr(IROpcode::Pop, {
-        IRRegister{IRRegisterType::GPR, 1, 32} // ecx
+        std::string("ecx")
     });
 
     simulator.execute_ir_instruction(pop_instr);

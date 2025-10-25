@@ -29,7 +29,7 @@
 #include "register_map.h"
 #include "operand_types.h"
 #include "i_database_manager.h"
-#include "decoder.h" // Include for DecodedInstruction and DecodedOperand
+#include "decoder.h" 
 #include "architecture.h"
 #include "ir.h"
 #include "pipeline.h"
@@ -70,40 +70,33 @@ friend class SimulatorCoreTest;
 friend class IRExecutorTest;
 #endif
 public:
-    // Constructor, other public methods
+  // Constructor, other public methods
   X86Simulator(IDatabaseManager& db_manager, Memory& memory, int session_id, bool headless = false);
   ~X86Simulator();
   
-  void init(const std::string& program_name);
   bool executeInstruction(const DecodedInstruction& decoded_instr);
   void runSingleInstruction();
   bool isRunning();
-  bool loadProgram(const std::string& filename) override;
-  bool firstPass();
-  bool secondPass();
   void runProgram() override;
-  void accept(IRVisitor& visitor, const IRInstruction& instr) override;
+  bool loadProgram(const std::string& program_path) override;
+  bool firstPass() override;
+  bool secondPass() override;
+
+  void execute_ir_instruction(const IRInstruction& ir_instr) override;
   void dumpTextSegment(const std::string& filename);
+  void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
   void dumpDataSegment(const std::string& filename);
   void dumpBssSegment(const std::string& filename);
   void dumpSymbolTable(const std::string& filename);
-  void displayRegistersWithDiff();
-  void displayRegistersControlled();
-  std::string trim(const std::string& str) ;
-
-  // --- Getters for helpers ---
-  const Architecture& get_architecture() const override { return architecture_; }
-  ProgramDecoder* getProgramDecoder() override { return program_decoder_.get(); }
-  RegisterMap& getRegisterMap() override { return register_map_; }
-  const RegisterMap& getRegisterMap() const override { return register_map_; }
+  // --- ISimulator Interface Implementation ---
+  IRegisterMap& getRegisterMap() override { return *register_map_; }
+  const IRegisterMap& getRegisterMap() const override { return *register_map_; }
   Memory& getMemory() override { return memory_; }
   const Memory& getMemory() const override { return memory_; }
-  int get_session_id() const override { return session_id_; }
-  const char* get_stack_pointer_name() const override { return "rsp"; }
-  const char* get_instruction_pointer_name() const override { return "rip"; }
   IDatabaseManager& getDatabaseManager() override { return db_manager_; }
-  bool is_headless() const { return headless_; }
-  address_t get_instruction_pointer() const { return instructionPointer_; }
+  const Architecture& get_architecture() const override { return architecture_; }
+  ProgramDecoder* getProgramDecoder() override { return program_decoder_.get(); }
+  int get_session_id() const override { return session_id_; }
 
   bool get_CF() const override;
   void set_CF(bool value) override;
@@ -118,46 +111,45 @@ public:
   bool get_AF() const;
   void set_AF(bool value);
   bool get_PF() const override;
-      void set_PF(bool val) override;
+  void set_PF(bool val) override;
   
-      uint64_t get_system_register(const std::string& name) override;
-      void set_system_register(const std::string& name, uint64_t value) override;
+  uint64_t get_system_register(const std::string& name) override;
+  void set_system_register(const std::string& name, uint64_t value) override;
   
-      void execute_ir_instruction(const IRInstruction& ir_instr) override;    void update_rflags_in_register_map();
+  void update_rflags_in_register_map();
 
-    // --- I/O Handling ---
-    void log_out(uint16_t port, uint64_t value);
-    const std::vector<std::pair<uint16_t, uint64_t>>& get_out_log() const;
+  // --- I/O Handling ---
+  void log_out(uint16_t port, uint64_t value);
+  const std::vector<std::pair<uint16_t, uint64_t>>& get_out_log() const;
 
 #if defined(GOOGLE_TEST)
-    RegisterMap& getRegisterMapForTesting() { return register_map_; }
-    Memory& getMemoryForTesting() { return memory_; }
+  RegisterMap& getRegisterMapForTesting() { return *register_map_; }
+  Memory& getMemoryForTesting() { return memory_; }
 #endif
 
 private:
-    // Private helper methods
-    void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
+  // Private helper methods
+  std::string trim(const std::string& str);
 
-    // --- Member Variables ---
-    IDatabaseManager& db_manager_;
-    Memory& memory_;
-    Architecture architecture_;
-    RegisterMap register_map_;
+  // --- Member Variables ---
+  IDatabaseManager& db_manager_;
+  Memory& memory_;
+  Architecture architecture_;
+  std::unique_ptr<RegisterMap> register_map_;
 
-    int session_id_;
-    bool headless_;
+  int session_id_;
+  bool headless_;
     
-    address_t instructionPointer_ = 0;
-    address_t program_size_in_bytes_ = 0;
-    uint64_t rflags_;
+  address_t instructionPointer_ = 0;
+  address_t program_size_in_bytes_ = 0;
 
-    std::unique_ptr<UIManager> ui_;
-    std::unique_ptr<Pipeline> pipeline_;
-    std::unique_ptr<ProgramDecoder> program_decoder_;
-    std::map<std::string, address_t> symbolTable_;
-    std::vector<std::pair<uint16_t, uint64_t>> out_log_;
-    std::vector<std::string> programLines_; // raw
-    std::string entryPointLabel_ = "_start"; // Default entry point
+  std::unique_ptr<UIManager> ui_;
+  std::unique_ptr<Pipeline> pipeline_;
+  std::unique_ptr<ProgramDecoder> program_decoder_;
+  std::map<std::string, address_t> symbolTable_;
+  std::vector<std::pair<uint16_t, uint64_t>> out_log_;
+  std::vector<std::string> programLines_; // raw
+  std::string entryPointLabel_ = "_start"; // Default entry point
 
   
 };

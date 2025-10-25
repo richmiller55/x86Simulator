@@ -13,18 +13,17 @@
 static m256i_t get_vector_operand(const IROperand& op, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
     auto& regs = x86_sim.getRegisterMap();
-    const auto& arch = x86_sim.get_architecture();
 
-    if (const IRRegister* reg = std::get_if<IRRegister>(&op)) {
-        return regs.getYmm(arch.get_register_name(*reg));
+    if (const std::string* reg_name = std::get_if<std::string>(&op)) {
+        return regs.getYmm(*reg_name);
     } else if (const IRMemoryOperand* mem_op = std::get_if<IRMemoryOperand>(&op)) {
         auto& mem = x86_sim.getMemory();
         address_t addr = mem_op->displacement;
         if (mem_op->base_reg) {
-            addr += regs.get64(arch.get_register_name(*mem_op->base_reg));
+            addr += regs.get64(*mem_op->base_reg);
         }
         if (mem_op->index_reg) {
-            uint64_t index_val = regs.get64(arch.get_register_name(*mem_op->index_reg));
+            uint64_t index_val = regs.get64(*mem_op->index_reg);
             addr += index_val * mem_op->scale;
         }
         return mem.read_ymm(addr);
@@ -36,18 +35,17 @@ static m256i_t get_vector_operand(const IROperand& op, ISimulator& simulator) {
 static void set_vector_operand(const IROperand& op, m256i_t value, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
     auto& regs = x86_sim.getRegisterMap();
-    const auto& arch = x86_sim.get_architecture();
 
-    if (const IRRegister* reg = std::get_if<IRRegister>(&op)) {
-        regs.setYmm(arch.get_register_name(*reg), value);
+    if (const std::string* reg_name = std::get_if<std::string>(&op)) {
+        regs.setYmm(*reg_name, value);
     } else if (const IRMemoryOperand* mem_op = std::get_if<IRMemoryOperand>(&op)) {
         auto& mem = x86_sim.getMemory();
         address_t addr = mem_op->displacement;
         if (mem_op->base_reg) {
-            addr += regs.get64(arch.get_register_name(*mem_op->base_reg));
+            addr += regs.get64(*mem_op->base_reg);
         }
         if (mem_op->index_reg) {
-            uint64_t index_val = regs.get64(arch.get_register_name(*mem_op->index_reg));
+            uint64_t index_val = regs.get64(*mem_op->index_reg);
             addr += index_val * mem_op->scale;
         }
         mem.write_ymm(addr, value);
@@ -226,16 +224,15 @@ void handle_ir_vector_zero_upper(const IRInstruction& ir_instr, ISimulator& simu
     }
 }
 
-
-
 void handle_x86_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
     auto& regs = x86_sim.getRegisterMap();
+    const auto& arch = x86_sim.get_architecture();
     const auto& src_op = ir_instr.operands[0];
 
     uint32_t size = 0;
-    if (const IRRegister* reg = std::get_if<IRRegister>(&src_op)) {
-        size = reg->size;
+    if (const std::string* reg_name = std::get_if<std::string>(&src_op)) {
+        size = arch.get_register_size_bits(*reg_name);
     } else if (const IRMemoryOperand* mem = std::get_if<IRMemoryOperand>(&src_op)) {
         size = mem->size;
     } else {
@@ -372,3 +369,4 @@ void X86IRVisitor::visit(const IRInstruction& instr, ISimulator& simulator) {
         }
     }
 }
+

@@ -16,9 +16,9 @@ class Memory;
 int64_t getOperandValue(const IROperand& op, ISimulator& simulator);
 
 /**
- * @brief Sets the value of an abstract IR register.
+ * @brief Sets the value of a register by name.
  */
-void setRegisterValue(const IRRegister& reg, int64_t value, ISimulator& simulator);
+void setRegisterValue(const std::string& reg_name, int64_t value, ISimulator& simulator);
 
 /**
  * @brief Sets the value of a memory location.
@@ -126,6 +126,8 @@ void handle_ir_packed_or(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_packed_xor(const IRInstruction& ir_instr, ISimulator& simulator);
 
 void handle_ir_packed_add_ps(const IRInstruction& ir_instr, ISimulator& simulator);
+
+void handle_ir_packed_add_ps(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_packed_sub_ps(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_packed_mul_ps(const IRInstruction& ir_instr, ISimulator& simulator);
 void handle_ir_packed_div_ps(const IRInstruction& ir_instr, ISimulator& simulator);
@@ -172,5 +174,25 @@ void handle_ir_wait_for_event(const IRInstruction& ir_instr, ISimulator& simulat
 void handle_ir_send_event(const IRInstruction& ir_instr, ISimulator& simulator);
 
 void handle_ir_compare_and_branch_if_not_zero(const IRInstruction& ir_instr, ISimulator& simulator);
+
+// Scalar Floating-Point
+void handle_ir_float_add_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_sub_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_mul_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_div_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_sqrt_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_add_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_sub_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_mul_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_div_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_sqrt_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_cmp_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_cmp_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_to_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_to_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_int_to_float_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_int_to_float_d(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_to_int_s(const IRInstruction& ir_instr, ISimulator& simulator);
+void handle_ir_float_to_int_d(const IRInstruction& ir_instr, ISimulator& simulator);
 
 #endif // IR_EXECUTOR_HELPERS_H

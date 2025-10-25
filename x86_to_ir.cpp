@@ -1,28 +1,16 @@
 #include "x86_to_ir.h"
-#include "architecture.h" // TODO: This is not ideal, see translate_operand
+#include "architecture.h"
 #include <stdexcept>
 
 // Forward declaration for our new operand translation helper
-IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture& arch, uint32_t size_hint = 32);
+IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture& arch);
 
-// TODO: This is a temporary, inefficient way to do reverse lookups.
-// The Architecture class should be improved with a dedicated reverse map.
-IRRegister find_ir_register_by_name(const std::string& name, const Architecture& arch) {
-    for (const auto& pair : arch.register_map) {
-        if (pair.second == name) {
-            return IRRegister{pair.first.type, pair.first.index, pair.first.size};
-        }
-    }
-    throw std::runtime_error("Unknown register name in translate_operand: " + name);
-}
-
-
-IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture& arch, uint32_t size_hint) {
+IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture& arch) {
     switch (decoded_op.type) {
         case OperandType::REGISTER:
-        case OperandType::YMM_REGISTER: // Treat YMM like any other register for now
+        case OperandType::YMM_REGISTER: // YMM registers are identified by their string names
         {
-            return find_ir_register_by_name(decoded_op.text, arch);
+            return decoded_op.text;
         }
         case OperandType::IMMEDIATE:
         {
@@ -34,7 +22,8 @@ IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture
             // the complex memory addressing from decoded_op.text (e.g., "[eax + ecx*4]")
             IRMemoryOperand mem_op;
             mem_op.displacement = decoded_op.value;
-            mem_op.size = size_hint; // Use the hint for memory access size
+            // The size of memory operands is often implicit from the instruction/other operands.
+            // The IR executor will have to handle this. For now, we leave it default.
             return mem_op;
         }
         default:
@@ -43,233 +32,177 @@ IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture
 }
 
 std::unique_ptr<IRInstruction> translate_to_ir(const DecodedInstruction& decoded_instr) {
-    // For this to work, we need an Architecture object. For now, we create one on the fly.
-    // In a real scenario, this would be passed in or be globally available.
     static Architecture x86_arch = create_x86_architecture();
 
     std::vector<IROperand> ops;
     IROpcode opcode = IROpcode::Nop;
     bool supported = true;
 
-    if (decoded_instr.mnemonic == "mov") {
+    // Helper lambda to translate all operands
+    auto translate_all_operands = [&]() {
+        for (const auto& op : decoded_instr.operands) {
+            ops.push_back(translate_operand(op, x86_arch));
+        }
+    };
+
+    const auto& mnemonic = decoded_instr.mnemonic;
+
+    if (mnemonic == "mov" || mnemonic == "movsx" || mnemonic == "movzx") {
         opcode = IROpcode::Move;
-        // Get the size from the destination operand
-        auto dest_reg = find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch);
-        ops.push_back(dest_reg);
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, dest_reg.size));
-
-    } else if (decoded_instr.mnemonic == "add") {
+        translate_all_operands();
+    } else if (mnemonic == "vmovups") {
+        opcode = IROpcode::VectorMove;
+        translate_all_operands();
+    } else if (mnemonic == "add") {
         opcode = IROpcode::Add;
-        auto dest_reg = find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch);
-        ops.push_back(dest_reg);
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, dest_reg.size));
-
-    } else if (decoded_instr.mnemonic == "sub") {
+        translate_all_operands();
+    } else if (mnemonic == "vaddps") {
+        opcode = IROpcode::PackedAddPS;
+        translate_all_operands();
+    } else if (mnemonic == "sub") {
         opcode = IROpcode::Sub;
-        auto dest_reg = find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch);
-        ops.push_back(dest_reg);
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, dest_reg.size));
-
-    } else if (decoded_instr.mnemonic == "cmp") {
+        translate_all_operands();
+    } else if (mnemonic == "cmp") {
         opcode = IROpcode::Cmp;
-        auto op1_reg = find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch);
-        ops.push_back(op1_reg);
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, op1_reg.size));
-
-    } else if (decoded_instr.mnemonic == "jmp") {
+        translate_all_operands();
+    } else if (mnemonic == "jmp") {
         opcode = IROpcode::Jump;
-        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value)); // Jump target address
-
-    } else if (decoded_instr.mnemonic == "jne") {
+        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
+    } else if (mnemonic == "jne" || mnemonic == "jnz") {
         opcode = IROpcode::Branch;
-        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value)); // Target address
-        ops.push_back(IRConditionCode::NotEqual); // The condition
-
-    } else if (decoded_instr.mnemonic == "jg") {
+        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
+        ops.push_back(IRConditionCode::NotEqual);
+    } else if (mnemonic == "jg" || mnemonic == "jnle") {
         opcode = IROpcode::Branch;
-        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value)); // Target address
-        ops.push_back(IRConditionCode::Greater); // The condition
-
-    } else if (decoded_instr.mnemonic == "jge") {
+        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
+        ops.push_back(IRConditionCode::Greater);
+    } else if (mnemonic == "jge" || mnemonic == "jnl") {
         opcode = IROpcode::Branch;
-        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value)); // Target address
-        ops.push_back(IRConditionCode::GreaterOrEqual); // The condition
-
-    } else if (decoded_instr.mnemonic == "je" || decoded_instr.mnemonic == "jz") {
+        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
+        ops.push_back(IRConditionCode::GreaterOrEqual);
+    } else if (mnemonic == "je" || mnemonic == "jz") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::Equal);
-
-    } else if (decoded_instr.mnemonic == "jl" || decoded_instr.mnemonic == "jnge") {
+    } else if (mnemonic == "jl" || mnemonic == "jnge") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::Less);
-
-    } else if (decoded_instr.mnemonic == "jle" || decoded_instr.mnemonic == "jng") {
+    } else if (mnemonic == "jle" || mnemonic == "jng") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::LessOrEqual);
-
-    } else if (decoded_instr.mnemonic == "ja" || decoded_instr.mnemonic == "jnbe") {
+    } else if (mnemonic == "ja" || mnemonic == "jnbe") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::Above);
-
-    } else if (decoded_instr.mnemonic == "jae" || decoded_instr.mnemonic == "jnb" || decoded_instr.mnemonic == "jnc") {
+    } else if (mnemonic == "jae" || mnemonic == "jnb" || mnemonic == "jnc") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::AboveOrEqual);
-
-    } else if (decoded_instr.mnemonic == "jb" || decoded_instr.mnemonic == "jnae" || decoded_instr.mnemonic == "jc") {
+    } else if (mnemonic == "jb" || mnemonic == "jnae" || mnemonic == "jc") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::Below);
-
-    } else if (decoded_instr.mnemonic == "jbe" || decoded_instr.mnemonic == "jna") {
+    } else if (mnemonic == "jbe" || mnemonic == "jna") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::BelowOrEqual);
-
-    } else if (decoded_instr.mnemonic == "jo") {
+    } else if (mnemonic == "jo") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::Overflow);
-
-    } else if (decoded_instr.mnemonic == "jno") {
+    } else if (mnemonic == "jno") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::NotOverflow);
-
-    } else if (decoded_instr.mnemonic == "js") {
+    } else if (mnemonic == "js") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::Sign);
-
-    } else if (decoded_instr.mnemonic == "jns") {
+    } else if (mnemonic == "jns") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::NotSign);
-
-    } else if (decoded_instr.mnemonic == "jp" || decoded_instr.mnemonic == "jpe") {
+    } else if (mnemonic == "jp" || mnemonic == "jpe") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::ParityEven);
-
-    } else if (decoded_instr.mnemonic == "jnp" || decoded_instr.mnemonic == "jpo") {
+    } else if (mnemonic == "jnp" || mnemonic == "jpo") {
         opcode = IROpcode::Branch;
         ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
         ops.push_back(IRConditionCode::ParityOdd);
-
-    } else if (decoded_instr.mnemonic == "call") {
+    } else if (mnemonic == "call") {
         opcode = IROpcode::Call;
-        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value)); // Target address
-
-    } else if (decoded_instr.mnemonic == "push") {
+        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
+    } else if (mnemonic == "push") {
         opcode = IROpcode::Push;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-
-    } else if (decoded_instr.mnemonic == "pop") {
+        translate_all_operands();
+    } else if (mnemonic == "pop") {
         opcode = IROpcode::Pop;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-
-    } else if (decoded_instr.mnemonic == "dec") {
+        translate_all_operands();
+    } else if (mnemonic == "dec") {
         opcode = IROpcode::Dec;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-
-    } else if (decoded_instr.mnemonic == "inc") {
+        translate_all_operands();
+    } else if (mnemonic == "inc") {
         opcode = IROpcode::Inc;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-
-    } else if (decoded_instr.mnemonic == "xor") {
-        opcode = IROpcode::Xor;
-        auto dest_reg = find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch);
-        ops.push_back(dest_reg);
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, dest_reg.size));
-
-    } else if (decoded_instr.mnemonic == "int") {
-        opcode = IROpcode::Syscall;
-        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value)); // Interrupt vector
-
-    } else if (decoded_instr.mnemonic == "ret") {
-        opcode = IROpcode::Ret;
-    } else if (decoded_instr.mnemonic == "in") {
-        opcode = IROpcode::In;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch));
-    } else if (decoded_instr.mnemonic == "out") {
-        opcode = IROpcode::Out;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch));
-    } else if (decoded_instr.mnemonic == "div") {
-        opcode = IROpcode::Div;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-    } else if (decoded_instr.mnemonic == "vaddps") {
+        translate_all_operands();
+    } else if (mnemonic == "vaddps") {
         opcode = IROpcode::PackedAddPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vsubps") {
+        translate_all_operands();
+    } else if (mnemonic == "vsubps") {
         opcode = IROpcode::PackedSubPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vmulps") {
+        translate_all_operands();
+    } else if (mnemonic == "xor" || mnemonic == "vpxor") {
+        opcode = (mnemonic == "xor") ? IROpcode::Xor : IROpcode::PackedXor;
+        translate_all_operands();
+    } else if (mnemonic == "int") {
+        opcode = IROpcode::Syscall;
+        ops.push_back(static_cast<uint64_t>(decoded_instr.operands[0].value));
+    } else if (mnemonic == "ret") {
+        opcode = IROpcode::Ret;
+    } else if (mnemonic == "in") {
+        opcode = IROpcode::In;
+        translate_all_operands();
+    } else if (mnemonic == "out") {
+        opcode = IROpcode::Out;
+        translate_all_operands();
+    } else if (mnemonic == "div" || mnemonic == "idiv") {
+        opcode = (mnemonic == "div") ? IROpcode::Div : IROpcode::IMul;
+        translate_all_operands();
+    } else if (mnemonic == "mul" || mnemonic == "imul") {
+        opcode = (mnemonic == "mul") ? IROpcode::Mul : IROpcode::IMul;
+        translate_all_operands();
+    } else if (mnemonic == "vmulps") {
         opcode = IROpcode::PackedMulPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vdivps") {
+        translate_all_operands();
+    } else if (mnemonic == "vdivps") {
         opcode = IROpcode::PackedDivPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vmaxps") {
+        translate_all_operands();
+    } else if (mnemonic == "vmaxps") {
         opcode = IROpcode::PackedMaxPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vminps") {
+        translate_all_operands();
+    } else if (mnemonic == "vminps") {
         opcode = IROpcode::PackedMinPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vsqrtps") {
+        translate_all_operands();
+    } else if (mnemonic == "vsqrtps") {
         opcode = IROpcode::PackedSqrtPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vrcpps") {
+        translate_all_operands();
+    } else if (mnemonic == "vrcpps") {
         opcode = IROpcode::PackedReciprocalPS;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vpand") {
+        translate_all_operands();
+    } else if (mnemonic == "vpand") {
         opcode = IROpcode::PackedAnd;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vpandn") {
+        translate_all_operands();
+    } else if (mnemonic == "vpandn") {
         opcode = IROpcode::PackedAndNot;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vpxor") {
-        opcode = IROpcode::PackedXor;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vpor") {
+        translate_all_operands();
+    } else if (mnemonic == "vpor") {
         opcode = IROpcode::PackedOr;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vpmullw") {
+        translate_all_operands();
+    } else if (mnemonic == "vpmullw") {
         opcode = IROpcode::PackedMulLowI16;
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[0].text, x86_arch));
-        ops.push_back(find_ir_register_by_name(decoded_instr.operands[1].text, x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[2], x86_arch, 256));
-    } else if (decoded_instr.mnemonic == "vmovups") {
-        opcode = IROpcode::VectorMove;
-        ops.push_back(translate_operand(decoded_instr.operands[0], x86_arch));
-        ops.push_back(translate_operand(decoded_instr.operands[1], x86_arch));
+        translate_all_operands();
     } else {
         supported = false;
     }

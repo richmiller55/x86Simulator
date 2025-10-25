@@ -21,13 +21,16 @@ LIB_SRCS = \
 	system_bus.cpp \
 	register_rflags.cpp \
 	register_map.cpp \
+	generic_register_map.cpp \
 	DatabaseManager.cpp \
 	file_system_device.cpp \
 	ui_manager.cpp \
+	arm_ui_manager.cpp \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
 	INTEL_helpers.cpp \
+	ARM_helpers.cpp \
 	ir_executor_helpers.cpp \
 	pipeline.cpp \
 	program_decoder.cpp \
@@ -70,18 +73,24 @@ TEST_SRCS = \
 	tests/operand_parser_test.cpp \
 	tests/program_decoder_test.cpp \
 	tests/register_map_test.cpp \
+	tests/arm_register_map_test.cpp \
 	tests/rflags_test.cpp \
 	tests/simulator_core_test.cpp \
 	tests/system_bus_test.cpp \
 	tests/ir_translation_test.cpp \
+	tests/arm_ir_translation_test.cpp \
 	tests/ir_executor_test.cpp \
 	tests/arm_ir_executor_test.cpp \
 	tests/file_system_device_test.cpp \
 	tests/parser_utils_test.cpp \
 	tests/simulator_integration_test.cpp \
+	tests/arm_ui_manager_test.cpp \
+	tests/arm_to_ir_converter_test.cpp \
+	tests/arm_simulator_ui_test.cpp \
+	tests/arm_simulator_test.cpp \
 	tests/mock_database_manager.cpp
 TEST_OBJS = $(TEST_SRCS:.cpp=.o)
-TEST_TARGET = x86_decoder_test
+TEST_TARGET = run_tests_for_simulator
 
 # Add gtest flags
 GTEST_LIBS = -lgtest -lgtest_main -pthread

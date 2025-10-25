@@ -2,6 +2,7 @@
 #include "ir_visitor.h"
 #include "program_decoder.h"
 #include "ir_executor_helpers.h"
+#include "generic_register_map.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -99,6 +100,24 @@ public:
             case IROpcode::SendEvent: handle_ir_send_event(instr, simulator); break;
             case IROpcode::CompareAndBranchIfNotZero: handle_ir_compare_and_branch_if_not_zero(instr, simulator); break;
             case IROpcode::Syscall: handle_ir_syscall(instr, simulator); break;
+            case IROpcode::FloatAddS: handle_ir_float_add_s(instr, simulator); break;
+            case IROpcode::FloatSubS: handle_ir_float_sub_s(instr, simulator); break;
+            case IROpcode::FloatMulS: handle_ir_float_mul_s(instr, simulator); break;
+            case IROpcode::FloatDivS: handle_ir_float_div_s(instr, simulator); break;
+            case IROpcode::FloatSqrtS: handle_ir_float_sqrt_s(instr, simulator); break;
+            case IROpcode::FloatAddD: handle_ir_float_add_d(instr, simulator); break;
+            case IROpcode::FloatSubD: handle_ir_float_sub_d(instr, simulator); break;
+            case IROpcode::FloatMulD: handle_ir_float_mul_d(instr, simulator); break;
+            case IROpcode::FloatDivD: handle_ir_float_div_d(instr, simulator); break;
+            case IROpcode::FloatSqrtD: handle_ir_float_sqrt_d(instr, simulator); break;
+            case IROpcode::FloatCmpS: handle_ir_float_cmp_s(instr, simulator); break;
+            case IROpcode::FloatCmpD: handle_ir_float_cmp_d(instr, simulator); break;
+            case IROpcode::FloatToS: handle_ir_float_to_s(instr, simulator); break;
+            case IROpcode::FloatToD: handle_ir_float_to_d(instr, simulator); break;
+            case IROpcode::IntToFloatS: handle_ir_int_to_float_s(instr, simulator); break;
+            case IROpcode::IntToFloatD: handle_ir_int_to_float_d(instr, simulator); break;
+            case IROpcode::FloatToIntS: handle_ir_float_to_int_s(instr, simulator); break;
+            case IROpcode::FloatToIntD: handle_ir_float_to_int_d(instr, simulator); break;
             default:
                 simulator.getDatabaseManager().log(
                     simulator.get_session_id(),
@@ -117,9 +136,19 @@ ArmSimulator::ArmSimulator(IDatabaseManager& db_manager, Memory& memory, int ses
     : db_manager_(db_manager),
       memory_(memory),
       architecture_(create_arm_cortex_r8_architecture()),
-      register_map_(architecture_),
+      register_map_(std::make_unique<GenericRegisterMap>(architecture_)),
       session_id_(session_id),
-      headless_(headless) {}
+      headless_(headless) {
+    if (!headless_) {
+        ui_manager_ = std::make_unique<ArmUIManager>(memory_);
+        ui_manager_->setRegisterMap(register_map_.get());
+        // The following components are not yet implemented for ARM, so we pass nullptr.
+        // This will need to be updated as the ARM simulator is more fully featured.
+        ui_manager_->setPipeline(nullptr); 
+        ui_manager_->setSymbolTable(nullptr);
+        ui_manager_->setProgramDecoder(nullptr);
+    }
+}
 
 ArmSimulator::~ArmSimulator() {}
 
@@ -130,16 +159,24 @@ constexpr int C_BIT = 29;
 constexpr int V_BIT = 28;
 
 void ArmSimulator::set_ZF(bool value) { 
-    if (value) cpsr_ |= (1 << Z_BIT); else cpsr_ &= ~(1 << Z_BIT); 
+    uint32_t cpsr = register_map_->get32("cpsr");
+    if (value) cpsr |= (1 << Z_BIT); else cpsr &= ~(1 << Z_BIT);
+    register_map_->set32("cpsr", cpsr);
 }
 void ArmSimulator::set_SF(bool value) { 
-    if (value) cpsr_ |= (1 << N_BIT); else cpsr_ &= ~(1 << N_BIT); 
+    uint32_t cpsr = register_map_->get32("cpsr");
+    if (value) cpsr |= (1 << N_BIT); else cpsr &= ~(1 << N_BIT);
+    register_map_->set32("cpsr", cpsr);
 }
 void ArmSimulator::set_CF(bool value) { 
-    if (value) cpsr_ |= (1 << C_BIT); else cpsr_ &= ~(1 << C_BIT); 
+    uint32_t cpsr = register_map_->get32("cpsr");
+    if (value) cpsr |= (1 << C_BIT); else cpsr &= ~(1 << C_BIT);
+    register_map_->set32("cpsr", cpsr);
 }
 void ArmSimulator::set_OF(bool value) { 
-    if (value) cpsr_ |= (1 << V_BIT); else cpsr_ &= ~(1 << V_BIT); 
+    uint32_t cpsr = register_map_->get32("cpsr");
+    if (value) cpsr |= (1 << V_BIT); else cpsr &= ~(1 << V_BIT);
+    register_map_->set32("cpsr", cpsr);
 }
 
 void ArmSimulator::set_NZCV(bool n, bool z, bool c, bool v) {
@@ -149,10 +186,10 @@ void ArmSimulator::set_NZCV(bool n, bool z, bool c, bool v) {
     set_OF(v);
 }
 
-bool ArmSimulator::get_ZF() const { return (cpsr_ >> Z_BIT) & 1; }
-bool ArmSimulator::get_SF() const { return (cpsr_ >> N_BIT) & 1; }
-bool ArmSimulator::get_CF() const { return (cpsr_ >> C_BIT) & 1; }
-bool ArmSimulator::get_OF() const { return (cpsr_ >> V_BIT) & 1; }
+bool ArmSimulator::get_ZF() const { return (register_map_->get32("cpsr") >> Z_BIT) & 1; }
+bool ArmSimulator::get_SF() const { return (register_map_->get32("cpsr") >> N_BIT) & 1; }
+bool ArmSimulator::get_CF() const { return (register_map_->get32("cpsr") >> C_BIT) & 1; }
+bool ArmSimulator::get_OF() const { return (register_map_->get32("cpsr") >> V_BIT) & 1; }
 
 void ArmSimulator::set_PF(bool value) {
     // No-op for ARM, as it doesn't have a Parity Flag like x86.
@@ -170,29 +207,137 @@ bool ArmSimulator::loadProgram(const std::string& program_path) {
         return false;
     }
 
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string assembly_content = buffer.str();
+    programLines_.clear();
+    std::string line;
+    while (std::getline(file, line)) {
+        programLines_.push_back(line);
+    }
 
-    ArmToIrConverter converter(architecture_);
-    ir_program_ = converter.convert(assembly_content);
+    return !programLines_.empty();
+}
 
-    std::cout << "Successfully converted ARM assembly to IR. " << ir_program_.size() << " IR instructions generated." << std::endl;
+// Helper to remove leading/trailing whitespace
+std::string trim(const std::string& str) {
+  size_t first = str.find_first_not_of(" \t\n\r");
+  if (std::string::npos == first) {
+    return "";
+  }
+  size_t last = str.find_last_not_of(" \t\n\r");
+  return str.substr(first, (last - first + 1));
+}
+
+bool ArmSimulator::firstPass() {
+    symbolTable_.clear();
+    address_t current_address = 0;
+    bool in_text_section = true; // Assume starting in .text
+
+    for (const auto& line : programLines_) {
+        std::string trimmed_line = trim(line);
+        if (trimmed_line.empty() || trimmed_line[0] == ';') {
+            continue;
+        }
+
+        // Section directives
+        if (trimmed_line.find("AREA") != std::string::npos) {
+            if (trimmed_line.find("CODE") != std::string::npos) {
+                in_text_section = true;
+                current_address = memory_.get_text_segment_start();
+            } else if (trimmed_line.find("DATA") != std::string::npos) {
+                in_text_section = false;
+                current_address = memory_.get_data_segment_start();
+            }
+            continue;
+        }
+
+        // Labels
+        size_t colon_pos = trimmed_line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string label = trimmed_line.substr(0, colon_pos);
+            symbolTable_[label] = current_address;
+            
+            // If there's code after the label on the same line
+            std::string rest_of_line = trim(trimmed_line.substr(colon_pos + 1));
+            if (rest_of_line.empty()) {
+                continue;
+            }
+            trimmed_line = rest_of_line;
+        }
+
+        // For simplicity, assume all instructions are 4 bytes
+        if (in_text_section) {
+            current_address += 4;
+        } else {
+            // Basic data directive handling (DCD)
+            if (trimmed_line.find("DCD") != std::string::npos) {
+                current_address += 4;
+            }
+        }
+    }
+    return true;
+}
+
+bool ArmSimulator::secondPass() {
+    // In a real assembler, the second pass would involve converting assembly to machine code.
+    // Here, we are converting assembly to IR, and this is now done in the second pass
+    // after the symbol table is built.
+
+    std::stringstream whole_program;
+    for(const auto& line : programLines_) {
+        whole_program << line << '\n';
+    }
+
+    ArmToIrConverter converter(architecture_, &symbolTable_);
+    ir_program_ = converter.convert(whole_program.str());
+
+    // Set the initial program counter (PC) to the address of the entry point label.
+    auto it = symbolTable_.find(entryPointLabel_);
+    if (it != symbolTable_.end()) {
+        register_map_->set32(get_instruction_pointer_name(), it->second);
+    } else {
+        db_manager_.log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
+        register_map_->set32(get_instruction_pointer_name(), memory_.get_text_segment_start());
+    }
 
     program_decoder_ = std::make_unique<ProgramDecoder>(memory_);
+
+    if (ui_manager_) {
+        ui_manager_->setProgramDecoder(program_decoder_.get());
+        ui_manager_->setSymbolTable(&symbolTable_);
+    }
 
     return true;
 }
 
 void ArmSimulator::runProgram() {
-    std::cout << "\n--- Starting ARM Simulation ---" << std::endl;
-    std::cout << "Executing " << ir_program_.size() << " IR instructions." << std::endl;
+    if (headless_) {
+        std::cout << "\n--- Starting ARM Simulation (Headless) ---" << std::endl;
+        std::cout << "Executing " << ir_program_.size() << " IR instructions." << std::endl;
+        for (const auto& instr : ir_program_) {
+            execute_ir_instruction(*instr);
+        }
+        std::cout << "--- ARM Simulation Finished ---" << std::endl;
+    } else {
+        const char* ip_name = get_instruction_pointer_name();
+        address_t current_pc = register_map_->get32(ip_name);
 
-    for (const auto& instr : ir_program_) {
-        execute_ir_instruction(*instr);
+        while (current_pc < ir_program_.size()) {
+            ui_manager_->draw(current_pc);
+            if (!ui_manager_->waitForInput()) { // Returns false if user quits
+                break;
+            }
+
+            const auto& instr = ir_program_[current_pc];
+            execute_ir_instruction(*instr);
+            
+            // In a real scenario, the IP would be updated by branch/jump instructions.
+            // For this linear execution model, we just increment it.
+            current_pc = register_map_->get32(ip_name);
+            if (current_pc == register_map_->get32(ip_name)) { // If IP wasn't changed by a jump
+                 register_map_->set32(ip_name, current_pc + 1);
+            }
+            current_pc = register_map_->get32(ip_name);
+        }
     }
-
-    std::cout << "--- ARM Simulation Finished ---" << std::endl;
 }
 
 void ArmSimulator::accept(IRVisitor& visitor, const IRInstruction& instr) {
@@ -210,14 +355,14 @@ ProgramDecoder* ArmSimulator::getProgramDecoder() {
 
 uint64_t ArmSimulator::get_system_register(const std::string& name) {
     if (name == "cpsr") {
-        return cpsr_;
+        return register_map_->get32("cpsr");
     }
     throw std::runtime_error("Unknown ARM system register: " + name);
 }
 
 void ArmSimulator::set_system_register(const std::string& name, uint64_t value) {
     if (name == "cpsr") {
-        cpsr_ = value;
+        register_map_->set32("cpsr", value);
     } else {
         throw std::runtime_error("Unknown ARM system register: " + name);
     }

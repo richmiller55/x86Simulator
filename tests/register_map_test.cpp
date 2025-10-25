@@ -3,13 +3,16 @@
 
 class RegisterMapTest : public ::testing::Test {
 protected:
-    RegisterMapTest() : arch_(create_x86_architecture()), regs(arch_) {}
+    RegisterMapTest() {}
     void SetUp() override {
     }
 
-    Architecture arch_;
-    RegisterMap regs;
+    static Architecture arch_;
+    static RegisterMap regs;
 };
+
+Architecture RegisterMapTest::arch_(create_x86_architecture());
+RegisterMap RegisterMapTest::regs(RegisterMapTest::arch_);
 
 TEST_F(RegisterMapTest, GetSet64) {
     uint64_t value = 0x123456789ABCDEF0;
