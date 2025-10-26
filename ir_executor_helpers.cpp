@@ -498,7 +498,7 @@ void handle_ir_jump(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const char* ip_name = simulator.get_instruction_pointer_name();
-    simulator.getRegisterMap().set64(ip_name, target_address);
+    setRegisterValue(ip_name, target_address, simulator);
 }
 
 /**
@@ -588,7 +588,7 @@ void handle_ir_branch(const IRInstruction& ir_instr, ISimulator& simulator) {
     // --- 3. Perform Jump if Condition is Met ---
     if (should_jump) {
         const char* ip_name = simulator.get_instruction_pointer_name();
-        simulator.getRegisterMap().set64(ip_name, target_address);
+        setRegisterValue(ip_name, target_address, simulator);
     }
     // If the condition is not met, do nothing and let the IP advance normally.
 }
@@ -770,7 +770,7 @@ void handle_ir_syscall(const IRInstruction& ir_instr, ISimulator& simulator) {
                 simulator.getDatabaseManager().log(simulator.get_session_id(), logMessage, "INFO", 0, __FILE__, __LINE__);
                 
                 const char* ip_name = simulator.get_instruction_pointer_name();
-                regs.set64(ip_name, simulator.getMemory().get_total_memory_size());
+                setRegisterValue(ip_name, simulator.getMemory().get_total_memory_size(), simulator);
                 break;
             }
             default: {
@@ -789,7 +789,7 @@ void handle_ir_syscall(const IRInstruction& ir_instr, ISimulator& simulator) {
                 simulator.getDatabaseManager().log(simulator.get_session_id(), logMessage, "INFO", 0, __FILE__, __LINE__);
 
                 const char* ip_name = simulator.get_instruction_pointer_name();
-                regs.set64(ip_name, simulator.getMemory().get_total_memory_size());
+                setRegisterValue(ip_name, simulator.getMemory().get_total_memory_size(), simulator);
                 break;
             }
             default: {
@@ -981,7 +981,7 @@ void handle_ir_call(const IRInstruction& ir_instr, ISimulator& simulator) {
 
     // 4. Set IP to the target address
     const char* ip_name = simulator.get_instruction_pointer_name();
-    regs.set64(ip_name, target_address);
+    setRegisterValue(ip_name, target_address, simulator);
 }
 
 void handle_ir_push(const IRInstruction& ir_instr, ISimulator& simulator) {
@@ -1368,7 +1368,7 @@ void handle_ir_ret(const IRInstruction& ir_instr, ISimulator& simulator) {
     }
 
     const char* ip_name = simulator.get_instruction_pointer_name();
-    regs.set64(ip_name, return_address);
+    setRegisterValue(ip_name, return_address, simulator);
     regs.set64(sp_name, sp + pop_size);
 }
 
@@ -1850,7 +1850,7 @@ void handle_ir_compare_and_branch_if_not_zero(const IRInstruction& ir_instr, ISi
         }
 
         const char* ip_name = simulator.get_instruction_pointer_name();
-        simulator.getRegisterMap().set64(ip_name, target_address);
+        setRegisterValue(ip_name, target_address, simulator);
     }
 }
 

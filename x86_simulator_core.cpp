@@ -39,3 +39,19 @@ void X86Simulator::set_system_register(const std::string& name, uint64_t value) 
     // TODO: Implement
 }
 
+void X86Simulator::accept(IRVisitor& visitor, const IRInstruction& instr) {
+    visitor.visit(instr, *this);
+}
+
+const char* X86Simulator::get_stack_pointer_name() const {
+    return "rsp";
+}
+
+const char* X86Simulator::get_instruction_pointer_name() const {
+    return "rip";
+}
+
+bool X86Simulator::is_headless() const {
+    return headless_;
+}
+

@@ -12,7 +12,7 @@
 // Helper to resolve a vector operand (YMM register or memory)
 static m256i_t get_vector_operand(const IROperand& op, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
-    auto& regs = x86_sim.getRegisterMap();
+    RegisterMap& regs = static_cast<RegisterMap&>(x86_sim.getRegisterMap());
 
     if (const std::string* reg_name = std::get_if<std::string>(&op)) {
         return regs.getYmm(*reg_name);
@@ -34,7 +34,7 @@ static m256i_t get_vector_operand(const IROperand& op, ISimulator& simulator) {
 // Helper to write to a vector operand (YMM register or memory)
 static void set_vector_operand(const IROperand& op, m256i_t value, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
-    auto& regs = x86_sim.getRegisterMap();
+    RegisterMap& regs = static_cast<RegisterMap&>(x86_sim.getRegisterMap());
 
     if (const std::string* reg_name = std::get_if<std::string>(&op)) {
         regs.setYmm(*reg_name, value);
@@ -207,7 +207,7 @@ void handle_ir_vector_move(const IRInstruction& ir_instr, ISimulator& simulator)
 
 void handle_ir_vector_zero(const IRInstruction& ir_instr, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
-    auto& regs = x86_sim.getRegisterMap();
+    RegisterMap& regs = static_cast<RegisterMap&>(x86_sim.getRegisterMap());
     m256i_t zero = _mm256_setzero_si256_sim();
     for (int i = 0; i < 16; ++i) {
         regs.setYmm("ymm" + std::to_string(i), zero);
@@ -216,7 +216,7 @@ void handle_ir_vector_zero(const IRInstruction& ir_instr, ISimulator& simulator)
 
 void handle_ir_vector_zero_upper(const IRInstruction& ir_instr, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
-    auto& regs = x86_sim.getRegisterMap();
+    RegisterMap& regs = static_cast<RegisterMap&>(x86_sim.getRegisterMap());
     for (int i = 0; i < 16; ++i) {
         m256i_t val = regs.getYmm("ymm" + std::to_string(i));
         val.m128[1] = _mm_setzero_si128_sim();
@@ -226,7 +226,7 @@ void handle_ir_vector_zero_upper(const IRInstruction& ir_instr, ISimulator& simu
 
 void handle_x86_ir_div(const IRInstruction& ir_instr, ISimulator& simulator) {
     X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
-    auto& regs = x86_sim.getRegisterMap();
+    RegisterMap& regs = static_cast<RegisterMap&>(x86_sim.getRegisterMap());
     const auto& arch = x86_sim.get_architecture();
     const auto& src_op = ir_instr.operands[0];
 
@@ -364,9 +364,8 @@ void X86IRVisitor::visit(const IRInstruction& instr, ISimulator& simulator) {
         default: {
             X86Simulator& x86_sim = static_cast<X86Simulator&>(simulator);
             std::string logmessage = "Unsupported IR Opcode in X86IRVisitor: " + std::to_string(static_cast<int>(instr.opcode));
-            x86_sim.getDatabaseManager().log(x86_sim.get_session_id(), logmessage, "ERROR", x86_sim.get_instruction_pointer(), __FILE__, __LINE__);
+            x86_sim.getDatabaseManager().log(x86_sim.get_session_id(), logmessage, "ERROR", x86_sim.getRegisterMap().get64(x86_sim.get_instruction_pointer_name()), __FILE__, __LINE__);
             break;
         }
     }
 }
-

@@ -82,6 +82,10 @@ public:
   bool firstPass() override;
   bool secondPass() override;
 
+  void accept(IRVisitor& visitor, const IRInstruction& instr) override;
+  const char* get_stack_pointer_name() const override;
+  const char* get_instruction_pointer_name() const override;
+
   void execute_ir_instruction(const IRInstruction& ir_instr) override;
   void dumpTextSegment(const std::string& filename);
   void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
@@ -116,11 +120,10 @@ public:
   uint64_t get_system_register(const std::string& name) override;
   void set_system_register(const std::string& name, uint64_t value) override;
   
-  void update_rflags_in_register_map();
-
   // --- I/O Handling ---
   void log_out(uint16_t port, uint64_t value);
   const std::vector<std::pair<uint16_t, uint64_t>>& get_out_log() const;
+  bool is_headless() const;
 
 #if defined(GOOGLE_TEST)
   RegisterMap& getRegisterMapForTesting() { return *register_map_; }

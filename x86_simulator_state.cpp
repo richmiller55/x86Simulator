@@ -12,29 +12,8 @@
 #include <sstream>
 
 void X86Simulator::execute_ir_instruction(const IRInstruction& ir_instr) {
-    switch (ir_instr.opcode) {
-        case IROpcode::Add:
-            handle_ir_add(ir_instr, *this);
-            break;
-        case IROpcode::Sub:
-            handle_ir_sub(ir_instr, *this);
-            break;
-        case IROpcode::Move:
-            handle_ir_move(ir_instr, *this);
-            break;
-        case IROpcode::Load:
-            handle_ir_load(ir_instr, *this);
-            break;
-        case IROpcode::Store:
-            handle_ir_store(ir_instr, *this);
-            break;
-        case IROpcode::PackedAddPS:
-            handle_ir_packed_add_ps(ir_instr, *this);
-            break;
-        default:
-            db_manager_.log(session_id_, "Unhandled IR opcode", "ERROR", 0, __FILE__, __LINE__);
-            break;
-    }
+    X86IRVisitor visitor;
+    accept(visitor, ir_instr);
 }
 
 // Rewritten executeInstruction to use the new IR pipeline
@@ -89,7 +68,7 @@ void X86Simulator::runSingleInstruction() {
         db_manager_.log(session_id_, "Execution failed for: " + decoded_instr->mnemonic, "ERROR", instruction_pointer, __FILE__, __LINE__);
     }
 
-    update_rflags_in_register_map();
+    
 }
 
 void X86Simulator::runProgram() {
