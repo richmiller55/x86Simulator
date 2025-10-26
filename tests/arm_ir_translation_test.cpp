@@ -15,7 +15,6 @@ protected:
   void SetUp() override {
         // Create a dummy ARM architecture for the converter
         arm_arch = create_arm_cortex_r8_architecture();
-        converter = std::make_unique<ArmToIrConverter>(arm_arch, nullptr);
         simulator = std::make_unique<ArmSimulator>(dbManager, memory, 0, true);
     }
 
@@ -35,6 +34,11 @@ target_label:
     mov r0, #1
 )";
 
+    simulator->loadProgramFromString(arm_assembly);
+    simulator->firstPass();
+    const auto& symbol_table = simulator->getSymbolTable();
+
+    converter = std::make_unique<ArmToIrConverter>(arm_arch, &symbol_table);
     IRProgram ir_program = converter->convert(arm_assembly);
 
     // Find the IR instruction for BGT

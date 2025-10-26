@@ -36,19 +36,17 @@ public:
      */
     IRProgram convert(const std::string& arm_assembly);
 
-private:
-    const Architecture& architecture_;
-    const std::map<std::string, address_t>* symbol_table_;
-    size_t current_assembly_line_index_; // Tracks the current line number in assembly
-    std::map<size_t, size_t> assembly_line_to_ir_index_map_; // Maps assembly line index to the first IR instruction index it generates
-
-
-
     /**
      * @brief Parses a single line of assembly into an IRInstruction.
      * @return A unique_ptr to an IRInstruction, or nullptr if the line is not an instruction.
      */
     std::unique_ptr<IRInstruction> parse_line(const std::string& line);
+
+private:
+    const Architecture& architecture_;
+    const std::map<std::string, address_t>* symbol_table_;
+    size_t current_assembly_line_index_; // Tracks the current line number in assembly
+    std::map<size_t, size_t> assembly_line_to_ir_index_map_; // Maps assembly line index to the first IR instruction index it generates
 
     /**
      * @brief Parses a string representation of an operand into an IROperand variant.

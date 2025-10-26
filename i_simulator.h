@@ -4,6 +4,7 @@
 class IRInstruction; // Forward declaration
 
 #include <string>
+#include <cstdint>
 
 // Forward declarations for components
 class IRegisterMap;

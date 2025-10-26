@@ -30,8 +30,8 @@ TEST_F(SimulatorCoreTest, VaddpsExecution) {
     // Initialize ymm1 and ymm2 registers
     m256i_t val1 = _mm256_set_ps_sim(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f);
     m256i_t val2 = _mm256_set_ps_sim(8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     // Create a decoded instruction object
     DecodedInstruction decoded_instr;
@@ -53,7 +53,7 @@ TEST_F(SimulatorCoreTest, VaddpsExecution) {
     simulator.executeInstruction(decoded_instr);
 
     // Verify the result in ymm0
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_add_ps_sim(val1, val2);
 
     for (int i = 0; i < 8; ++i) {
@@ -65,8 +65,8 @@ TEST_F(SimulatorCoreTest, VmaxpsExecution) {
     // VMAXPS ymm0, ymm1, ymm2
     m256i_t val1 = _mm256_set_ps_sim(1.0f, 8.0f, 3.0f, 6.0f, 5.0f, 4.0f, 7.0f, 2.0f);
     m256i_t val2 = _mm256_set_ps_sim(8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vmaxps";
@@ -76,7 +76,7 @@ TEST_F(SimulatorCoreTest, VmaxpsExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_max_ps_sim(val1, val2);
 
     for (int i = 0; i < 8; ++i) {
@@ -88,8 +88,8 @@ TEST_F(SimulatorCoreTest, VpandnExecution) {
     // VPANDN ymm0, ymm1, ymm2
     m256i_t val1 = _mm256_set_epi32_sim(0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000, 0xF0F0F0F0, 0x0F0F0F0F, 0xAAAAAAAA, 0x55555555);
     m256i_t val2 = _mm256_set_epi32_sim(0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000, 0xFF00FF00, 0xFF00FF00, 0xCCCCCCCC, 0xCCCCCCCC);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vpandn";
@@ -99,7 +99,7 @@ TEST_F(SimulatorCoreTest, VpandnExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     m128i_t val1_low  = _mm256_extractf128_si256_sim(val1, 0);
     m128i_t val1_high = _mm256_extractf128_si256_sim(val1, 1);
@@ -117,8 +117,8 @@ TEST_F(SimulatorCoreTest, VpandnExecution) {
 TEST_F(SimulatorCoreTest, VpandExecution) {
     m256i_t val1 = _mm256_set_epi32_sim(0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000, 0xF0F0F0F0, 0x0F0F0F0F, 0xAAAAAAAA, 0x55555555);
     m256i_t val2 = _mm256_set_epi32_sim(0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000, 0xFF00FF00, 0xFF00FF00, 0xCCCCCCCC, 0xCCCCCCCC);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vpand";
@@ -128,7 +128,7 @@ TEST_F(SimulatorCoreTest, VpandExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     m128i_t val1_low  = _mm256_extractf128_si256_sim(val1, 0);
     m128i_t val1_high = _mm256_extractf128_si256_sim(val1, 1);
@@ -146,8 +146,8 @@ TEST_F(SimulatorCoreTest, VpandExecution) {
 TEST_F(SimulatorCoreTest, VpmullwExecution) {
     m256i_t val1 = _mm256_set_epi16_sim(1, 2, 3, 4, 5, 6, 7, 8, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000);
     m256i_t val2 = _mm256_set_epi16_sim(10, 20, 30, 40, 50, 60, 70, 80, 1, 2, 3, 4, 5, 6, 7, 8);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vpmullw";
@@ -157,7 +157,7 @@ TEST_F(SimulatorCoreTest, VpmullwExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     m128i_t val1_low  = _mm256_extractf128_si256_sim(val1, 0);
     m128i_t val1_high = _mm256_extractf128_si256_sim(val1, 1);
@@ -175,8 +175,8 @@ TEST_F(SimulatorCoreTest, VpmullwExecution) {
 TEST_F(SimulatorCoreTest, VminpsExecution) {
     m256i_t val1 = _mm256_set_ps_sim(1.0f, 8.0f, 3.0f, 6.0f, 5.0f, 4.0f, 7.0f, 2.0f);
     m256i_t val2 = _mm256_set_ps_sim(8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vminps";
@@ -186,7 +186,7 @@ TEST_F(SimulatorCoreTest, VminpsExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_min_ps_sim(val1, val2);
 
     for (int i = 0; i < 8; ++i) {
@@ -197,8 +197,8 @@ TEST_F(SimulatorCoreTest, VminpsExecution) {
 TEST_F(SimulatorCoreTest, VpxorExecution) {
     m256i_t val1 = _mm256_set_epi32_sim(0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000, 0xF0F0F0F0, 0x0F0F0F0F, 0xAAAAAAAA, 0x55555555);
     m256i_t val2 = _mm256_set_epi32_sim(0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000, 0xFF00FF00, 0xFF00FF00, 0xCCCCCCCC, 0xCCCCCCCC);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vpxor";
@@ -208,7 +208,7 @@ TEST_F(SimulatorCoreTest, VpxorExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     m128i_t val1_low  = _mm256_extractf128_si256_sim(val1, 0);
     m128i_t val1_high = _mm256_extractf128_si256_sim(val1, 1);
@@ -225,7 +225,7 @@ TEST_F(SimulatorCoreTest, VpxorExecution) {
 
 TEST_F(SimulatorCoreTest, VrcppsExecution) {
     m256i_t val1 = _mm256_set_ps_sim(1.0f, 2.0f, 4.0f, 8.0f, 0.5f, 0.25f, -2.0f, -4.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vrcpps";
@@ -234,7 +234,7 @@ TEST_F(SimulatorCoreTest, VrcppsExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_rcp_ps_sim(val1);
 
     for (int i = 0; i < 8; ++i) {
@@ -244,7 +244,7 @@ TEST_F(SimulatorCoreTest, VrcppsExecution) {
 
 TEST_F(SimulatorCoreTest, VsqrtpsExecution) {
     m256i_t val1 = _mm256_set_ps_sim(1.0f, 4.0f, 9.0f, 16.0f, 25.0f, 100.0f, 0.25f, 0.04f);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vsqrtps";
@@ -253,7 +253,7 @@ TEST_F(SimulatorCoreTest, VsqrtpsExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_sqrt_ps_sim(val1);
 
     for (int i = 0; i < 8; ++i) {
@@ -264,8 +264,8 @@ TEST_F(SimulatorCoreTest, VsqrtpsExecution) {
 TEST_F(SimulatorCoreTest, VsubpsExecution) {
     m256i_t val1 = _mm256_set_ps_sim(1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f);
     m256i_t val2 = _mm256_set_ps_sim(8.0f, 7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vsubps";
@@ -275,7 +275,7 @@ TEST_F(SimulatorCoreTest, VsubpsExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_sub_ps_sim(val1, val2);
 
     for (int i = 0; i < 8; ++i) {
@@ -286,8 +286,8 @@ TEST_F(SimulatorCoreTest, VsubpsExecution) {
 TEST_F(SimulatorCoreTest, VporExecution) {
     m256i_t val1 = _mm256_set_epi32_sim(0xFFFFFFFF, 0x00000000, 0xFFFFFFFF, 0x00000000, 0xF0F0F0F0, 0x0F0F0F0F, 0xAAAAAAAA, 0x55555555);
     m256i_t val2 = _mm256_set_epi32_sim(0xFFFFFFFF, 0xFFFFFFFF, 0x00000000, 0x00000000, 0xFF00FF00, 0xFF00FF00, 0xCCCCCCCC, 0xCCCCCCCC);
-    simulator.getRegisterMap().setYmm("ymm1", val1);
-    simulator.getRegisterMap().setYmm("ymm2", val2);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val1);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm2", val2);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vpor";
@@ -297,7 +297,7 @@ TEST_F(SimulatorCoreTest, VporExecution) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     m128i_t val1_low  = _mm256_extractf128_si256_sim(val1, 0);
     m128i_t val1_high = _mm256_extractf128_si256_sim(val1, 1);
@@ -348,8 +348,6 @@ TEST_F(SimulatorCoreTest, RflagsUpdateOnAdd) {
 
     // In normal execution, runSingleInstruction handles this.
 
-    simulator.update_rflags_in_register_map();
-
 
 
     uint64_t rflags_after_sf = simulator.getRegisterMap().get64("rflags");
@@ -387,8 +385,6 @@ TEST_F(SimulatorCoreTest, RflagsUpdateOnAdd) {
 
 
     // Manually sync flags from the internal rflags_ to the register map for testing.
-
-    simulator.update_rflags_in_register_map();
 
 
 
@@ -502,7 +498,7 @@ TEST_F(SimulatorCoreTest, OutInstructionExecution) {
     std::stringstream output;
     std::streambuf* old_cout = std::cout.rdbuf(output.rdbuf());
 
-    simulator.getRegisterMap().set8("al", 'B');
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).set8("al", 'B');
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "out";
@@ -535,7 +531,7 @@ TEST_F(SimulatorCoreTest, VmovupsLoadExecution_1) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     for (int i = 0; i < 8; ++i) {
         EXPECT_EQ(result.m256i_i32[i], test_data.m256i_i32[i]);
@@ -546,7 +542,7 @@ TEST_F(SimulatorCoreTest, VmovupsStoreExecution_1) {
     // Test VMOVUPS [address], ymm0
     address_t mem_addr = simulator.getMemory().get_data_segment_start() + 0x200;
     m256i_t test_data = _mm256_set_epi32_sim(1, 2, 3, 4, 5, 6, 7, 8);
-    simulator.getRegisterMap().setYmm("ymm0", test_data);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm0", test_data);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vmovups";
@@ -584,7 +580,7 @@ TEST_F(SimulatorCoreTest, VmovupsLoadExecution_2) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     for (int i = 0; i < 8; ++i) {
         EXPECT_EQ(result.m256i_i32[i], test_data.m256i_i32[i]);
@@ -594,7 +590,7 @@ TEST_F(SimulatorCoreTest, VmovupsLoadExecution_2) {
 TEST_F(SimulatorCoreTest, VmovupsStoreExecution_2) {
     address_t mem_addr = simulator.getMemory().get_data_segment_start() + 0x400;
     m256i_t test_data = _mm256_set_epi32_sim(1, 2, 3, 4, 5, 6, 7, 8);
-    simulator.getRegisterMap().setYmm("ymm0", test_data);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm0", test_data);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vmovups";
@@ -620,7 +616,7 @@ TEST_F(SimulatorCoreTest, VsqrtpsExecutionSpecialValues) {
     float nan = std::numeric_limits<float>::quiet_NaN();
 
     m256i_t val = _mm256_set_ps_sim(1.0f, 1.0f, nan, -1.0f, inf, -0.0f, 0.0f, -1.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vsqrtps";
@@ -629,7 +625,7 @@ TEST_F(SimulatorCoreTest, VsqrtpsExecutionSpecialValues) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     EXPECT_TRUE(std::isnan(result.m256_f32[0])); // sqrt(-1.0)
     EXPECT_EQ(result.m256_f32[1], 0.0f); // sqrt(0.0)
@@ -658,7 +654,7 @@ TEST_F(SimulatorCoreTest, VsqrtpsExecutionMemorySource) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_sqrt_ps_sim(val);
 
     for (int i = 0; i < 8; ++i) {
@@ -671,7 +667,7 @@ TEST_F(SimulatorCoreTest, VrcppsExecutionSpecialValues) {
     float nan = std::numeric_limits<float>::quiet_NaN();
 
     m256i_t val = _mm256_set_ps_sim(1.0f, nan, inf, -0.0f, 0.0f, -2.0f, 4.0f, 1.0f);
-    simulator.getRegisterMap().setYmm("ymm1", val);
+    static_cast<RegisterMap&>(simulator.getRegisterMap()).setYmm("ymm1", val);
 
     DecodedInstruction decoded_instr;
     decoded_instr.mnemonic = "vrcpps";
@@ -680,7 +676,7 @@ TEST_F(SimulatorCoreTest, VrcppsExecutionSpecialValues) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
 
     EXPECT_NEAR(result.m256_f32[0], 1.0f, 0.001);
     EXPECT_NEAR(result.m256_f32[1], 0.25f, 0.001);
@@ -709,7 +705,7 @@ TEST_F(SimulatorCoreTest, VrcppsExecutionMemorySource) {
 
     simulator.executeInstruction(decoded_instr);
 
-    m256i_t result = simulator.getRegisterMap().getYmm("ymm0");
+    m256i_t result = static_cast<RegisterMap&>(simulator.getRegisterMap()).getYmm("ymm0");
     m256i_t expected = _mm256_rcp_ps_sim(val);
 
     for (int i = 0; i < 8; ++i) {

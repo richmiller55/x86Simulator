@@ -25,6 +25,7 @@ public:
 
     void runProgram() override;
     bool loadProgram(const std::string& program_path) override;
+    void loadProgramFromString(const std::string& program_content);
     bool firstPass() override;
     bool secondPass() override;
 
@@ -64,6 +65,7 @@ public:
     void set_system_register(const std::string& name, uint64_t value) override;
 
     ArmUIManager* getUIManager() { return ui_manager_.get(); }
+    const std::map<std::string, address_t>& getSymbolTable() const { return symbolTable_; }
 
 private:
     std::unique_ptr<ProgramDecoder> program_decoder_;

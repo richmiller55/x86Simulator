@@ -19,6 +19,10 @@ public:
     void setValue(const std::string& reg_name, const void* src_buffer, size_t size_bytes) override {
         // Do nothing
     }
+    float get_float(const std::string& reg_name) const override { return 0.0f; }
+    void set_float(const std::string& reg_name, float value) override {}
+    double get_double(const std::string& reg_name) const override { return 0.0; }
+    void set_double(const std::string& reg_name, double value) override {}
 };
 
 

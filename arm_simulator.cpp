@@ -216,6 +216,15 @@ bool ArmSimulator::loadProgram(const std::string& program_path) {
     return !programLines_.empty();
 }
 
+void ArmSimulator::loadProgramFromString(const std::string& program_content) {
+    programLines_.clear();
+    std::stringstream ss(program_content);
+    std::string line;
+    while (std::getline(ss, line)) {
+        programLines_.push_back(line);
+    }
+}
+
 // Helper to remove leading/trailing whitespace
 std::string trim(const std::string& str) {
   size_t first = str.find_first_not_of(" \t\n\r");
@@ -229,79 +238,181 @@ std::string trim(const std::string& str) {
 bool ArmSimulator::firstPass() {
     symbolTable_.clear();
     address_t current_address = 0;
-    bool in_text_section = true; // Assume starting in .text
+    std::string current_section = ".text";
+
+    auto get_section_start = [&](const std::string& section) -> address_t {
+        if (section == ".text") return memory_.get_text_segment_start();
+        if (section == ".data") return memory_.get_data_segment_start();
+        if (section == ".bss") return memory_.get_bss_segment_start();
+        return 0;
+    };
+
+    current_address = get_section_start(current_section);
 
     for (const auto& line : programLines_) {
         std::string trimmed_line = trim(line);
-        if (trimmed_line.empty() || trimmed_line[0] == ';') {
+        if (trimmed_line.empty() || trimmed_line[0] == '@' || trimmed_line[0] == ';') {
             continue;
         }
 
-        // Section directives
-        if (trimmed_line.find("AREA") != std::string::npos) {
-            if (trimmed_line.find("CODE") != std::string::npos) {
-                in_text_section = true;
-                current_address = memory_.get_text_segment_start();
-            } else if (trimmed_line.find("DATA") != std::string::npos) {
-                in_text_section = false;
-                current_address = memory_.get_data_segment_start();
-            }
-            continue;
-        }
-
-        // Labels
-        size_t colon_pos = trimmed_line.find(':');
-        if (colon_pos != std::string::npos) {
-            std::string label = trimmed_line.substr(0, colon_pos);
-            symbolTable_[label] = current_address;
-            
-            // If there's code after the label on the same line
-            std::string rest_of_line = trim(trimmed_line.substr(colon_pos + 1));
-            if (rest_of_line.empty()) {
+        // Handle section directives
+        if (trimmed_line[0] == '.') {
+            if (trimmed_line == ".text" || trimmed_line == ".data" || trimmed_line == ".bss") {
+                current_section = trimmed_line;
+                current_address = get_section_start(current_section);
                 continue;
             }
-            trimmed_line = rest_of_line;
+        }
+        if (trimmed_line.find("AREA") != std::string::npos) {
+            if (trimmed_line.find("CODE") != std::string::npos) {
+                current_section = ".text";
+            } else if (trimmed_line.find("DATA") != std::string::npos) {
+                current_section = ".data";
+            }
+            current_address = get_section_start(current_section);
+            continue;
         }
 
-        // For simplicity, assume all instructions are 4 bytes
-        if (in_text_section) {
-            current_address += 4;
+        // Handle labels and EQU
+        size_t colon_pos = trimmed_line.find(':');
+        if (colon_pos != std::string::npos) {
+            std::string label = trim(trimmed_line.substr(0, colon_pos));
+            symbolTable_[label] = current_address;
+            trimmed_line = trim(trimmed_line.substr(colon_pos + 1));
+            if (trimmed_line.empty()) continue;
         } else {
-            // Basic data directive handling (DCD)
-            if (trimmed_line.find("DCD") != std::string::npos) {
-                current_address += 4;
+            std::stringstream ss(trimmed_line);
+            std::string label, equ, value_str;
+            ss >> label >> equ >> value_str;
+            if (equ == "EQU") {
+                try {
+                    uint64_t value = std::stoull(value_str, nullptr, 0);
+                    symbolTable_[label] = value;
+                } catch (...) {}
+                continue;
             }
+        }
+
+        std::stringstream ss(trimmed_line);
+        std::string mnemonic;
+        ss >> mnemonic;
+
+        if (current_section == ".data") {
+            if (mnemonic == "DCD" || mnemonic == "DCW" || mnemonic == "DCB") {
+                std::string value_part;
+                std::getline(ss, value_part);
+                value_part = trim(value_part);
+
+                if (mnemonic == "DCB" && value_part.front() == '"' && value_part.back() == '"') {
+                    current_address += value_part.length() - 2;
+                } else {
+                    std::stringstream value_ss(value_part);
+                    std::string value_str;
+                    while (std::getline(value_ss, value_str, ',')) {
+                        if (mnemonic == "DCD") current_address += 4;
+                        else if (mnemonic == "DCW") current_address += 2;
+                        else if (mnemonic == "DCB") current_address += 1;
+                    }
+                }
+            }
+        } else if (current_section == ".bss") {
+            // BSS handling
+        } else { // .text section
+            current_address += 4; // Assume 4-byte instructions
         }
     }
     return true;
 }
 
 bool ArmSimulator::secondPass() {
-    // In a real assembler, the second pass would involve converting assembly to machine code.
-    // Here, we are converting assembly to IR, and this is now done in the second pass
-    // after the symbol table is built.
+    ir_program_.clear();
+    address_t current_address = 0;
+    std::string current_section = ".text";
+    ArmToIrConverter converter(architecture_, &symbolTable_);
 
-    std::stringstream whole_program;
-    for(const auto& line : programLines_) {
-        whole_program << line << '\n';
+    auto get_section_start = [&](const std::string& section) -> address_t {
+        if (section == ".text") return memory_.get_text_segment_start();
+        if (section == ".data") return memory_.get_data_segment_start();
+        return 0;
+    };
+    current_address = get_section_start(current_section);
+
+    for (const auto& line : programLines_) {
+        std::string trimmed_line = trim(line);
+        if (trimmed_line.empty() || trimmed_line[0] == '@' || trimmed_line[0] == ';') {
+            continue;
+        }
+
+        if (trimmed_line[0] == '.') {
+            if (trimmed_line == ".text" || trimmed_line == ".data" || trimmed_line == ".bss") {
+                current_section = trimmed_line;
+                current_address = get_section_start(current_section);
+                continue;
+            }
+        }
+        if (trimmed_line.find("AREA") != std::string::npos) {
+            if (trimmed_line.find("CODE") != std::string::npos) current_section = ".text";
+            else if (trimmed_line.find("DATA") != std::string::npos) current_section = ".data";
+            current_address = get_section_start(current_section);
+            continue;
+        }
+
+        size_t colon_pos = trimmed_line.find(':');
+        if (colon_pos != std::string::npos) {
+            trimmed_line = trim(trimmed_line.substr(colon_pos + 1));
+            if (trimmed_line.empty()) continue;
+        }
+
+        if (current_section == ".data") {
+            std::stringstream ss(trimmed_line);
+            std::string mnemonic;
+            ss >> mnemonic;
+            if (mnemonic == "DCD" || mnemonic == "DCW" || mnemonic == "DCB") {
+                std::string value_part;
+                std::getline(ss, value_part);
+                value_part = trim(value_part);
+
+                if (mnemonic == "DCB" && value_part.front() == '"' && value_part.back() == '"') {
+                    std::string str_val = value_part.substr(1, value_part.length() - 2);
+                    for (char c : str_val) {
+                        memory_.write_byte(current_address++, c);
+                    }
+                } else {
+                    std::stringstream value_ss(value_part);
+                    std::string value_str;
+                    while (std::getline(value_ss, value_str, ',')) {
+                        uint64_t value = std::stoull(trim(value_str), nullptr, 0);
+                        if (mnemonic == "DCD") {
+                            memory_.write_dword(current_address, value);
+                            current_address += 4;
+                        } else if (mnemonic == "DCW") {
+                            memory_.write_word(current_address, value);
+                            current_address += 2;
+                        } else if (mnemonic == "DCB") {
+                            memory_.write_byte(current_address, value);
+                            current_address += 1;
+                        }
+                    }
+                }
+            }
+        } else if (current_section == ".text") {
+            auto ir_instr = converter.parse_line(trimmed_line);
+            if (ir_instr) {
+                ir_instr->original_address = current_address;
+                ir_program_.push_back(std::move(ir_instr));
+            }
+            current_address += 4; // Assuming fixed instruction size
+        }
     }
 
-    ArmToIrConverter converter(architecture_, &symbolTable_);
-    ir_program_ = converter.convert(whole_program.str());
-
-    // Set the initial program counter (PC) to the address of the entry point label.
     auto it = symbolTable_.find(entryPointLabel_);
     if (it != symbolTable_.end()) {
         register_map_->set32(get_instruction_pointer_name(), it->second);
     } else {
-        db_manager_.log(session_id_, "Entry point label '" + entryPointLabel_ + "' not found. Defaulting to start of text segment.", "ERROR", 0, __FILE__, __LINE__);
         register_map_->set32(get_instruction_pointer_name(), memory_.get_text_segment_start());
     }
 
-    program_decoder_ = std::make_unique<ProgramDecoder>(memory_);
-
     if (ui_manager_) {
-        ui_manager_->setProgramDecoder(program_decoder_.get());
         ui_manager_->setSymbolTable(&symbolTable_);
     }
 
