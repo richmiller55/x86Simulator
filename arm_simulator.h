@@ -13,6 +13,9 @@
 #include <vector>
 #include "i_database_manager.h"
 #include "arm_ui_manager.h"
+#include "alu.h"
+#include "fpu.h"
+#include "vpu.h"
 
 /**
  * @class ArmSimulator
@@ -28,6 +31,10 @@ public:
     void loadProgramFromString(const std::string& program_content);
     bool firstPass() override;
     bool secondPass() override;
+
+    void accept(IRVisitor& visitor, const IRInstruction& instr) override;
+    void execute_ir_instruction(const IRInstruction& ir_instr);
+
 
     // --- ISimulator Interface Implementation ---
     IRegisterMap& getRegisterMap() override { return *register_map_; }
@@ -52,9 +59,7 @@ public:
     bool get_CF() const override;
     bool get_OF() const override;
 
-    void accept(IRVisitor& visitor, const IRInstruction& instr) override;
 
-    void execute_ir_instruction(const IRInstruction& ir_instr) override;
     ProgramDecoder* getProgramDecoder() override;
 
     void set_PF(bool value) override;
@@ -77,6 +82,9 @@ private:
     int session_id_;
     bool headless_;
     std::unique_ptr<ArmUIManager> ui_manager_;
+    std::unique_ptr<ALU> alu_;
+    std::unique_ptr<FPU> fpu_;
+    std::unique_ptr<VPU> vpu_;
     std::map<std::string, address_t> symbolTable_;
     std::vector<std::string> programLines_;
     std::string entryPointLabel_ = "_start";

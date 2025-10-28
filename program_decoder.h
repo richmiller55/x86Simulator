@@ -12,6 +12,7 @@ class ProgramDecoder {
 public:
     ProgramDecoder(const Memory& memory);
     void decode();
+    void add_instruction(std::shared_ptr<DecodedInstruction> instr);
     const std::vector<std::unique_ptr<DecodedInstruction>>& getDecodedProgram() const;
     const std::map<address_t, size_t>& getAddressToIndexMap() const;
 

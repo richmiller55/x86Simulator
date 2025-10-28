@@ -160,6 +160,26 @@ IRMemoryOperand ArmToIrConverter::parse_memory_operand(const std::string& mem_st
     return mem_op;
 }
 
+static FunctionalUnitType get_fu_type_for_opcode(IROpcode opcode) {
+    switch (opcode) {
+        case IROpcode::FloatAddD:
+        case IROpcode::FloatSubD:
+        case IROpcode::FloatMulD:
+        case IROpcode::FloatDivD:
+        case IROpcode::FloatSqrtD:
+        case IROpcode::FloatCmpD:
+        case IROpcode::FloatAddS:
+        case IROpcode::FloatSubS:
+        case IROpcode::FloatMulS:
+        case IROpcode::FloatDivS:
+        case IROpcode::FloatSqrtS:
+        case IROpcode::FloatCmpS:
+            return FunctionalUnitType::FPU;
+        default:
+            return FunctionalUnitType::ALU;
+    }
+}
+
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_data_processing(const std::string& mnemonic, const std::vector<std::string>& operands) {
     IROpcode opcode;
     if (mnemonic == "mov" || mnemonic == "movw") opcode = IROpcode::Move;
@@ -184,12 +204,14 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_data_processing(const
         ir_operands.push_back(parse_operand(op_str));
     }
 
+    FunctionalUnitType fu_type = get_fu_type_for_opcode(opcode);
+
     if (mnemonic == "rsb" || mnemonic == "rsc") {
         auto op = (mnemonic == "rsb") ? IROpcode::Sub : IROpcode::SubC;
-        return std::make_unique<IRInstruction>(op, std::vector<IROperand>{ir_operands[0], ir_operands[2], ir_operands[1]});
+        return std::make_unique<IRInstruction>(op, std::vector<IROperand>{ir_operands[0], ir_operands[2], ir_operands[1]}, fu_type);
     }
 
-    return std::make_unique<IRInstruction>(opcode, std::move(ir_operands));
+    return std::make_unique<IRInstruction>(opcode, std::move(ir_operands), fu_type);
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_load_store(const std::string& mnemonic, const std::vector<std::string>& operands) {
@@ -199,20 +221,23 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_load_store(const std:
     IROperand op1 = parse_operand(operands[0]);
     IROperand op2 = parse_operand(operands[1]);
 
+    FunctionalUnitType fu_type = get_fu_type_for_opcode(opcode);
+
     if (opcode == IROpcode::Store) {
-        return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{op2, op1});
+        return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{op2, op1}, fu_type);
     } else {
-        return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{op1, op2});
+        return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{op1, op2}, fu_type);
     }
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_branch(const std::string& mnemonic, const std::vector<std::string>& operands) {
     if (operands.empty()) throw std::runtime_error("Missing operand for branch: " + mnemonic);
     IROperand target = parse_operand(operands[0]);
-    if (mnemonic == "b") return std::make_unique<IRInstruction>(IROpcode::Jump, std::vector<IROperand>{target});
-    if (mnemonic == "bl") return std::make_unique<IRInstruction>(IROpcode::Call, std::vector<IROperand>{target});
-    if (mnemonic == "bx") return std::make_unique<IRInstruction>(IROpcode::Jump, std::vector<IROperand>{target});
-    if (mnemonic == "blx") return std::make_unique<IRInstruction>(IROpcode::Call, std::vector<IROperand>{target});
+    FunctionalUnitType fu_type = FunctionalUnitType::ALU;
+    if (mnemonic == "b") return std::make_unique<IRInstruction>(IROpcode::Jump, std::vector<IROperand>{target}, fu_type);
+    if (mnemonic == "bl") return std::make_unique<IRInstruction>(IROpcode::Call, std::vector<IROperand>{target}, fu_type);
+    if (mnemonic == "bx") return std::make_unique<IRInstruction>(IROpcode::Jump, std::vector<IROperand>{target}, fu_type);
+    if (mnemonic == "blx") return std::make_unique<IRInstruction>(IROpcode::Call, std::vector<IROperand>{target}, fu_type);
 
     std::string cond_str = mnemonic.substr(1);
     static const std::map<std::string, IRConditionCode> cond_map = {
@@ -227,7 +252,7 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_branch(const std::str
     };
     auto it = cond_map.find(cond_str);
     if (it != cond_map.end()) {
-        return std::make_unique<IRInstruction>(IROpcode::Branch, std::vector<IROperand>{target, it->second});
+        return std::make_unique<IRInstruction>(IROpcode::Branch, std::vector<IROperand>{target, it->second}, fu_type);
     }
     throw std::runtime_error("Unsupported branch: " + mnemonic);
 }
@@ -236,31 +261,31 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_compare_and_branch(co
     if (operands.size() != 2) throw std::runtime_error("Invalid operands for " + mnemonic);
     IROperand reg = parse_operand(operands[0]);
     IROperand label = parse_operand(operands[1]);
-    return std::make_unique<IRInstruction>(IROpcode::CompareAndBranchIfNotZero, std::vector<IROperand>{reg, label});
+    return std::make_unique<IRInstruction>(IROpcode::CompareAndBranchIfNotZero, std::vector<IROperand>{reg, label}, FunctionalUnitType::ALU);
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_push_pop(const std::string& mnemonic, const std::vector<std::string>& operands) {
     if (operands.size() != 1) throw std::runtime_error("Only single-register push/pop supported.");
     IROpcode opcode = (mnemonic == "push") ? IROpcode::Push : IROpcode::Pop;
-    return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{parse_operand(operands[0])});
+    return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{parse_operand(operands[0])}, FunctionalUnitType::ALU);
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_swi(const std::string& mnemonic, const std::vector<std::string>& operands) {
     if (operands.empty()) throw std::runtime_error("Missing operand for SWI");
-    return std::make_unique<IRInstruction>(IROpcode::Syscall, std::vector<IROperand>{parse_operand(operands[0])});
+    return std::make_unique<IRInstruction>(IROpcode::Syscall, std::vector<IROperand>{parse_operand(operands[0])}, FunctionalUnitType::ALU);
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_swap(const std::string& mnemonic, const std::vector<std::string>& operands) {
     if (operands.size() != 3) throw std::runtime_error("Invalid operands for SWP");
-    return std::make_unique<IRInstruction>(IROpcode::Swap, std::vector<IROperand>{parse_operand(operands[0]), parse_operand(operands[1]), parse_operand(operands[2])});
+    return std::make_unique<IRInstruction>(IROpcode::Swap, std::vector<IROperand>{parse_operand(operands[0]), parse_operand(operands[1]), parse_operand(operands[2])}, FunctionalUnitType::ALU);
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_mrs_msr(const std::string& mnemonic, const std::vector<std::string>& operands) {
     if (operands.size() != 2) throw std::runtime_error("Invalid operands for " + mnemonic);
     if (mnemonic == "mrs") {
-        return std::make_unique<IRInstruction>(IROpcode::MoveFromSystemRegister, std::vector<IROperand>{parse_operand(operands[0]), parse_operand(operands[1])});
+        return std::make_unique<IRInstruction>(IROpcode::MoveFromSystemRegister, std::vector<IROperand>{parse_operand(operands[0]), parse_operand(operands[1])}, FunctionalUnitType::ALU);
     } else {
-        return std::make_unique<IRInstruction>(IROpcode::MoveToSystemRegister, std::vector<IROperand>{parse_operand(operands[0]), parse_operand(operands[1])});
+        return std::make_unique<IRInstruction>(IROpcode::MoveToSystemRegister, std::vector<IROperand>{parse_operand(operands[0]), parse_operand(operands[1])}, FunctionalUnitType::ALU);
     }
 }
 
@@ -271,7 +296,7 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_special(const std::st
     else if (mnemonic == "wfe") opcode = IROpcode::WaitForEvent;
     else if (mnemonic == "sev") opcode = IROpcode::SendEvent;
     else return nullptr;
-    return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{});
+    return std::make_unique<IRInstruction>(opcode, std::vector<IROperand>{}, FunctionalUnitType::ALU);
 }
 
 std::unique_ptr<IRInstruction> ArmToIrConverter::translate_vfp_instruction(const std::string& mnemonic, const std::vector<std::string>& operands) {
@@ -297,5 +322,5 @@ std::unique_ptr<IRInstruction> ArmToIrConverter::translate_vfp_instruction(const
         ir_operands.push_back(parse_operand(op_str));
     }
 
-    return std::make_unique<IRInstruction>(opcode, std::move(ir_operands));
+    return std::make_unique<IRInstruction>(opcode, std::move(ir_operands), FunctionalUnitType::FPU);
 }

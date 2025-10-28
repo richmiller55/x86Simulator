@@ -29,16 +29,27 @@ LIB_SRCS = \
 	decoder.cpp \
 	CodeGenerator.cpp \
 	instruction_describer.cpp \
-	INTEL_helpers.cpp \
 	ARM_helpers.cpp \
-	ir_executor_helpers.cpp \
 	pipeline.cpp \
+	pipelined_instruction.cpp \
+	fetch_stage.cpp \
+	decode_stage.cpp \
+	execute_stage.cpp \
+	memory_stage.cpp \
+	write_back_stage.cpp \
+	alu.cpp \
+	fpu.cpp \
+	vpu.cpp \
 	program_decoder.cpp \
 	formatting_utils.cpp \
 	architecture.cpp \
 	x86_to_ir.cpp \
 	arm_to_ir.cpp \
-	arm_simulator.cpp
+	arm_simulator.cpp \
+	ir.cpp \
+	scoreboard.cpp \
+	score_counter.cpp \
+	execution_helpers.cpp
 
 # Define object files
 LIB_OBJS = $(LIB_SRCS:.cpp=.o)
@@ -66,7 +77,9 @@ $(TARGET): $(MAIN_OBJ) $(LIB_OBJS)
 
 # --- Test Targets ---
 TEST_SRCS = \
+	tests/vpu_test.cpp \
 	tests/decoder_test.cpp \
+	tests/alu_test.cpp \
 	tests/formatting_utils_test.cpp \
 	tests/instruction_describer_test.cpp \
 	tests/memory_test.cpp \
@@ -75,7 +88,6 @@ TEST_SRCS = \
 	tests/register_map_test.cpp \
 	tests/arm_register_map_test.cpp \
 	tests/rflags_test.cpp \
-	tests/simulator_core_test.cpp \
 	tests/system_bus_test.cpp \
 	tests/ir_translation_test.cpp \
 	tests/arm_ir_translation_test.cpp \
@@ -84,7 +96,6 @@ TEST_SRCS = \
 	tests/file_system_device_test.cpp \
 	tests/parser_utils_test.cpp \
 	tests/simulator_integration_test.cpp \
-	tests/arm_ui_manager_test.cpp \
 	tests/arm_to_ir_converter_test.cpp \
 	tests/arm_simulator_ui_test.cpp \
 	tests/arm_simulator_test.cpp \

@@ -1,22 +1,22 @@
 #ifndef PIPELINE_H
 #define PIPELINE_H
 
-#include "ir.h"
-#include "instruction_state_enums.h"
+#include "pipelined_instruction.h"
+#include "latch.h"
+#include "score_counter.h"
+#include "scoreboard.h"
 #include <deque>
 #include <memory>
+#include <vector>
 
 // Forward declarations
 class ISimulator;
-
-/**
- * @brief Represents an instruction as it moves through the pipeline, holding the
- *        IR representation and its current execution state.
- */
-struct PipelinedInstruction {
-    IRInstruction ir_instruction;
-    InstructionState state;
-};
+class IStage;
+class FetchStage;
+class DecodeStage;
+class ExecuteStage;
+class MemoryStage;
+class WriteBackStage;
 
 /**
  * @brief Manages the instruction pipeline, orchestrating the fetch, decode,
@@ -25,6 +25,7 @@ struct PipelinedInstruction {
 class Pipeline {
 public:
     explicit Pipeline(ISimulator& simulator);
+    ~Pipeline();
 
     /**
      * @brief Advances the entire pipeline by one clock cycle.
@@ -37,22 +38,36 @@ public:
      */
     void flush();
 
-    /**
-     * @brief Returns a constant reference to the current state of the pipeline,
-     *        primarily for UI display and debugging.
-     * @return A deque of instructions currently in the pipeline.
-     */
-    const std::deque<PipelinedInstruction>& get_pipeline_state() const;
+    void retire_instruction(const PipelinedInstruction& instr);
+
+    FetchStage& get_fetch_stage();
+
+    const Latch<PipelinedInstruction>& get_if_id_latch() const { return if_id_latch_; }
+    const Latch<PipelinedInstruction>& get_id_ex_latch() const { return id_ex_latch_; }
+    const Latch<PipelinedInstruction>& get_ex_mem_latch() const { return ex_mem_latch_; }
+    const Latch<PipelinedInstruction>& get_mem_wb_latch() const { return mem_wb_latch_; }
+
+    Scoreboard& get_scoreboard() { return scoreboard_; }
+
+    std::deque<PipelinedInstruction> get_pipeline_state() const;
 
 private:
-    void do_write_back_stage();
-    void do_memory_access_stage();
-    void do_execute_stage();
-    void do_decode_stage();
-    void do_fetch_stage();
+    friend class FetchStage;
+    friend class DecodeStage;
+    friend class ExecuteStage;
+    friend class MemoryStage;
+    friend class WriteBackStage;
 
     ISimulator& simulator_;
-    std::deque<PipelinedInstruction> pipeline_stages_;
+    ScoreCounter score_counter_;
+    Scoreboard scoreboard_;
+    std::vector<std::unique_ptr<IStage>> stages_;
+    std::deque<PipelinedInstruction> retired_instructions_;
+    
+    Latch<PipelinedInstruction> if_id_latch_;
+    Latch<PipelinedInstruction> id_ex_latch_;
+    Latch<PipelinedInstruction> ex_mem_latch_;
+    Latch<PipelinedInstruction> mem_wb_latch_;
 };
 
 #endif // PIPELINE_H
