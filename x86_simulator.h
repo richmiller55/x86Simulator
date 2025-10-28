@@ -34,6 +34,10 @@
 #include "ir.h"
 #include "pipeline.h"
 #include "program_decoder.h"
+#include "x86_to_ir.h"
+#include "alu.h"
+#include "fpu.h"
+#include "vpu.h"
 
 #include "i_simulator.h"
 
@@ -76,17 +80,17 @@ public:
   
   bool executeInstruction(const DecodedInstruction& decoded_instr);
   void runSingleInstruction();
-  bool isRunning();
   void runProgram() override;
   bool loadProgram(const std::string& program_path) override;
   bool firstPass() override;
   bool secondPass() override;
 
-  void accept(IRVisitor& visitor, const IRInstruction& instr) override;
-  const char* get_stack_pointer_name() const override;
-  const char* get_instruction_pointer_name() const override;
+    void accept(IRVisitor& visitor, const IRInstruction& instr) override;
 
-  void execute_ir_instruction(const IRInstruction& ir_instr) override;
+    void execute_ir_instruction(const IRInstruction& ir_instr);
+
+    const char* get_stack_pointer_name() const override;
+    const char* get_instruction_pointer_name() const override;
   void dumpTextSegment(const std::string& filename);
   void dumpMemoryRange(const std::string& filename, address_t start_addr, size_t size);
   void dumpDataSegment(const std::string& filename);
@@ -100,6 +104,8 @@ public:
   IDatabaseManager& getDatabaseManager() override { return db_manager_; }
   const Architecture& get_architecture() const override { return architecture_; }
   ProgramDecoder* getProgramDecoder() override { return program_decoder_.get(); }
+  void set_program_decoder(std::unique_ptr<ProgramDecoder> decoder) { program_decoder_ = std::move(decoder); }
+  Pipeline& get_pipeline() { return *pipeline_; }
   int get_session_id() const override { return session_id_; }
 
   bool get_CF() const override;
@@ -149,6 +155,9 @@ private:
   std::unique_ptr<UIManager> ui_;
   std::unique_ptr<Pipeline> pipeline_;
   std::unique_ptr<ProgramDecoder> program_decoder_;
+  std::unique_ptr<ALU> alu_;
+  std::unique_ptr<FPU> fpu_;
+  std::unique_ptr<VPU> vpu_;
   std::map<std::string, address_t> symbolTable_;
   std::vector<std::pair<uint16_t, uint64_t>> out_log_;
   std::vector<std::string> programLines_; // raw

@@ -1,4 +1,5 @@
 #include "architecture.h"
+#include <iostream>
 
 bool Architecture::is_register(const std::string& name) const {
     for (const auto& [type, file_def] : register_files) {
@@ -27,6 +28,7 @@ uint32_t Architecture::get_register_size_bits(const std::string& name) const {
 }
 
 Architecture create_x86_architecture() {
+    std::cout << "Creating x86 architecture..." << std::endl;
     Architecture arch;
     arch.isa = ISA::X86;
     arch.pointer_size_bits = 64;

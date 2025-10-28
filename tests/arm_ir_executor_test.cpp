@@ -31,7 +31,7 @@ TEST_F(ArmIRExecutorTest, HandleIrAdc) {
         std::string("r0"),
         std::string("r1"),
         std::string("r2")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(adc_instr);
 
@@ -48,7 +48,7 @@ TEST_F(ArmIRExecutorTest, HandleIrSbc) {
         std::string("r0"),
         std::string("r1"),
         std::string("r2")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(sbc_instr);
 
@@ -65,7 +65,7 @@ TEST_F(ArmIRExecutorTest, HandleIrRsc) {
         std::string("r0"),
         std::string("r2"),
         std::string("r1")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(rsc_instr);
 
@@ -80,7 +80,7 @@ TEST_F(ArmIRExecutorTest, HandleIrTst) {
     IRInstruction tst_instr(IROpcode::Tst, {
         std::string("r0"),
         std::string("r1")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(tst_instr);
 
@@ -96,7 +96,7 @@ TEST_F(ArmIRExecutorTest, HandleIrTeq) {
     IRInstruction teq_instr(IROpcode::Teq, {
         std::string("r0"),
         std::string("r1")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(teq_instr);
 
@@ -112,7 +112,7 @@ TEST_F(ArmIRExecutorTest, HandleIrCmn) {
     IRInstruction cmn_instr(IROpcode::Cmn, {
         std::string("r0"),
         std::string("r1")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(cmn_instr);
 
@@ -127,7 +127,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMvn) {
     IRInstruction mvn_instr(IROpcode::MoveNot, {
         std::string("r0"),
         std::string("r1")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(mvn_instr);
 
@@ -143,7 +143,7 @@ TEST_F(ArmIRExecutorTest, HandleIrBic) {
         std::string("r0"),
         std::string("r1"),
         std::string("r2")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(bic_instr);
 
@@ -159,7 +159,7 @@ TEST_F(ArmIRExecutorTest, HandleIrQadd) {
         std::string("r0"),
         std::string("r1"),
         std::string("r2")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(qadd_instr);
 
@@ -175,7 +175,7 @@ TEST_F(ArmIRExecutorTest, HandleIrQsub) {
         std::string("r0"),
         std::string("r1"),
         std::string("r2")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(qsub_instr);
 
@@ -191,7 +191,7 @@ TEST_F(ArmIRExecutorTest, HandleIrCbnz_BranchTaken) {
     IRInstruction cbnz_instr(IROpcode::CompareAndBranchIfNotZero, {
         std::string("r1"),
         static_cast<uint64_t>(0x2000) // Target address
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(cbnz_instr);
 
@@ -207,7 +207,7 @@ TEST_F(ArmIRExecutorTest, HandleIrCbnz_BranchNotTaken) {
     IRInstruction cbnz_instr(IROpcode::CompareAndBranchIfNotZero, {
         std::string("r1"),
         static_cast<uint64_t>(0x2000) // Target address
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(cbnz_instr);
 
@@ -220,7 +220,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMovw) {
     IRInstruction movw_instr(IROpcode::Move, {
         std::string("r0"),
         static_cast<uint64_t>(0x1234) // Immediate value
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(movw_instr);
 
@@ -236,7 +236,7 @@ TEST_F(ArmIRExecutorTest, HandleIrDiv) {
         std::string("r0"),
         std::string("r1"),
         std::string("r2")
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(div_instr);
 
@@ -250,7 +250,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMrs) {
     IRInstruction mrs_instr(IROpcode::MoveFromSystemRegister, {
         std::string("r0"),      // r0
         std::string("cpsr")     // CPSR
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(mrs_instr);
 
@@ -268,7 +268,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMsr) {
     IRInstruction msr_instr(IROpcode::MoveToSystemRegister, {
         std::string("cpsr"),     // CPSR
         std::string("r1")       // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(msr_instr);
 
@@ -287,7 +287,7 @@ TEST_F(ArmIRExecutorTest, HandleIrRsb) {
         std::string("r0"), // r0
         std::string("r2"), // r2
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(rsb_instr);
 
@@ -303,7 +303,7 @@ TEST_F(ArmIRExecutorTest, HandleIrOrr) {
         std::string("r0"), // r0
         std::string("r1"), // r1
         std::string("r2")  // r2
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(orr_instr);
 
@@ -319,7 +319,7 @@ TEST_F(ArmIRExecutorTest, HandleIrEor) {
         std::string("r0"), // r0
         std::string("r1"), // r1
         std::string("r2")  // r2
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(eor_instr);
 
@@ -333,7 +333,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMovReg) {
     IRInstruction mov_instr(IROpcode::Move, {
         std::string("r0"), // r0
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(mov_instr);
 
@@ -348,7 +348,7 @@ TEST_F(ArmIRExecutorTest, HandleIrCmp) {
     IRInstruction cmp_instr(IROpcode::Cmp, {
         std::string("r1"), // r1
         std::string("r2")  // r2
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(cmp_instr);
 
@@ -371,7 +371,7 @@ TEST_F(ArmIRExecutorTest, HandleIrLdr) {
     IRInstruction ldr_instr(IROpcode::Load, {
         std::string("r0"), // r0
         mem_op
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(ldr_instr);
 
@@ -392,7 +392,7 @@ TEST_F(ArmIRExecutorTest, HandleIrStr) {
     IRInstruction str_instr(IROpcode::Store, {
         mem_op,
         std::string("r0") // r0
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(str_instr);
 
@@ -411,7 +411,7 @@ TEST_F(ArmIRExecutorTest, HandleIrVaddF32) {
         std::string("s0"), // s0
         std::string("s1"), // s1
         std::string("s2")  // s2
-    });
+    }, FunctionalUnitType::FPU);
 
     simulator.execute_ir_instruction(vadd_instr);
 
@@ -429,7 +429,7 @@ TEST_F(ArmIRExecutorTest, HandleIrQdadd) {
         std::string("r0"), // r0
         std::string("r1"), // r1
         std::string("r2")  // r2
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(qdadd_instr);
 
@@ -446,7 +446,7 @@ TEST_F(ArmIRExecutorTest, HandleIrQdsub) {
         std::string("r0"), // r0
         std::string("r1"), // r1
         std::string("r2")  // r2
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(qdsub_instr);
 
@@ -465,7 +465,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMla) {
         std::string("r1"), // rm
         std::string("r2"), // rs
         std::string("r3")  // rn
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(mla_instr);
 
@@ -484,7 +484,7 @@ TEST_F(ArmIRExecutorTest, HandleIrMls) {
         std::string("r1"), // rm
         std::string("r2"), // rs
         std::string("r3")  // rn
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(mls_instr);
 
@@ -502,7 +502,7 @@ TEST_F(ArmIRExecutorTest, HandleIrUmull) {
         std::string("r1"), // rdhi
         std::string("r2"), // rm
         std::string("r3")  // rs
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(umull_instr);
 
@@ -521,7 +521,7 @@ TEST_F(ArmIRExecutorTest, HandleIrSmull) {
         std::string("r1"), // rdhi
         std::string("r2"), // rm
         std::string("r3")  // rs
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(smull_instr);
 
@@ -542,7 +542,7 @@ TEST_F(ArmIRExecutorTest, HandleIrUmlal) {
         std::string("r1"), // rdhi
         std::string("r2"), // rm
         std::string("r3")  // rs
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(umlal_instr);
 
@@ -563,7 +563,7 @@ TEST_F(ArmIRExecutorTest, HandleIrSmlal) {
         std::string("r1"), // rdhi
         std::string("r2"), // rm
         std::string("r3")  // rs
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(smlal_instr);
 
@@ -579,7 +579,7 @@ TEST_F(ArmIRExecutorTest, HandleIrClz) {
     IRInstruction clz_instr(IROpcode::CountLeadingZeros, {
         std::string("r0"), // r0
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(clz_instr);
 
@@ -593,7 +593,7 @@ TEST_F(ArmIRExecutorTest, HandleIrRbit) {
     IRInstruction rbit_instr(IROpcode::ReverseBits, {
         std::string("r0"), // r0
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(rbit_instr);
 
@@ -607,7 +607,7 @@ TEST_F(ArmIRExecutorTest, HandleIrRev) {
     IRInstruction rev_instr(IROpcode::ReverseBytes, {
         std::string("r0"), // r0
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(rev_instr);
 
@@ -621,7 +621,7 @@ TEST_F(ArmIRExecutorTest, HandleIrRev16) {
     IRInstruction rev16_instr(IROpcode::ReverseBytes16, {
         std::string("r0"), // r0
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(rev16_instr);
 
@@ -635,7 +635,7 @@ TEST_F(ArmIRExecutorTest, HandleIrRevsh) {
     IRInstruction revsh_instr(IROpcode::ReverseBytesSignedHalfword, {
         std::string("r0"), // r0
         std::string("r1")  // r1
-    });
+    }, FunctionalUnitType::ALU);
 
     simulator.execute_ir_instruction(revsh_instr);
     EXPECT_EQ(static_cast<int32_t>(regs.get32("r0")), static_cast<int32_t>(0xFFFFF012));
@@ -653,7 +653,7 @@ TEST_F(ArmIRExecutorTest, HandleIrVsubF32) {
         std::string("s0"), // s0
         std::string("s1"), // s1
         std::string("s2")  // s2
-    });
+    }, FunctionalUnitType::FPU);
 
     simulator.execute_ir_instruction(vsub_instr);
     uint32_t result_bits = regs.get32("s0");
@@ -673,7 +673,7 @@ TEST_F(ArmIRExecutorTest, HandleIrVmulF32) {
         std::string("s0"), // s0
         std::string("s1"), // s1
         std::string("s2")  // s2
-    });
+    }, FunctionalUnitType::FPU);
 
     simulator.execute_ir_instruction(vmul_instr);
     uint32_t result_bits = regs.get32("s0");
@@ -693,7 +693,7 @@ TEST_F(ArmIRExecutorTest, HandleIrVdivF32) {
         std::string("s0"), // s0
         std::string("s1"), // s1
         std::string("s2")  // s2
-    });
+    }, FunctionalUnitType::FPU);
 
     simulator.execute_ir_instruction(vdiv_instr);
     uint32_t result_bits = regs.get32("s0");
@@ -710,7 +710,7 @@ TEST_F(ArmIRExecutorTest, HandleIrVsqrtF32) {
     IRInstruction vsqrt_instr(IROpcode::FloatSqrtS, {
         std::string("s0"), // s0
         std::string("s1")  // s1
-    });
+    }, FunctionalUnitType::FPU);
 
     simulator.execute_ir_instruction(vsqrt_instr);
     uint32_t result_bits = regs.get32("s0");

@@ -8,6 +8,12 @@
 #include <optional>
 #include <memory>
 
+enum class FunctionalUnitType {
+    ALU, // Integer Arithmetic Logic Unit
+    FPU, // Floating-Point Unit
+    VPU  // Vector Processing Unit
+};
+
 enum class IROpcode {
     Move,   
     Load,   
@@ -111,7 +117,8 @@ enum class IROpcode {
     IntToFloatS, 
     IntToFloatD, 
     FloatToIntS, 
-    FloatToIntD, 
+    FloatToIntD,
+    Bubble 
 };
 
 enum class IRConditionCode {
@@ -158,12 +165,19 @@ using IROperand = std::variant<
 
 class IRInstruction {
 public:
+    IRInstruction();
     // TODO: Add original_instruction to the constructor
     IRInstruction(IROpcode op, std::vector<IROperand> ops = {})
         : opcode(op), operands(std::move(ops)) {}
 
+    IRInstruction(IROpcode op, std::vector<IROperand>&& ops, FunctionalUnitType fu_type)
+        : opcode(op), operands(std::move(ops)), functional_unit_type(fu_type) {}
+
     IROpcode opcode;
     std::vector<IROperand> operands;
+    FunctionalUnitType functional_unit_type; // New field
+
+    // Metadata for pipeline simulation and debugging
     std::string original_instruction;
 
     uint64_t original_address = 0;

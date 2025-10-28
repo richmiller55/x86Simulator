@@ -3,6 +3,10 @@
 #include "program_decoder.h"
 #include "ir_executor_helpers.h"
 #include "generic_register_map.h"
+#include "alu.h"
+#include "fpu.h"
+#include "vpu.h"
+#include "pipelined_instruction.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -39,98 +43,7 @@ std::string ir_op_to_string(IROpcode opcode) {
     }
 }
 
-// A visitor for executing ARM IR instructions by dispatching to generic handlers.
-class ArmIRVisitor : public IRVisitor {
-public:
-    void visit(const IRInstruction& instr, ISimulator& simulator) override {
-        switch (instr.opcode) {
-            case IROpcode::Move:    handle_ir_move(instr, simulator); break;
-            case IROpcode::Load:    handle_ir_load(instr, simulator); break;
-            case IROpcode::Store:   handle_ir_store(instr, simulator); break;
-            case IROpcode::Add:     handle_ir_add(instr, simulator); break;
-            case IROpcode::Sub:     handle_ir_sub(instr, simulator); break;
-            case IROpcode::AddC:    handle_ir_addc(instr, simulator); break;
-            case IROpcode::SubC:    handle_ir_subc(instr, simulator); break;
-            case IROpcode::Mul:     handle_ir_mul(instr, simulator); break;
-            case IROpcode::IMul:    handle_ir_imul(instr, simulator); break;
-            case IROpcode::Div:     handle_ir_div(instr, simulator); break;
-            case IROpcode::And:     handle_ir_and(instr, simulator); break;
-            case IROpcode::Or:      handle_ir_or(instr, simulator); break;
-            case IROpcode::Xor:     handle_ir_xor(instr, simulator); break;
-            case IROpcode::Not:     handle_ir_not(instr, simulator); break;
-            case IROpcode::Shl:     handle_ir_shl(instr, simulator); break;
-            case IROpcode::Shr:     handle_ir_shr(instr, simulator); break;
-            case IROpcode::Sar:     handle_ir_sar(instr, simulator); break;
-            case IROpcode::Jump:    handle_ir_jump(instr, simulator); break;
-            case IROpcode::Branch:  handle_ir_branch(instr, simulator); break;
-            case IROpcode::Call:    handle_ir_call(instr, simulator); break;
-            case IROpcode::Ret:     handle_ir_ret(instr, simulator); break;
-            case IROpcode::Push:    handle_ir_push(instr, simulator); break;
-            case IROpcode::Pop:     handle_ir_pop(instr, simulator); break;
-            case IROpcode::Inc:     handle_ir_inc(instr, simulator); break;
-            case IROpcode::Dec:     handle_ir_dec(instr, simulator); break;
-            case IROpcode::Cmp:     handle_ir_cmp(instr, simulator); break;
-            case IROpcode::Tst:     handle_ir_tst(instr, simulator); break;
-            case IROpcode::Teq:     handle_ir_teq(instr, simulator); break;
-            case IROpcode::Cmn:     handle_ir_cmn(instr, simulator); break;
-            case IROpcode::MoveNot: handle_ir_movenot(instr, simulator); break;
-            case IROpcode::AndNot:  handle_ir_andnot(instr, simulator); break;
-            case IROpcode::Nop:     handle_ir_nop(instr, simulator); break;
-            case IROpcode::Swap:    handle_ir_swap(instr, simulator); break;
-            case IROpcode::MoveToSystemRegister: handle_ir_move_to_system_register(instr, simulator); break;
-            case IROpcode::MoveFromSystemRegister: handle_ir_move_from_system_register(instr, simulator); break;
-            case IROpcode::CountLeadingZeros: handle_ir_count_leading_zeros(instr, simulator); break;
-            case IROpcode::ReverseBits: handle_ir_reverse_bits(instr, simulator); break;
-            case IROpcode::ReverseBytes: handle_ir_reverse_bytes(instr, simulator); break;
-            case IROpcode::ReverseBytes16: handle_ir_reverse_bytes16(instr, simulator); break;
-            case IROpcode::ReverseBytesSignedHalfword: handle_ir_reverse_bytes_signed_halfword(instr, simulator); break;
-            case IROpcode::SaturatingAdd: handle_ir_saturating_add(instr, simulator); break;
-            case IROpcode::SaturatingSub: handle_ir_saturating_sub(instr, simulator); break;
-            case IROpcode::SaturatingDoubleAdd: handle_ir_saturating_double_add(instr, simulator); break;
-            case IROpcode::SaturatingDoubleSub: handle_ir_saturating_double_sub(instr, simulator); break;
-            case IROpcode::MultiplyAccumulate: handle_ir_multiply_accumulate(instr, simulator); break;
-            case IROpcode::MultiplySubtract: handle_ir_multiply_subtract(instr, simulator); break;
-            case IROpcode::UnsignedMultiplyLong: handle_ir_unsigned_multiply_long(instr, simulator); break;
-            case IROpcode::SignedMultiplyLong: handle_ir_signed_multiply_long(instr, simulator); break;
-            case IROpcode::UnsignedMultiplyAccumulateLong: handle_ir_unsigned_multiply_accumulate_long(instr, simulator); break;
-            case IROpcode::SignedMultiplyAccumulateLong: handle_ir_signed_multiply_accumulate_long(instr, simulator); break;
-            case IROpcode::Breakpoint: handle_ir_breakpoint(instr, simulator); break;
-            case IROpcode::WaitForInterrupt: handle_ir_wait_for_interrupt(instr, simulator); break;
-            case IROpcode::WaitForEvent: handle_ir_wait_for_event(instr, simulator); break;
-            case IROpcode::SendEvent: handle_ir_send_event(instr, simulator); break;
-            case IROpcode::CompareAndBranchIfNotZero: handle_ir_compare_and_branch_if_not_zero(instr, simulator); break;
-            case IROpcode::Syscall: handle_ir_syscall(instr, simulator); break;
-            case IROpcode::FloatAddS: handle_ir_float_add_s(instr, simulator); break;
-            case IROpcode::FloatSubS: handle_ir_float_sub_s(instr, simulator); break;
-            case IROpcode::FloatMulS: handle_ir_float_mul_s(instr, simulator); break;
-            case IROpcode::FloatDivS: handle_ir_float_div_s(instr, simulator); break;
-            case IROpcode::FloatSqrtS: handle_ir_float_sqrt_s(instr, simulator); break;
-            case IROpcode::FloatAddD: handle_ir_float_add_d(instr, simulator); break;
-            case IROpcode::FloatSubD: handle_ir_float_sub_d(instr, simulator); break;
-            case IROpcode::FloatMulD: handle_ir_float_mul_d(instr, simulator); break;
-            case IROpcode::FloatDivD: handle_ir_float_div_d(instr, simulator); break;
-            case IROpcode::FloatSqrtD: handle_ir_float_sqrt_d(instr, simulator); break;
-            case IROpcode::FloatCmpS: handle_ir_float_cmp_s(instr, simulator); break;
-            case IROpcode::FloatCmpD: handle_ir_float_cmp_d(instr, simulator); break;
-            case IROpcode::FloatToS: handle_ir_float_to_s(instr, simulator); break;
-            case IROpcode::FloatToD: handle_ir_float_to_d(instr, simulator); break;
-            case IROpcode::IntToFloatS: handle_ir_int_to_float_s(instr, simulator); break;
-            case IROpcode::IntToFloatD: handle_ir_int_to_float_d(instr, simulator); break;
-            case IROpcode::FloatToIntS: handle_ir_float_to_int_s(instr, simulator); break;
-            case IROpcode::FloatToIntD: handle_ir_float_to_int_d(instr, simulator); break;
-            default:
-                simulator.getDatabaseManager().log(
-                    simulator.get_session_id(),
-                    "Unsupported IR Opcode in ArmIRVisitor: " + ir_op_to_string(instr.opcode),
-                    "WARNING",
-                    0,
-                    __FILE__,
-                    __LINE__
-                );
-                break;
-        }
-    }
-};
+
 
 ArmSimulator::ArmSimulator(IDatabaseManager& db_manager, Memory& memory, int session_id, bool headless)
     : db_manager_(db_manager),
@@ -139,6 +52,9 @@ ArmSimulator::ArmSimulator(IDatabaseManager& db_manager, Memory& memory, int ses
       register_map_(std::make_unique<GenericRegisterMap>(architecture_)),
       session_id_(session_id),
       headless_(headless) {
+    alu_ = std::make_unique<ALU>();
+    fpu_ = std::make_unique<FPU>();
+    vpu_ = std::make_unique<VPU>();
     if (!headless_) {
         ui_manager_ = std::make_unique<ArmUIManager>(memory_);
         ui_manager_->setRegisterMap(register_map_.get());
@@ -423,8 +339,19 @@ void ArmSimulator::runProgram() {
     if (headless_) {
         std::cout << "\n--- Starting ARM Simulation (Headless) ---" << std::endl;
         std::cout << "Executing " << ir_program_.size() << " IR instructions." << std::endl;
-        for (const auto& instr : ir_program_) {
-            execute_ir_instruction(*instr);
+        for (const auto& instr_ptr : ir_program_) {
+            PipelinedInstruction p_instr(*instr_ptr, InstructionState::Fetched);
+            switch (instr_ptr->functional_unit_type) {
+                case FunctionalUnitType::ALU:
+                    alu_->execute(p_instr, *this);
+                    break;
+                case FunctionalUnitType::FPU:
+                    fpu_->execute(p_instr, *this);
+                    break;
+                case FunctionalUnitType::VPU:
+                    vpu_->execute(p_instr, *this);
+                    break;
+            }
         }
         std::cout << "--- ARM Simulation Finished ---" << std::endl;
     } else {
@@ -438,12 +365,23 @@ void ArmSimulator::runProgram() {
             }
 
             const auto& instr = ir_program_[current_pc];
-            execute_ir_instruction(*instr);
+            PipelinedInstruction p_instr(*instr, InstructionState::Fetched);
+            switch (instr->functional_unit_type) {
+                case FunctionalUnitType::ALU:
+                    alu_->execute(p_instr, *this);
+                    break;
+                case FunctionalUnitType::FPU:
+                    fpu_->execute(p_instr, *this);
+                    break;
+                case FunctionalUnitType::VPU:
+                    vpu_->execute(p_instr, *this);
+                    break;
+            }
             
             // In a real scenario, the IP would be updated by branch/jump instructions.
             // For this linear execution model, we just increment it.
-            current_pc = register_map_->get32(ip_name);
-            if (current_pc == register_map_->get32(ip_name)) { // If IP wasn't changed by a jump
+            address_t next_pc = register_map_->get32(ip_name);
+            if (current_pc == next_pc) { // If IP wasn't changed by a jump
                  register_map_->set32(ip_name, current_pc + 1);
             }
             current_pc = register_map_->get32(ip_name);
@@ -451,14 +389,7 @@ void ArmSimulator::runProgram() {
     }
 }
 
-void ArmSimulator::accept(IRVisitor& visitor, const IRInstruction& instr) {
-    visitor.visit(instr, *this);
-}
 
-void ArmSimulator::execute_ir_instruction(const IRInstruction& ir_instr) {
-    ArmIRVisitor visitor;
-    accept(visitor, ir_instr);
-}
 
 ProgramDecoder* ArmSimulator::getProgramDecoder() {
     return program_decoder_.get();
@@ -476,5 +407,29 @@ void ArmSimulator::set_system_register(const std::string& name, uint64_t value) 
         register_map_->set32("cpsr", value);
     } else {
         throw std::runtime_error("Unknown ARM system register: " + name);
+    }
+}
+
+void ArmSimulator::accept(IRVisitor& visitor, const IRInstruction& instr) {
+    // This method is part of a deprecated visitor pattern and is no longer used.
+    // The new architecture uses direct calls to functional units.
+}
+
+void ArmSimulator::execute_ir_instruction(const IRInstruction& ir_instr) {
+    PipelinedInstruction p_instr(ir_instr, InstructionState::Executing);
+
+    switch (ir_instr.functional_unit_type) {
+        case FunctionalUnitType::ALU:
+            alu_->execute(p_instr, *this);
+            break;
+        case FunctionalUnitType::FPU:
+            fpu_->execute(p_instr, *this);
+            break;
+        case FunctionalUnitType::VPU:
+            vpu_->execute(p_instr, *this);
+            break;
+        default:
+            db_manager_.log(session_id_, "Unknown functional unit type for IR instruction", "ERROR", register_map_->get32(get_instruction_pointer_name()), __FILE__, __LINE__);
+            break;
     }
 }

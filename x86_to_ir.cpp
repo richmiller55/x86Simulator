@@ -31,6 +31,33 @@ IROperand translate_operand(const DecodedOperand& decoded_op, const Architecture
     }
 }
 
+static FunctionalUnitType get_fu_type_for_opcode(IROpcode opcode) {
+    switch (opcode) {
+        case IROpcode::PackedAddPS:
+        case IROpcode::PackedSubPS:
+        case IROpcode::PackedMulPS:
+        case IROpcode::PackedDivPS:
+        case IROpcode::PackedMaxPS:
+        case IROpcode::PackedMinPS:
+        case IROpcode::PackedSqrtPS:
+        case IROpcode::PackedReciprocalPS:
+        case IROpcode::PackedAnd:
+        case IROpcode::PackedAndNot:
+        case IROpcode::PackedOr:
+        case IROpcode::PackedXor:
+        case IROpcode::PackedMulLowI16:
+        case IROpcode::VectorMove:
+            return FunctionalUnitType::VPU;
+        case IROpcode::FloatAddS:
+        case IROpcode::FloatSubS:
+        case IROpcode::FloatMulS:
+        case IROpcode::FloatDivS:
+            return FunctionalUnitType::FPU;
+        default:
+            return FunctionalUnitType::ALU;
+    }
+}
+
 std::unique_ptr<IRInstruction> translate_to_ir(const DecodedInstruction& decoded_instr) {
     static Architecture x86_arch = create_x86_architecture();
 
@@ -211,7 +238,8 @@ std::unique_ptr<IRInstruction> translate_to_ir(const DecodedInstruction& decoded
         return nullptr; // Instruction not supported for translation
     }
 
-    auto ir_instr = std::make_unique<IRInstruction>(opcode, std::move(ops));
+    FunctionalUnitType fu_type = get_fu_type_for_opcode(opcode);
+    auto ir_instr = std::make_unique<IRInstruction>(opcode, std::move(ops), fu_type);
     ir_instr->original_address = decoded_instr.address;
     ir_instr->original_size = decoded_instr.length_in_bytes;
 

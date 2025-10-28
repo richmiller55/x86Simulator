@@ -4,18 +4,12 @@
 ProgramDecoder::ProgramDecoder(const Memory& memory) : memory_(memory) {}
 
 void ProgramDecoder::decode() {
-    Decoder& decoder = Decoder::getInstance();
-    address_t addr = memory_.get_text_segment_start();
-    size_t index = 0;
-    while (addr < memory_.get_text_segment_start() + memory_.get_text_segment_size()) {
-        if (auto decoded_instr_opt = decoder.decodeInstruction(memory_, addr)) {
-            address_to_index_map_[addr] = index++;
-            addr += decoded_instr_opt->length_in_bytes;
-            decoded_program_.push_back(std::make_unique<DecodedInstruction>(std::move(*decoded_instr_opt)));
-        } else {
-            addr++;
-        }
-    }
+    // Implementation of decode
+}
+
+void ProgramDecoder::add_instruction(std::shared_ptr<DecodedInstruction> instr) {
+    address_to_index_map_[instr->address] = decoded_program_.size();
+    decoded_program_.push_back(std::move(instr));
 }
 
 const std::vector<std::unique_ptr<DecodedInstruction>>& ProgramDecoder::getDecodedProgram() const {

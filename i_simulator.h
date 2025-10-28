@@ -49,7 +49,6 @@ public:
     virtual bool firstPass() = 0;
     virtual bool secondPass() = 0;
 
-    virtual void execute_ir_instruction(const IRInstruction& ir_instr) = 0;
 
     // --- Generic Component Getters ---
     virtual IRegisterMap& getRegisterMap() = 0;

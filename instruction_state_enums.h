@@ -10,7 +10,8 @@ enum class InstructionState {
     Writeback,  // WB: Result written back to a register
     Completed,  // Finished execution
     Stalled,    // Halted due to a hazard
-    Squashed    // Discarded (e.g., due to a mispredicted branch)
+    Squashed,    // Discarded (e.g., due to a mispredicted branch)
+    Bubble      // A no-op instruction in the pipeline
 };
 
 #endif // INSTRUCTION_STATE

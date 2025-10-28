@@ -89,9 +89,9 @@ void SystemBus::create_and_configure_simulator(const json& process_info, bool ui
             std::cerr << "Error: Second pass failed for program '" << program_path << "'" << std::endl;
             return;
         }
-        x86_sim->dumpTextSegment("text_segment.dump");
-        x86_sim->dumpDataSegment("data_segment.dump");
-        x86_sim->dumpSymbolTable("symbol_table.dump");
+        // x86_sim->dumpTextSegment("text_segment.dump");
+        // x86_sim->dumpDataSegment("data_segment.dump");
+        // x86_sim->dumpSymbolTable("symbol_table.dump");
         simulator = std::move(x86_sim);
     } else if (isa_str == "arm") {
         auto arm_sim = std::make_unique<ArmSimulator>(db_manager_, *memory, session_id, !ui_enabled);
